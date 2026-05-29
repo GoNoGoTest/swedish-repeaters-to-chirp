@@ -1,7 +1,11 @@
 import type { NormalizedChannel, SortSettings } from "./models";
 import { encodeGeohash } from "./geohash";
+import { maidenheadToLatLon } from "./maidenhead";
+import { haversineKm } from "./distance";
+import { extractDistrict } from "./district";
 
-export function sortChannels(channels: NormalizedChannel[], s: SortSettings): NormalizedChannel[] {
+/** Base sort that runs the configured key list. Used as fallback and for "other districts". */
+function sortByKeys(channels: NormalizedChannel[], s: SortSettings): NormalizedChannel[] {
   const withKeys = channels.map((c) => {
     const geohash =
       c.lat != null && c.lng != null ? encodeGeohash(c.lat, c.lng, s.geohashPrecision) : "~";
@@ -15,7 +19,6 @@ export function sortChannels(channels: NormalizedChannel[], s: SortSettings): No
         case "district":
           av = a.c.district || "~";
           bv = b.c.district || "~";
-          // numeric districts sorted numerically
           if (/^\d+$/.test(String(av)) && /^\d+$/.test(String(bv))) {
             av = Number(av); bv = Number(bv);
           }
@@ -31,4 +34,88 @@ export function sortChannels(channels: NormalizedChannel[], s: SortSettings): No
     return 0;
   });
   return withKeys.map((x) => x.c);
+}
+
+/** Resolve a channel's effective district: prefer explicit field, fall back to callsign prefix. */
+function districtOf(c: NormalizedChannel): string {
+  if (c.district) return c.district;
+  return extractDistrict(c.call) ?? "";
+}
+
+function sortHomeChannels(
+  channels: NormalizedChannel[],
+  s: SortSettings,
+): NormalizedChannel[] {
+  switch (s.home_district_sort) {
+    case "distance": {
+      const qth = s.qth_maidenhead ? maidenheadToLatLon(s.qth_maidenhead) : null;
+      if (!qth) {
+        // No valid QTH — fall back to geohash inside home district.
+        return sortByKeys(channels, { ...s, keys: ["geohash", "city"] });
+      }
+      const decorated = channels.map((c) => {
+        const dist =
+          c.lat != null && c.lng != null
+            ? haversineKm(qth, { lat: c.lat, lon: c.lng })
+            : Infinity;
+        return { c, dist };
+      });
+      decorated.sort((a, b) => a.dist - b.dist);
+      return decorated.map((x) => x.c);
+    }
+    case "alphabetical": {
+      return [...channels].sort((a, b) => {
+        const ak = (a.call || a.city || "").toLowerCase();
+        const bk = (b.call || b.city || "").toLowerCase();
+        return ak < bk ? -1 : ak > bk ? 1 : 0;
+      });
+    }
+    case "geohash":
+    default:
+      return sortByKeys(channels, { ...s, keys: ["geohash", "city"] });
+  }
+}
+
+function sortOtherDistricts(
+  channels: NormalizedChannel[],
+  s: SortSettings,
+): NormalizedChannel[] {
+  // Group by district, sort districts numerically/alphabetically, geohash within.
+  const groups = new Map<string, NormalizedChannel[]>();
+  for (const c of channels) {
+    const d = districtOf(c) || "~";
+    const arr = groups.get(d) ?? [];
+    arr.push(c);
+    groups.set(d, arr);
+  }
+  const keys = Array.from(groups.keys()).sort((a, b) => {
+    const an = /^\d+$/.test(a), bn = /^\d+$/.test(b);
+    if (an && bn) return Number(a) - Number(b);
+    if (an) return -1;
+    if (bn) return 1;
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  const out: NormalizedChannel[] = [];
+  for (const k of keys) {
+    out.push(...sortByKeys(groups.get(k)!, { ...s, keys: ["geohash", "city"] }));
+  }
+  return out;
+}
+
+export function sortChannels(channels: NormalizedChannel[], s: SortSettings): NormalizedChannel[] {
+  // No home district set → original behavior.
+  if (!s.home_district) {
+    return sortByKeys(channels, s);
+  }
+  const home: NormalizedChannel[] = [];
+  const others: NormalizedChannel[] = [];
+  for (const c of channels) {
+    if (districtOf(c) === s.home_district) home.push(c);
+    else others.push(c);
+  }
+  const homeSorted = sortHomeChannels(home, s);
+  const othersSorted = sortOtherDistricts(others, s);
+  return s.home_district_first
+    ? [...homeSorted, ...othersSorted]
+    : [...othersSorted, ...homeSorted];
 }
