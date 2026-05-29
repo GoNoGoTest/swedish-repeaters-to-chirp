@@ -111,4 +111,24 @@ describe("CHIRP exporter", () => {
     expect(rows[0].rToneFreq).toBe("");
     expect(rows[0].cToneFreq).toBe("");
   });
+
+  it("SK6BA with DCS access exports as Cross + DTCS->", () => {
+    const c = makeChannel({ generated_name_final: "X", dtcs_code: "025", dtcs_polarity: "NN" });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Tone).toBe("Cross");
+    expect(rows[0].DtcsCode).toBe("025");
+    expect(rows[0].DtcsPolarity).toBe("NN");
+    expect(rows[0].CrossMode).toBe("DTCS->");
+    expect(rows[0].rToneFreq).toBe("");
+    expect(rows[0].cToneFreq).toBe("");
+  });
+
+  it("SK6BA with both CTCSS and DCS prefers CTCSS", () => {
+    const c = makeChannel({ generated_name_final: "X", ctcss_tx: 123.0, dtcs_code: "025", dtcs_polarity: "NN" });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Tone).toBe("Tone");
+    expect(rows[0].rToneFreq).toBe("123.0");
+    expect(rows[0].DtcsCode).toBe("");
+    expect(rows[0].CrossMode).toBe("");
+  });
 });
