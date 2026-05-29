@@ -134,7 +134,6 @@ function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): N
         break;
       case "duplex_off":
         ch.duplex = "off";
-        ch.warnings.push({ code: "rx_only_marked", message: "RX-only: exporteras med Duplex=off" });
         out.push(ch);
         break;
       case "mark":

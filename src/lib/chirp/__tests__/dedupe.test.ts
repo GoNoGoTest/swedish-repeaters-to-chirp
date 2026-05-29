@@ -8,7 +8,7 @@ describe("applyFreqDedupe", () => {
     const b = makeChannel({ rx_frequency: 145.6, source_type: "channel_pack" });
     const r = applyFreqDedupe([a, b], "keep_both");
     expect(r.channels).toHaveLength(2);
-    expect(a.warnings.some((w) => w.code === "freq_duplicate")).toBe(true);
+    expect(a.warnings.some((w) => w.code === "freq_duplicate")).toBe(false);
     expect(b.warnings.some((w) => w.code === "freq_duplicate")).toBe(true);
   });
 

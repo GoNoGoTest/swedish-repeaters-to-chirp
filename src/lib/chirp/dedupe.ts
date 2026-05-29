@@ -38,6 +38,9 @@ export function applyFreqDedupe(
     const shouldWarn = (hasSk6ba && hasPack) || packCount >= 2;
     if (shouldWarn) {
       for (const ch of arr) {
+        // SK6BA repeater rows are authoritative — never warn on them.
+        // Only flag pack rows that collide.
+        if (ch.source_type === "sk6ba") continue;
         ch.warnings.push({
           code: "freq_duplicate",
           message: `Frekvensdubblett: ${arr.length} rader på ${arr[0].rx_frequency?.toFixed(5)} MHz`,
