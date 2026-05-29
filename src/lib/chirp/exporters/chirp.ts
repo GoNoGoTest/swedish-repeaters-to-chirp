@@ -8,8 +8,15 @@ export const CHIRP_COLUMNS = [
   "Power","Comment","URCALL","RPT1CALL","RPT2CALL",
 ];
 
-// Power default is fine — non-tone column. Tone/DCS columns are emitted as
-// empty strings when not semantically active for the row.
+// Technical CSV-import defaults. CHIRP/RMS parse these columns as float/int
+// even when Tone is empty, so the columns must always carry parsable values.
+// These are NOT user-facing access settings.
+const DEFAULT_RTONE = "88.5";
+const DEFAULT_CTONE = "88.5";
+const DEFAULT_DTCS = "023";
+const DEFAULT_DTCS_POL = "NN";
+const DEFAULT_RX_DTCS = "023";
+const DEFAULT_CROSS = "Tone->";
 const DEFAULT_POWER = "10.0W";
 
 function resolveMode(c: NormalizedChannel, fallback: string): string {
@@ -53,14 +60,17 @@ interface ToneFields {
   CrossMode: string;
 }
 
-const EMPTY_TONE_FIELDS: ToneFields = {
+// Defaults are chosen so CHIRP generic CSV import never trips on
+// `could not convert string to float: ''`. Tone is left empty here when
+// the row has no actual tone; callers override specific fields per branch.
+const DEFAULT_TONE_FIELDS: ToneFields = {
   Tone: "",
-  rToneFreq: "",
-  cToneFreq: "",
-  DtcsCode: "",
-  DtcsPolarity: "",
-  RxDtcsCode: "",
-  CrossMode: "",
+  rToneFreq: DEFAULT_RTONE,
+  cToneFreq: DEFAULT_CTONE,
+  DtcsCode: DEFAULT_DTCS,
+  DtcsPolarity: DEFAULT_DTCS_POL,
+  RxDtcsCode: DEFAULT_RX_DTCS,
+  CrossMode: DEFAULT_CROSS,
 };
 
 function resolveToneFields(c: NormalizedChannel): ToneFields {
@@ -69,13 +79,13 @@ function resolveToneFields(c: NormalizedChannel): ToneFields {
     const t = (c.tone_raw || "").trim().toUpperCase();
     if (t === "TSQL") {
       const f = c.ctone_freq ?? c.rtone_freq ?? c.ctcss_tx;
-      if (f == null) return { ...EMPTY_TONE_FIELDS };
-      return { ...EMPTY_TONE_FIELDS, Tone: "TSQL", rToneFreq: f.toFixed(1), cToneFreq: f.toFixed(1) };
+      if (f == null) return { ...DEFAULT_TONE_FIELDS };
+      return { ...DEFAULT_TONE_FIELDS, Tone: "TSQL", rToneFreq: f.toFixed(1), cToneFreq: f.toFixed(1) };
     }
     if (t === "DTCS" || t === "DCS") {
-      if (!c.dtcs_code) return { ...EMPTY_TONE_FIELDS };
+      if (!c.dtcs_code) return { ...DEFAULT_TONE_FIELDS };
       return {
-        ...EMPTY_TONE_FIELDS,
+        ...DEFAULT_TONE_FIELDS,
         Tone: "DTCS",
         DtcsCode: c.dtcs_code,
         DtcsPolarity: c.dtcs_polarity || "NN",
@@ -83,25 +93,25 @@ function resolveToneFields(c: NormalizedChannel): ToneFields {
     }
     if (t === "TONE" || (t === "" && c.rtone_freq != null)) {
       const f = c.rtone_freq ?? c.ctcss_tx;
-      if (f == null) return { ...EMPTY_TONE_FIELDS };
-      return { ...EMPTY_TONE_FIELDS, Tone: "Tone", rToneFreq: f.toFixed(1) };
+      if (f == null) return { ...DEFAULT_TONE_FIELDS };
+      return { ...DEFAULT_TONE_FIELDS, Tone: "Tone", rToneFreq: f.toFixed(1) };
     }
-    return { ...EMPTY_TONE_FIELDS };
+    return { ...DEFAULT_TONE_FIELDS };
   }
-  // SK6BA-row: CTCSS-TX wins; otherwise DCS-from-access → Cross; else empty.
+  // SK6BA-row: CTCSS-TX wins; otherwise DCS-from-access → Cross; else defaults.
   if (c.ctcss_tx != null) {
-    return { ...EMPTY_TONE_FIELDS, Tone: "Tone", rToneFreq: c.ctcss_tx.toFixed(1) };
+    return { ...DEFAULT_TONE_FIELDS, Tone: "Tone", rToneFreq: c.ctcss_tx.toFixed(1) };
   }
   if (c.dtcs_code) {
     return {
-      ...EMPTY_TONE_FIELDS,
+      ...DEFAULT_TONE_FIELDS,
       Tone: "Cross",
       DtcsCode: c.dtcs_code,
       DtcsPolarity: c.dtcs_polarity || "NN",
       CrossMode: "DTCS->",
     };
   }
-  return { ...EMPTY_TONE_FIELDS };
+  return { ...DEFAULT_TONE_FIELDS };
 }
 
 export function toChirpRows(channels: NormalizedChannel[], s: ChirpSettings) {
