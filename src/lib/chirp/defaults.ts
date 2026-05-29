@@ -5,7 +5,7 @@ import type { NamingSettings, Settings } from "./models";
  * Korta, ortsdrivna namn som passar typiska radio-displayer på 6 tecken.
  */
 export const DEFAULT_REPEATER_NAMING: NamingSettings = {
-  components: ["{city}"],
+  components: ["{district}", "{band}", "{network}", "{city}", "{call}"],
   separator: "-",
   cityMaxLength: 6,
   transliterate: true,
