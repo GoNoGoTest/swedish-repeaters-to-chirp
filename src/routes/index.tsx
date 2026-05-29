@@ -664,7 +664,9 @@ function PackRow({ pack, entry, onChange }: {
               onChange={(n) => onChange({ naming: n })}
               tokens={PACK_TOKENS}
               hint={`Standard: \`{name_hint}\`, max 6 tecken — funkar för t.ex. "S20", "PMR1", "M16". Skriv egen mall om paketet kräver annat.`}
+              previewKind="pack"
             />
+
           </div>
         </div>
       )}
