@@ -43,10 +43,17 @@ function loadStoredSettings(): Settings {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw);
+    // Migration: maxLength flyttades från NamingSettings till ChirpSettings.
+    const legacyMax = parsed?.naming?.maxLength;
+    const chirpMerged = { ...DEFAULT_SETTINGS.chirp, ...(parsed.chirp ?? {}) };
+    if (chirpMerged.maxLength == null && typeof legacyMax === "number") {
+      chirpMerged.maxLength = legacyMax;
+    }
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
       naming: { ...DEFAULT_SETTINGS.naming, ...(parsed.naming ?? {}) },
+      chirp: chirpMerged,
       packs: { ...DEFAULT_SETTINGS.packs, ...(parsed.packs ?? {}) },
       sort: { ...DEFAULT_SETTINGS.sort, ...(parsed.sort ?? {}) },
     };
