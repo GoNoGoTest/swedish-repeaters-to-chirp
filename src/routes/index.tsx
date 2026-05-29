@@ -8,8 +8,9 @@ import { loadMergedPacks, type MergedPack } from "@/lib/chirp/channel_packs/regi
 import { selectPackChannels, type ParsedPackChannel } from "@/lib/chirp/importers/channel_pack";
 import type {
   RawRow, Settings, NormalizedChannel, NamingSettings,
-  PackPlacement, FreqDupePolicy, RxOnlyPolicy, PackSelectionEntry,
+  PackPlacement, FreqDupePolicy, RxOnlyPolicy, PackSelectionEntry, HomeDistrictSort,
 } from "@/lib/chirp/models";
+import { isValidMaidenhead } from "@/lib/chirp/maidenhead";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const STORAGE_KEY = "sk6ba-chirp-settings-v3";
+const STORAGE_KEY = "sk6ba-chirp-settings-v4";
 
 const REPEATER_TOKENS = ["{type}", "{network}", "{band}", "{district}", "{city}", "{channel}", "{call}"];
 const PACK_TOKENS = ["{service}", "{category}", "{label}", "{name_hint}", "{channel}", "{band}"];
@@ -45,6 +46,7 @@ function loadStoredSettings(): Settings {
       ...parsed,
       naming: { ...DEFAULT_SETTINGS.naming, ...(parsed.naming ?? {}) },
       packs: { ...DEFAULT_SETTINGS.packs, ...(parsed.packs ?? {}) },
+      sort: { ...DEFAULT_SETTINGS.sort, ...(parsed.sort ?? {}) },
     };
   } catch { return DEFAULT_SETTINGS; }
 }
