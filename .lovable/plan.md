@@ -1,44 +1,49 @@
-## Flytta `maxLength` till global radio-inställning
+## Korrekt tonexport i CHIRP — inga filler-defaults
 
-### Mål
-`maxLength` (max kanalnamnslängd) är en hårdvarubegränsning för radions display, inte en egenskap per namnmall. Idag dupliceras den på repeater-naming + varje paket-naming, vilket är förvirrande och lätt att glömma synka. Vi flyttar den till en global inställning i CHIRP-export-sektionen, tillsammans med `mode` och `tStep`.
+### Problem
+`exporters/chirp.ts` skriver alltid värden i `cToneFreq`, `DtcsCode`, `DtcsPolarity` (88.5 / "23" / "NN") även när raden inte använder TSQL eller DTCS. Det är farligt — i radioskanrar kan det aktivera mottagar-tonskelch och göra kanalen "tyst". `cToneFreq` är dessutom exponerad som global användarinställning, vilket inbjuder till samma misstag.
 
-`cityMaxLength` förblir per namnmall (stilistisk, inte hårdvarurelaterad). Den finns bara i repeater-editorn idag, så ingen ändring där.
+### Regler för Tone-fält per rad
+- **Ingen ton**: `Tone="" rToneFreq="" cToneFreq="" DtcsCode="" DtcsPolarity=""`.
+- **Vanlig sänd-CTCSS** (SK6BA-access eller pack utan `tone="TSQL"`): `Tone="Tone" rToneFreq=<CTCSS> cToneFreq="" DtcsCode="" DtcsPolarity=""`.
+- **TSQL uttryckligen angivet** (endast paket med `tone="TSQL"`): `Tone="TSQL" rToneFreq=<CTCSS> cToneFreq=<CTCSS>`.
+- **DTCS/DCS uttryckligen angivet** (paket med `tone="DTCS"` + `dtcs_code`): `Tone="DTCS" DtcsCode=<kod> DtcsPolarity=<pol|NN>`, övriga ton-fält tomma.
+- **Cross**: utanför scope just nu — om `tone_raw` är annat än ovan, behandla som "Ingen ton" och varna.
 
-### Datamodell (`src/lib/chirp/models.ts`)
-- Ta bort `maxLength` från `NamingSettings`.
-- Lägg till `maxLength: number` på `ChirpSettings` (default 6).
+`RxDtcsCode` och `CrossMode` lämnas tomma utom när DTCS/Cross faktiskt används.
 
-### Defaults (`src/lib/chirp/defaults.ts`)
-- Ta bort `maxLength: 6` från `DEFAULT_REPEATER_NAMING` och `DEFAULT_PACK_NAMING`.
-- Lägg till `maxLength: 6` i `DEFAULT_SETTINGS.chirp`.
+### Defaults — endast där de inte ändrar radiobeteendet
+- `Location` startnummer: behåll, användarval (default 1). OK.
+- `Mode` för SK6BA FM-rader: behåll global default NFM. OK.
+- `TStep`: behåll global default 5.0 om paketet inte anger annat. OK.
+- `Offset`: `0.000000` endast när `duplex=""` (simplex verifierat via `parseShift`). Behåll.
+- `Skip`: tomt om användaren inte valt skip — redan korrekt, behåll.
 
-### Namnlogik (`src/lib/chirp/naming.ts`)
-- `buildName(ch, naming, maxLength)` — extra argument istället för att läsa `naming.maxLength`.
-- `resolveCollisions(channels, naming, maxLength)` — samma sak; använder `maxLength` för suffix-klippning.
+### Ändringar
 
-### Pipeline (`src/lib/chirp/pipeline.ts`)
-- Skicka in `settings.chirp.maxLength` till alla `buildName`/`resolveCollisions`-anrop, både för SK6BA-rader och paketrader.
+**`src/lib/chirp/exporters/chirp.ts`**
+- Ersätt nuvarande Tone/DTCS-logik med en helper `resolveToneFields(c)` som returnerar `{ Tone, rToneFreq, cToneFreq, DtcsCode, DtcsPolarity, RxDtcsCode, CrossMode }` enligt reglerna ovan. Inga fallbacks till `s.cToneFreq`, `"23"`, `"NN"`, eller `88.5`.
+- SK6BA-rad: om `ctcss_tx != null` → "Tone"-grenen. Annars tomt (även om `uses_1750` är true; 1750 Hz hanteras inte av CHIRP-tone-fältet).
+- Pack-rad: läs `tone_raw` (case-insensitive) — "TSQL"/"DTCS"/"Tone"/"" styr grenen. `rtone_freq`/`ctone_freq`/`dtcs_code`/`dtcs_polarity` används direkt från paketet.
 
-### UI (`src/routes/index.tsx`)
-- I sektionen där `chirp.mode`, `chirp.tStep`, `chirp.cToneFreq` redan visas: lägg till ett `NumberField` "Max längd kanalnamn" (1–16, default 6) bundet till `settings.chirp.maxLength`.
-- Ta bort `maxLength`-fältet ur `NamingEditor` helt (raden försvinner för både repeater och paket).
-- `NamingPreview` tar emot `maxLength` som prop (eller läser från ett gemensamt context/state) så previews fortfarande visar korrekt trunkering. Enklast: skicka `maxLength` ner som prop från `Index` → `NamingEditor` → `NamingPreview`.
+**`src/lib/chirp/models.ts`**
+- Ta bort `cToneFreq: number` från `ChirpSettings`.
 
-### Tester
-- Uppdatera `src/lib/chirp/__tests__/naming.test.ts` — alla anrop till `buildName`/`resolveCollisions` får ett `maxLength`-argument istället för att sätta `maxLength` i naming-objektet.
-- Kör `bunx vitest run` och se att alla 82+ tester passerar.
+**`src/lib/chirp/defaults.ts`**
+- Ta bort `cToneFreq: 88.5` från `DEFAULT_SETTINGS.chirp`.
 
-### Migration av sparad state
-Om settings persisteras (t.ex. localStorage): lägg till en enkel migration som plockar `settings.naming.maxLength` (eller första paketets `maxLength`) och flyttar till `settings.chirp.maxLength` vid laddning, samt strippar fältet från sub-objekten. Om ingen persistens finns hoppar vi över detta steg.
+**`src/routes/index.tsx`**
+- Ta bort `NumberField "cToneFreq (Hz)"` (rader 813–815) och tillhörande `updChirp({ cToneFreq })`.
 
-### Sidoplock (orelaterat men billigt)
-Hydration-warningen i `ChannelPacksPanel` ("server: 2, client: 0") tyder på att antal valda kanaler räknas olika på server vs klient — troligen `localStorage`-läsning vid första render. Tas i separat ärende, inte i denna plan.
+**`src/lib/chirp/__tests__/exporters/chirp.test.ts`**
+- Uppdatera "sets Tone when ctcss_tx present"-testet: förvänta `cToneFreq=""`, `DtcsCode=""`, `DtcsPolarity=""`.
+- Nya tester:
+  - SK6BA utan CTCSS → alla ton-fält tomma.
+  - Pack med `tone="TSQL"` + `ctone_freq=123` → `Tone=TSQL`, `cToneFreq=123.0`.
+  - Pack med `tone="DTCS"` + `dtcs_code="411"` → endast DTCS-fält fyllda, `rToneFreq`/`cToneFreq` tomma.
+  - Pack med tomt `tone` och tomt `rtone_freq` → alla ton-fält tomma.
 
-### Filer som ändras
-- `src/lib/chirp/models.ts`
-- `src/lib/chirp/defaults.ts`
-- `src/lib/chirp/naming.ts`
-- `src/lib/chirp/pipeline.ts`
-- `src/lib/chirp/__tests__/naming.test.ts`
-- `src/routes/index.tsx`
+**Migration**: `loadStoredSettings` — strippa `cToneFreq` från sparade `settings.chirp` så gamla lagrade värden inte återinjicieras.
+
+### Verifiering
+`bunx vitest run` — alla existerande + nya tester ska passera. Manuell spotcheck av CSV-export för en simplex-kanal utan ton (alla 5 ton-kolumner tomma) och en repeater med CTCSS 123.0 (`Tone="Tone"`, `rToneFreq="123.0"`, `cToneFreq=""`).

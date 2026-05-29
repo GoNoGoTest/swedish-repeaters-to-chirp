@@ -45,7 +45,8 @@ function loadStoredSettings(): Settings {
     const parsed = JSON.parse(raw);
     // Migration: maxLength flyttades från NamingSettings till ChirpSettings.
     const legacyMax = parsed?.naming?.maxLength;
-    const chirpMerged = { ...DEFAULT_SETTINGS.chirp, ...(parsed.chirp ?? {}) };
+    const { cToneFreq: _drop, ...chirpClean } = parsed?.chirp ?? {};
+    const chirpMerged = { ...DEFAULT_SETTINGS.chirp, ...chirpClean };
     if (chirpMerged.maxLength == null && typeof legacyMax === "number") {
       chirpMerged.maxLength = legacyMax;
     }
@@ -810,9 +811,6 @@ function ExportPanel({ settings, setSettings, hasPacks }: {
           <NumberField label="TStep (kHz)" step={0.5} value={settings.chirp.tStep}
             onChange={(v) => updChirp({ tStep: v })}
             hint="Frekvensraster vid manuell rattning på radion. 5 kHz funkar för 2m/70cm i Sverige. PMR/marin sätter eget per kanal." />
-          <NumberField label="cToneFreq (Hz)" step={0.1} value={settings.chirp.cToneFreq}
-            onChange={(v) => updChirp({ cToneFreq: v })}
-            hint="Default-CTCSS som skrivs i cToneFreq-kolumnen när raden inte har en specifik ton. 88.5 Hz är CHIRP-standard." />
         </div>
         <label className="mt-3 flex items-center gap-2 text-sm">
           <input type="checkbox" checked={settings.chirp.skipLinks}

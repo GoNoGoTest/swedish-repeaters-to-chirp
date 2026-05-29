@@ -57,10 +57,58 @@ describe("CHIRP exporter", () => {
     expect(rows[0].Comment).toContain("src=SSA");
   });
 
-  it("sets Tone when ctcss_tx present", () => {
+  it("sets Tone when ctcss_tx present, leaves cTone/DTCS empty", () => {
     const c = makeChannel({ generated_name_final: "X", ctcss_tx: 123.0 });
     const rows = toChirpRows([c], chirp);
     expect(rows[0].Tone).toBe("Tone");
     expect(rows[0].rToneFreq).toBe("123.0");
+    expect(rows[0].cToneFreq).toBe("");
+    expect(rows[0].DtcsCode).toBe("");
+    expect(rows[0].DtcsPolarity).toBe("");
+    expect(rows[0].RxDtcsCode).toBe("");
+    expect(rows[0].CrossMode).toBe("");
+  });
+
+  it("SK6BA without CTCSS leaves all tone fields empty", () => {
+    const c = makeChannel({ generated_name_final: "X" });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Tone).toBe("");
+    expect(rows[0].rToneFreq).toBe("");
+    expect(rows[0].cToneFreq).toBe("");
+    expect(rows[0].DtcsCode).toBe("");
+    expect(rows[0].DtcsPolarity).toBe("");
+  });
+
+  it("pack with tone=TSQL fills rTone and cTone", () => {
+    const c = makeChannel({
+      source_type: "channel_pack", generated_name_final: "X",
+      tone_raw: "TSQL", rtone_freq: 123.0, ctone_freq: 123.0,
+    });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Tone).toBe("TSQL");
+    expect(rows[0].rToneFreq).toBe("123.0");
+    expect(rows[0].cToneFreq).toBe("123.0");
+    expect(rows[0].DtcsCode).toBe("");
+  });
+
+  it("pack with tone=DTCS fills only DTCS fields", () => {
+    const c = makeChannel({
+      source_type: "channel_pack", generated_name_final: "X",
+      tone_raw: "DTCS", dtcs_code: "411", dtcs_polarity: "NN",
+    });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Tone).toBe("DTCS");
+    expect(rows[0].DtcsCode).toBe("411");
+    expect(rows[0].DtcsPolarity).toBe("NN");
+    expect(rows[0].rToneFreq).toBe("");
+    expect(rows[0].cToneFreq).toBe("");
+  });
+
+  it("pack with empty tone and no rtone_freq leaves tone fields empty", () => {
+    const c = makeChannel({ source_type: "channel_pack", generated_name_final: "X" });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Tone).toBe("");
+    expect(rows[0].rToneFreq).toBe("");
+    expect(rows[0].cToneFreq).toBe("");
   });
 });
