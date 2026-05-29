@@ -47,7 +47,7 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
     if (shift.unclear) warnings.push({ code: "unclear_shift", message: `Oklar tx_shift: ${r.tx_shift}` });
 
     const access = parseAccess(r.access);
-    if (!access.ctcss && !access.uses1750 && r.access) {
+    if (!access.ctcss && !access.uses1750 && !access.carrier && r.access) {
       warnings.push({ code: "missing_access_tone", message: `Otydlig access: ${r.access}` });
     }
 
