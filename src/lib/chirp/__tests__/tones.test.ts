@@ -3,8 +3,8 @@ import { parseAccess } from "../tones";
 
 describe("parseAccess", () => {
   it("returns null/false for empty", () => {
-    expect(parseAccess("")).toEqual({ ctcss: null, uses1750: false, carrier: false });
-    expect(parseAccess(null)).toEqual({ ctcss: null, uses1750: false, carrier: false });
+    expect(parseAccess("")).toEqual({ ctcss: null, uses1750: false, carrier: false, dcs: null });
+    expect(parseAccess(null)).toEqual({ ctcss: null, uses1750: false, carrier: false, dcs: null });
   });
 
   it("detects 1750 separately from ctcss", () => {
@@ -62,5 +62,37 @@ describe("parseAccess", () => {
     expect(parseAccess("open").carrier).toBe(true);
     expect(parseAccess("none").carrier).toBe(true);
     expect(parseAccess("ingen").carrier).toBe(true);
+  });
+
+  describe("DCS/DTCS", () => {
+    it("parses 'DCS 025' as dcs=025", () => {
+      const r = parseAccess("DCS 025");
+      expect(r.dcs).toBe("025");
+      expect(r.ctcss).toBeNull();
+    });
+    it("parses inline forms DCS025/DTCS025/DTCS 025", () => {
+      expect(parseAccess("DCS025").dcs).toBe("025");
+      expect(parseAccess("DTCS025").dcs).toBe("025");
+      expect(parseAccess("DTCS 025").dcs).toBe("025");
+    });
+    it("parses short form D025", () => {
+      expect(parseAccess("D025").dcs).toBe("025");
+    });
+    it("normalises 'DCS 25' to '025'", () => {
+      expect(parseAccess("DCS 25").dcs).toBe("025");
+    });
+    it("does not treat bare '25' as DCS", () => {
+      expect(parseAccess("25").dcs).toBeNull();
+    });
+    it("combines 1750 and DCS", () => {
+      const r = parseAccess("1750/DCS 025");
+      expect(r.uses1750).toBe(true);
+      expect(r.dcs).toBe("025");
+    });
+    it("captures both CTCSS and DCS when present", () => {
+      const r = parseAccess("123.0/DCS 025");
+      expect(r.ctcss).toBeCloseTo(123.0);
+      expect(r.dcs).toBe("025");
+    });
   });
 });
