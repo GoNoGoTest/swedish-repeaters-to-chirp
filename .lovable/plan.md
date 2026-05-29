@@ -1,24 +1,44 @@
-## Två justeringar i namngivnings-UI
+## Flytta `maxLength` till global radio-inställning
 
-### 1. Ta bort "Max längd ort" från kanalpaket
-Fältet `cityMaxLength` är meningslöst för paketrader (de har sällan en ort). I `NamingEditor` (`src/routes/index.tsx` rad ~499) lägg till en prop `showCityMaxLength` som default är `true`. Dölj `NumberField` på rad 533 när den är `false`. Vid anropet i `PackRow` (rad 662) sätt `showCityMaxLength={false}`. Repeater-anropet (rad 203) är oförändrat.
+### Mål
+`maxLength` (max kanalnamnslängd) är en hårdvarubegränsning för radions display, inte en egenskap per namnmall. Idag dupliceras den på repeater-naming + varje paket-naming, vilket är förvirrande och lätt att glömma synka. Vi flyttar den till en global inställning i CHIRP-export-sektionen, tillsammans med `mode` och `tStep`.
 
-Bakomliggande `naming.cityMaxLength` i pack-settings rörs inte (default 6 i `DEFAULT_PACK_NAMING`, påverkar bara `{city}`-token som paket nästan aldrig använder).
+`cityMaxLength` förblir per namnmall (stilistisk, inte hårdvarurelaterad). Den finns bara i repeater-editorn idag, så ingen ändring där.
 
-### 2. Mini-preview per kanalpaket baserad på paketets egna rader
-Idag använder `NamingPreview` hårdkodade `PACK_EXAMPLES` — samma exempel för alla paket. Ändra så att packsens preview visar 2–3 riktiga rader från det aktuella paketet.
+### Datamodell (`src/lib/chirp/models.ts`)
+- Ta bort `maxLength` från `NamingSettings`.
+- Lägg till `maxLength: number` på `ChirpSettings` (default 6).
 
-- Lägg till en valfri `sampleChannels?: NormalizedChannel[]`-prop på både `NamingEditor` och `NamingPreview`.
-- I `NamingPreview`: om `sampleChannels` finns, mappa över de första 3 (välj gärna första, mitten, sista för spridning) och kör `buildName(ch, naming)` direkt. Label = `service` + ` ` + (`name_hint` || `channel` || `label`), trunkerad.
-- I `PackRow`: skicka `sampleChannels={pack.channels.slice(0, 3)}` (eller jämnt fördelade index om `pack.channels.length > 3`) till `NamingEditor`.
-- Behåll `PACK_EXAMPLES`-fallback om `sampleChannels` saknas eller är tom.
+### Defaults (`src/lib/chirp/defaults.ts`)
+- Ta bort `maxLength: 6` från `DEFAULT_REPEATER_NAMING` och `DEFAULT_PACK_NAMING`.
+- Lägg till `maxLength: 6` i `DEFAULT_SETTINGS.chirp`.
 
-Repeater-previewen fortsätter använda `REPEATER_EXAMPLES` oförändrat.
+### Namnlogik (`src/lib/chirp/naming.ts`)
+- `buildName(ch, naming, maxLength)` — extra argument istället för att läsa `naming.maxLength`.
+- `resolveCollisions(channels, naming, maxLength)` — samma sak; använder `maxLength` för suffix-klippning.
 
-### Filer
-- `src/routes/index.tsx` — enda filen som ändras.
+### Pipeline (`src/lib/chirp/pipeline.ts`)
+- Skicka in `settings.chirp.maxLength` till alla `buildName`/`resolveCollisions`-anrop, både för SK6BA-rader och paketrader.
 
-### Verifiering
-- Öppna ett paket (t.ex. PMR446), kolla att previewen visar paketets egna kanalnamn (PMR1, PMR2…) istället för generiska exempel.
-- Bekräfta att "Max längd ort"-fältet är borta i pack-editorn men finns kvar för repeatrar.
-- `bunx vitest run` (inga logik-ändringar förväntas, bara UI).
+### UI (`src/routes/index.tsx`)
+- I sektionen där `chirp.mode`, `chirp.tStep`, `chirp.cToneFreq` redan visas: lägg till ett `NumberField` "Max längd kanalnamn" (1–16, default 6) bundet till `settings.chirp.maxLength`.
+- Ta bort `maxLength`-fältet ur `NamingEditor` helt (raden försvinner för både repeater och paket).
+- `NamingPreview` tar emot `maxLength` som prop (eller läser från ett gemensamt context/state) så previews fortfarande visar korrekt trunkering. Enklast: skicka `maxLength` ner som prop från `Index` → `NamingEditor` → `NamingPreview`.
+
+### Tester
+- Uppdatera `src/lib/chirp/__tests__/naming.test.ts` — alla anrop till `buildName`/`resolveCollisions` får ett `maxLength`-argument istället för att sätta `maxLength` i naming-objektet.
+- Kör `bunx vitest run` och se att alla 82+ tester passerar.
+
+### Migration av sparad state
+Om settings persisteras (t.ex. localStorage): lägg till en enkel migration som plockar `settings.naming.maxLength` (eller första paketets `maxLength`) och flyttar till `settings.chirp.maxLength` vid laddning, samt strippar fältet från sub-objekten. Om ingen persistens finns hoppar vi över detta steg.
+
+### Sidoplock (orelaterat men billigt)
+Hydration-warningen i `ChannelPacksPanel` ("server: 2, client: 0") tyder på att antal valda kanaler räknas olika på server vs klient — troligen `localStorage`-läsning vid första render. Tas i separat ärende, inte i denna plan.
+
+### Filer som ändras
+- `src/lib/chirp/models.ts`
+- `src/lib/chirp/defaults.ts`
+- `src/lib/chirp/naming.ts`
+- `src/lib/chirp/pipeline.ts`
+- `src/lib/chirp/__tests__/naming.test.ts`
+- `src/routes/index.tsx`

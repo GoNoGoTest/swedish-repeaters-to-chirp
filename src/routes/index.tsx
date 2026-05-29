@@ -43,10 +43,17 @@ function loadStoredSettings(): Settings {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw);
+    // Migration: maxLength flyttades från NamingSettings till ChirpSettings.
+    const legacyMax = parsed?.naming?.maxLength;
+    const chirpMerged = { ...DEFAULT_SETTINGS.chirp, ...(parsed.chirp ?? {}) };
+    if (chirpMerged.maxLength == null && typeof legacyMax === "number") {
+      chirpMerged.maxLength = legacyMax;
+    }
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
       naming: { ...DEFAULT_SETTINGS.naming, ...(parsed.naming ?? {}) },
+      chirp: chirpMerged,
       packs: { ...DEFAULT_SETTINGS.packs, ...(parsed.packs ?? {}) },
       sort: { ...DEFAULT_SETTINGS.sort, ...(parsed.sort ?? {}) },
     };
@@ -206,6 +213,7 @@ function Index() {
                       tokens={REPEATER_TOKENS}
                       hint="Repeaterrader får sitt namn via dessa tokens. Tomma tokens droppas och dubbla separatorer undviks."
                       previewKind="repeater"
+                      maxLength={settings.chirp.maxLength}
                     />
                   </div>
                 </div>
@@ -466,9 +474,10 @@ function makeExampleChannel(over: Partial<NormalizedChannel>): NormalizedChannel
   };
 }
 
-function NamingPreview({ naming, kind, sampleChannels }: {
+function NamingPreview({ naming, kind, maxLength, sampleChannels }: {
   naming: NamingSettings;
   kind: "repeater" | "pack";
+  maxLength: number;
   sampleChannels?: NormalizedChannel[];
 }) {
   const examples = useMemo(() => {
@@ -479,7 +488,7 @@ function NamingPreview({ naming, kind, sampleChannels }: {
         : [0, Math.floor(n / 2), n - 1];
       return idxs.map((i) => {
         const ch = sampleChannels[i];
-        const { full, clipped } = buildName(ch, naming);
+        const { full, clipped } = buildName(ch, naming, maxLength);
         const label = `${ch.service || ""} ${ch.name_hint || ch.channel || ch.label || ""}`.trim().slice(0, 24) || "—";
         return { label, full, clipped };
       });
@@ -487,16 +496,16 @@ function NamingPreview({ naming, kind, sampleChannels }: {
     const seeds = kind === "repeater" ? REPEATER_EXAMPLES : PACK_EXAMPLES;
     return seeds.map((seed) => {
       const ch = makeExampleChannel(seed);
-      const { full, clipped } = buildName(ch, naming);
+      const { full, clipped } = buildName(ch, naming, maxLength);
       const label = kind === "repeater"
         ? `${seed.city || seed.call || "?"}${seed.channel ? `/${seed.channel}` : ""}`
         : `${seed.service || ""} ${seed.name_hint || seed.label || ""}`.trim();
       return { label, full, clipped };
     });
-  }, [naming, kind, sampleChannels]);
+  }, [naming, kind, maxLength, sampleChannels]);
   return (
     <div className="mt-3">
-      <div className="text-xs text-muted-foreground mb-1">Förhandsvisning</div>
+      <div className="text-xs text-muted-foreground mb-1">Förhandsvisning (max {maxLength} tecken)</div>
       <div className="flex flex-wrap gap-2">
         {examples.map((ex, i) => (
           <div key={i} className="rounded border border-border bg-muted/40 px-2 py-1">
@@ -513,9 +522,10 @@ function NamingPreview({ naming, kind, sampleChannels }: {
 }
 
 
-function NamingEditor({ value, onChange, tokens, hint, previewKind, showCityMaxLength = true, sampleChannels }: {
+function NamingEditor({ value, onChange, tokens, hint, previewKind, maxLength, showCityMaxLength = true, sampleChannels }: {
   value: NamingSettings; onChange: (n: NamingSettings) => void;
   tokens: string[]; hint?: string; previewKind?: "repeater" | "pack";
+  maxLength: number;
   showCityMaxLength?: boolean;
   sampleChannels?: NormalizedChannel[];
 }) {
@@ -547,8 +557,6 @@ function NamingEditor({ value, onChange, tokens, hint, previewKind, showCityMaxL
           {hint && <Hint>{hint}</Hint>}
         </div>
         <div className="space-y-2">
-          <NumberField label="Max längd kanalnamn" value={value.maxLength} onChange={(v) => upd({ maxLength: v })}
-            hint="Många radior trunkerar vid 6–7 tecken." />
           {showCityMaxLength && (
             <NumberField label="Max längd ort" value={value.cityMaxLength} onChange={(v) => upd({ cityMaxLength: v })} />
           )}
@@ -580,7 +588,7 @@ function NamingEditor({ value, onChange, tokens, hint, previewKind, showCityMaxL
           </Field>
         </div>
       </div>
-      {previewKind && <NamingPreview naming={value} kind={previewKind} sampleChannels={sampleChannels} />}
+      {previewKind && <NamingPreview naming={value} kind={previewKind} maxLength={maxLength} sampleChannels={sampleChannels} />}
     </div>
   );
 }
@@ -615,15 +623,17 @@ function ChannelPacksPanel({
       {packs.map((pack) => (
         <PackRow key={pack.packId} pack={pack}
           entry={settings.packs.selection[pack.packId]}
+          maxLength={settings.chirp.maxLength}
           onChange={(patch) => updPack(pack.packId, patch)} />
       ))}
     </div>
   );
 }
 
-function PackRow({ pack, entry, onChange }: {
+function PackRow({ pack, entry, maxLength, onChange }: {
   pack: MergedPack;
   entry: PackSelectionEntry | undefined;
+  maxLength: number;
   onChange: (patch: Partial<PackSelectionEntry>) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -685,8 +695,9 @@ function PackRow({ pack, entry, onChange }: {
               value={naming}
               onChange={(n) => onChange({ naming: n })}
               tokens={PACK_TOKENS}
-              hint={`Standard: \`{name_hint}\`, max 6 tecken — funkar för t.ex. "S20", "PMR1", "M16". Skriv egen mall om paketet kräver annat.`}
+              hint={`Standard: \`{name_hint}\`, max ${maxLength} tecken — funkar för t.ex. "S20", "PMR1", "M16". Skriv egen mall om paketet kräver annat.`}
               previewKind="pack"
+              maxLength={maxLength}
               showCityMaxLength={false}
               sampleChannels={pack.channels}
             />
@@ -780,11 +791,14 @@ function ExportPanel({ settings, setSettings, hasPacks }: {
       </div>
 
       <div className="border-t border-border pt-4">
-        <SectionLabel>CHIRP-fält</SectionLabel>
-        <div className="grid gap-3 md:grid-cols-4">
+        <SectionLabel>CHIRP-fält & radio</SectionLabel>
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
           <NumberField label="Startnummer (Location)" value={settings.chirp.startLocation}
             onChange={(v) => updChirp({ startLocation: v })}
             hint="Första minnesposition i radion. T.ex. 1 om du vill skriva från början, 100 om du vill lägga repeatrarna efter befintliga kanaler." />
+          <NumberField label="Max längd kanalnamn" value={settings.chirp.maxLength}
+            onChange={(v) => updChirp({ maxLength: v })}
+            hint="Hårdvarubegränsning — många radior trunkerar vid 6–7 tecken. Gäller alla kanaler (både repeatrar och paket)." />
           <Field label="Mode" hint="NFM = smal FM (12,5 kHz) — standard för amatörradio idag. FM = bred (25 kHz), äldre repeatrar.">
             <select value={settings.chirp.mode}
               onChange={(e) => updChirp({ mode: e.target.value as Settings["chirp"]["mode"] })}

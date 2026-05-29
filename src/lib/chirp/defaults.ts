@@ -7,7 +7,6 @@ import type { NamingSettings, Settings } from "./models";
 export const DEFAULT_REPEATER_NAMING: NamingSettings = {
   components: ["{city}"],
   separator: "-",
-  maxLength: 6,
   cityMaxLength: 6,
   transliterate: true,
   uppercase: true,
@@ -36,7 +35,7 @@ export const DEFAULT_REPEATER_NAMING: NamingSettings = {
 export const DEFAULT_PACK_NAMING: NamingSettings = {
   components: ["{name_hint}"],
   separator: "-",
-  maxLength: 6,
+  
   cityMaxLength: 6,
   transliterate: true,
   uppercase: true,
@@ -61,6 +60,7 @@ export const DEFAULT_SETTINGS: Settings = {
     tStep: 5.0,
     skipLinks: false,
     cToneFreq: 88.5,
+    maxLength: 6,
   },
   sort: {
     keys: ["district", "geohash", "city"],

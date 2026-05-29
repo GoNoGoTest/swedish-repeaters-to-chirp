@@ -101,7 +101,6 @@ export interface FilterSettings {
 export interface NamingSettings {
   components: string[];
   separator: string;
-  maxLength: number;
   cityMaxLength: number;
   transliterate: boolean;
   uppercase: boolean;
@@ -120,6 +119,8 @@ export interface ChirpSettings {
   tStep: number;
   skipLinks: boolean;
   cToneFreq: number;
+  /** Max length for the generated channel name. Hardware-specific (radio display width). */
+  maxLength: number;
 }
 
 export type HomeDistrictSort = "distance" | "geohash" | "alphabetical";
