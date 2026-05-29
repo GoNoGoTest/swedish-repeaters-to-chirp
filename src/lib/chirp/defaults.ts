@@ -65,6 +65,10 @@ export const DEFAULT_SETTINGS: Settings = {
   sort: {
     keys: ["district", "geohash", "city"],
     geohashPrecision: 5,
+    qth_maidenhead: "",
+    home_district: null,
+    home_district_sort: "distance",
+    home_district_first: true,
   },
   packs: {
     placement: "append",

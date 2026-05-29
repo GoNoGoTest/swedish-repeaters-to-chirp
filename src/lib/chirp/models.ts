@@ -122,9 +122,19 @@ export interface ChirpSettings {
   cToneFreq: number;
 }
 
+export type HomeDistrictSort = "distance" | "geohash" | "alphabetical";
+
 export interface SortSettings {
   keys: Array<"district" | "geohash" | "type" | "city" | "frequency">;
   geohashPrecision: number;
+  /** Maidenhead locator (e.g. "JO67bp"). Empty = no QTH set. */
+  qth_maidenhead?: string;
+  /** Home district digit ("0".."7") or null. */
+  home_district?: string | null;
+  /** Sort method inside the home district. */
+  home_district_sort: HomeDistrictSort;
+  /** When true, home district rows appear before other districts. */
+  home_district_first: boolean;
 }
 
 export type PackPlacement = "off" | "prepend" | "append";
