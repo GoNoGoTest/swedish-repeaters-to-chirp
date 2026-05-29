@@ -1,20 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { parseSk6baCsv, summarize, type Summary } from "@/lib/chirp/importers/sk6ba";
 import { runPipeline } from "@/lib/chirp/pipeline";
 import { exportChirpCsv } from "@/lib/chirp/exporters/chirp";
 import { DEFAULT_SETTINGS } from "@/lib/chirp/defaults";
-import type { RawRow, Settings } from "@/lib/chirp/models";
+import { loadMergedPacks } from "@/lib/chirp/channel_packs/registry";
+import { selectPackChannels, type ParsedPackChannel } from "@/lib/chirp/importers/channel_pack";
+import type { RawRow, Settings, NormalizedChannel, PackPlacement, FreqDupePolicy, RxOnlyPolicy } from "@/lib/chirp/models";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "SK6BA → CHIRP-CSV" },
-      { name: "description", content: "Bygg en CHIRP-CSV från Marks Amatörradioklubbs repeaterexport." },
+      { name: "description", content: "Bygg en CHIRP-CSV från Marks Amatörradioklubbs repeaterexport, valfritt kombinerat med svenska amatörradio-kanalpaket för 2m och 70cm." },
     ],
   }),
   component: Index,
 });
+
+const STORAGE_KEY = "sk6ba-chirp-settings-v2";
 
 function download(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
@@ -24,14 +28,49 @@ function download(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
+function loadStoredSettings(): Settings {
+  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_SETTINGS, ...parsed, packs: { ...DEFAULT_SETTINGS.packs, ...(parsed.packs ?? {}) } };
+  } catch { return DEFAULT_SETTINGS; }
+}
+
 function Index() {
   const [rows, setRows] = useState<RawRow[] | null>(null);
   const [columns, setColumns] = useState<string[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<Settings>(() => loadStoredSettings());
   const [advanced, setAdvanced] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
+  }, [settings]);
+
+  const packs = useMemo(() => loadMergedPacks(), []);
+
+  // Currently selected pack rows derived from settings.packs.selection
+  const selectedPackChannels = useMemo<NormalizedChannel[]>(() => {
+    if (settings.packs.placement === "off") return [];
+    const out: ParsedPackChannel[] = [];
+    for (const pack of packs) {
+      const sel = settings.packs.selection[pack.packId];
+      if (!sel) continue;
+      const picked = selectPackChannels(pack.channels, {
+        bands: sel.bands,
+        categories: sel.categories,
+        tags: sel.tags,
+        useEnabledDefault: sel.useEnabledDefault,
+        manualSourceIds: sel.manualSourceIds && sel.manualSourceIds.length > 0 ? sel.manualSourceIds : undefined,
+      });
+      out.push(...picked);
+    }
+    return out;
+  }, [packs, settings.packs.placement, settings.packs.selection]);
 
   const onFile = useCallback(async (file: File) => {
     setLoadError(null);
@@ -60,31 +99,38 @@ function Index() {
 
   const pipeline = useMemo(() => {
     if (!rows) return null;
-    return runPipeline(rows, settings);
-  }, [rows, settings]);
+    return runPipeline({ sk6baRows: rows, packChannels: selectedPackChannels, settings });
+  }, [rows, settings, selectedPackChannels]);
 
   const stats = useMemo(() => {
     if (!pipeline) return null;
-    let warned = 0, collided = 0;
+    let warned = 0, collided = 0, rxOnly = 0, dupes = 0, inferred = 0;
     for (const c of pipeline.channels) {
       if (c.warnings.length) warned++;
       if (c.collided) collided++;
+      if (c.rx_only) rxOnly++;
+      if (c.warnings.some((w) => w.code === "freq_duplicate")) dupes++;
+      if (c.inferred_from_range) inferred++;
     }
-    return { warned, collided };
+    return { warned, collided, rxOnly, dupes, inferred };
   }, [pipeline]);
 
   const doExport = () => {
     if (!pipeline) return;
+    if (pipeline.duplicateStop) {
+      alert("Export stoppad p.g.a. frekvensdubblett-policy. Ändra policyn eller åtgärda dubbletter först.");
+      return;
+    }
     const csv = exportChirpCsv(pipeline.channels, settings.chirp);
     download("chirp.csv", csv);
   };
 
   const exportReport = () => {
     if (!pipeline) return;
-    const lines = ["source_row,name,warnings"];
+    const lines = ["source_type,source_row,source_id,pack_id,name,warnings"];
     for (const c of pipeline.channels) {
       if (c.warnings.length) {
-        lines.push(`${c.source_row},${c.generated_name_final},"${c.warnings.map((w) => w.message).join("; ")}"`);
+        lines.push(`${c.source_type},${c.source_row},${c.source_id},${c.pack_id},${c.generated_name_final},"${c.warnings.map((w) => w.message).join("; ")}"`);
       }
     }
     download("varningar.csv", lines.join("\n"));
@@ -96,7 +142,7 @@ function Index() {
         <div className="mx-auto max-w-7xl px-6 py-5">
           <h1 className="font-mono text-xl font-semibold tracking-tight">sk6ba → chirp.csv</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Konvertera Marks Amatörradioklubbs repeaterexport till en CHIRP-importerbar CSV. All bearbetning sker lokalt i din webbläsare.
+            Konvertera Marks Amatörradioklubbs repeaterexport till en CHIRP-importerbar CSV — och lägg valfritt till svenska amatörradio-kanalpaket för 2m och 70cm. All bearbetning sker lokalt i din webbläsare.
           </p>
         </div>
       </header>
@@ -159,8 +205,19 @@ function Index() {
           </Section>
         )}
 
+        {rows && (
+          <Section title="4. Kanalpaket">
+            <ChannelPacksPanel
+              packs={packs}
+              settings={settings}
+              setSettings={setSettings}
+              selectedCount={selectedPackChannels.length}
+            />
+          </Section>
+        )}
+
         {pipeline && (
-          <Section title="4. Preview" right={
+          <Section title="5. Preview" right={
             <div className="flex gap-2">
               <button onClick={exportReport}
                 className="rounded border border-border px-3 py-1.5 text-xs">Ladda ner varningar</button>
@@ -170,11 +227,12 @@ function Index() {
               </button>
             </div>
           }>
-            <div className="grid gap-2 md:grid-cols-4 text-sm mb-3">
+            <div className="grid gap-2 md:grid-cols-5 text-sm mb-3">
               <Stat label="Input" value={pipeline.totalInput} />
-              <Stat label="Exporteras" value={pipeline.channels.length} />
+              <Stat label="SK6BA" value={pipeline.sk6baCount} />
+              <Stat label="Kanalpaket" value={pipeline.packCount} />
               <Stat label="Filtrerade bort" value={pipeline.filteredOut} />
-              <Stat label="Varningar / kollisioner" value={`${stats?.warned ?? 0} / ${stats?.collided ?? 0}`} />
+              <Stat label="Varn / Koll / Dupes / RX-only" value={`${stats?.warned ?? 0} / ${stats?.collided ?? 0} / ${stats?.dupes ?? 0} / ${stats?.rxOnly ?? 0}`} />
             </div>
             <PreviewTable channels={pipeline.channels} chirpMode={settings.chirp.mode} startLoc={settings.chirp.startLocation} />
           </Section>
@@ -257,7 +315,7 @@ function SettingsPanel({ summary, settings, setSettings, advanced }: {
 
   const upd = <K extends keyof Settings>(k: K, v: Settings[K]) => setSettings({ ...settings, [k]: v });
 
-  const tokens = ["{type}", "{network}", "{band}", "{district}", "{city}", "{channel}", "{call}"];
+  const tokens = ["{type}", "{network}", "{band}", "{district}", "{city}", "{channel}", "{call}", "{service}", "{category}", "{label}", "{name_hint}"];
 
   return (
     <div className="space-y-5">
@@ -318,6 +376,9 @@ function SettingsPanel({ summary, settings, setSettings, advanced }: {
                 </button>
               ))}
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Tomma komponenter droppas automatiskt (inga dubbla separatorer). Kanalpaketsrader utan city/call faller tillbaka på <code>name_hint</code>/<code>channel</code>/<code>label</code>.
+            </p>
           </div>
           <div className="space-y-2">
             <NumberField label="Max längd kanalnamn" value={settings.naming.maxLength}
@@ -414,39 +475,179 @@ function NumberField({ label, value, onChange, step = 1 }: { label: string; valu
   );
 }
 
-function PreviewTable({ channels, chirpMode, startLoc }: { channels: any[]; chirpMode: string; startLoc: number }) {
-  const shown = channels.slice(0, 200);
+function ChannelPacksPanel({
+  packs, settings, setSettings, selectedCount,
+}: {
+  packs: ReturnType<typeof loadMergedPacks>;
+  settings: Settings;
+  setSettings: (s: Settings) => void;
+  selectedCount: number;
+}) {
+  const upd = (patch: Partial<Settings["packs"]>) => setSettings({ ...settings, packs: { ...settings.packs, ...patch } });
+  const updSel = (packId: string, patch: Partial<Settings["packs"]["selection"][string]>) => {
+    const cur = settings.packs.selection[packId] ?? { bands: [], categories: [], tags: [], useEnabledDefault: false };
+    upd({ selection: { ...settings.packs.selection, [packId]: { ...cur, ...patch } } });
+  };
+
+  const placement = settings.packs.placement;
+  const enabled = placement !== "off";
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <div className="md:col-span-2">
+          <div className="text-xs text-muted-foreground mb-1">Lägg till kanalpaket utöver repeaterimporten?</div>
+          <div className="flex flex-wrap gap-1">
+            {([
+              ["off","Nej"],
+              ["prepend","Ja — i början"],
+              ["append","Ja — i slutet"],
+              ["merge_sort","Ja — samma sortering"],
+            ] as Array<[PackPlacement,string]>).map(([k,label]) => (
+              <button key={k} type="button"
+                onClick={() => upd({ placement: k })}
+                className={`rounded border px-2 py-1 text-xs ${placement === k ? "bg-primary text-primary-foreground border-primary" : "border-border bg-background"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Frekvensdubblett-policy</div>
+          <select value={settings.packs.freqDupePolicy} disabled={!enabled}
+            onChange={(e) => upd({ freqDupePolicy: e.target.value as FreqDupePolicy })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm disabled:opacity-50">
+            <option value="keep_both">Behåll båda</option>
+            <option value="drop_pack">Hoppa över pack-rad</option>
+            <option value="drop_sk6ba">Hoppa över SK6BA-rad</option>
+            <option value="stop">Stoppa export</option>
+          </select>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">RX-only-policy (framtida paket)</div>
+          <select value={settings.packs.rxOnlyPolicy} disabled={!enabled}
+            onChange={(e) => upd({ rxOnlyPolicy: e.target.value as RxOnlyPolicy })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm disabled:opacity-50">
+            <option value="mark">Varna + markera RX-ONLY i Comment</option>
+            <option value="duplex_off">Exportera som Duplex=off</option>
+            <option value="skip">Hoppa över</option>
+            <option value="stop">Stoppa export</option>
+          </select>
+        </div>
+      </div>
+
+      {!enabled && (
+        <p className="text-xs text-muted-foreground">
+          Default är <em>Nej</em>. Kanalpaket är fasta kanaler — simplex, APRS, anropskanaler, aktivitetscentra m.m. — som inte är repeatrar. Aktivera ovan för att kombinera dem med SK6BA-importen.
+        </p>
+      )}
+
+      {enabled && (
+        <div className="space-y-4">
+          <div className="text-xs text-muted-foreground">
+            {selectedCount} kanaler valda från {packs.length} paket.
+          </div>
+          {packs.map((pack) => {
+            const sel = settings.packs.selection[pack.packId] ?? { bands: [], categories: [], tags: [], useEnabledDefault: false };
+            const bands = Array.from(new Set(pack.channels.map((c) => c.band).filter(Boolean))).sort();
+            const categories = Array.from(new Set(pack.channels.map((c) => c.category).filter(Boolean))).sort();
+            const tags = Array.from(new Set(pack.channels.flatMap((c) => c.tags))).sort();
+            const services = Array.from(new Set(pack.channels.map((c) => c.service).filter(Boolean))).join(", ");
+            const enabledDefaultCount = pack.channels.filter((c) => c.enabled_default).length;
+
+            return (
+              <div key={pack.packId} className="rounded border border-border bg-background p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <div className="font-mono text-sm font-semibold">{pack.packId}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {pack.channels.length} rader · service: {services || "–"} · {pack.fileNames.join(", ")}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button"
+                      onClick={() => updSel(pack.packId, { useEnabledDefault: true, bands: [], categories: [], tags: [], manualSourceIds: [] })}
+                      className="rounded border border-border px-2 py-1 text-xs">
+                      Använd default ({enabledDefaultCount})
+                    </button>
+                    <button type="button"
+                      onClick={() => updSel(pack.packId, { useEnabledDefault: false, bands: [], categories: [], tags: [], manualSourceIds: [] })}
+                      className="rounded border border-border px-2 py-1 text-xs">
+                      Avmarkera
+                    </button>
+                  </div>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <MultiSelect label="Band" options={bands} value={sel.bands}
+                    onChange={(v) => updSel(pack.packId, { bands: v })} />
+                  <MultiSelect label="Kategori" options={categories} value={sel.categories}
+                    onChange={(v) => updSel(pack.packId, { categories: v })} />
+                  <MultiSelect label="Tag" options={tags} value={sel.tags}
+                    onChange={(v) => updSel(pack.packId, { tags: v })} />
+                </div>
+                <label className="mt-2 flex items-center gap-2 text-xs">
+                  <input type="checkbox" checked={sel.useEnabledDefault}
+                    onChange={(e) => updSel(pack.packId, { useEnabledDefault: e.target.checked })} />
+                  Bara rader med <code>enabled_default=true</code> ({enabledDefaultCount} rader). Tomt band/kategori/tag = alla.
+                </label>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PreviewTable({ channels, chirpMode, startLoc }: { channels: NormalizedChannel[]; chirpMode: string; startLoc: number }) {
+  const shown = channels.slice(0, 300);
   return (
     <div className="overflow-x-auto rounded border border-border">
       <table className="min-w-full text-xs font-mono">
         <thead className="bg-muted text-muted-foreground">
           <tr>
-            {["#","Loc","Namn (full → final)","Freq","Dpx","Off","Tone","Mode","Type/Net","City","Call","Comment","⚠"].map((h) => (
+            {["#","Loc","Källa","Namn (full → final)","Freq","Dpx","Off","Tone","Mode","Type/Net/Kat","Plats / Label","Tags","Comment","⚠"].map((h) => (
               <th key={h} className="px-2 py-1 text-left whitespace-nowrap">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {shown.map((c, i) => (
-            <tr key={c.source_row} className={`border-t border-border ${c.warnings.length ? "bg-destructive/5" : ""}`}>
-              <td className="px-2 py-1 text-muted-foreground">{c.source_row}</td>
-              <td className="px-2 py-1">{startLoc + i}</td>
-              <td className="px-2 py-1">
-                <div className="text-muted-foreground">{c.generated_name_full}</div>
-                <div className={c.collided ? "text-amber-500" : ""}>{c.generated_name_final}</div>
-              </td>
-              <td className="px-2 py-1">{c.rx_frequency?.toFixed(4)}</td>
-              <td className="px-2 py-1">{c.duplex || "—"}</td>
-              <td className="px-2 py-1">{c.offset.toFixed(3)}</td>
-              <td className="px-2 py-1">{c.ctcss_tx ?? (c.uses_1750 ? "1750" : "—")}</td>
-              <td className="px-2 py-1">{chirpMode}</td>
-              <td className="px-2 py-1">{c.type}{c.network ? `/${c.network}` : ""}</td>
-              <td className="px-2 py-1 truncate max-w-[10rem]">{c.city}</td>
-              <td className="px-2 py-1">{c.call}</td>
-              <td className="px-2 py-1 truncate max-w-[14rem] text-muted-foreground">{c.comment}</td>
-              <td className="px-2 py-1">{c.warnings.length ? <span title={c.warnings.map((w: any) => w.message).join("; ")} className="text-amber-500">!{c.warnings.length}</span> : ""}</td>
-            </tr>
-          ))}
+          {shown.map((c, i) => {
+            const isPack = c.source_type === "channel_pack";
+            const rowClass = c.warnings.length ? "bg-destructive/5" : isPack ? "bg-primary/5" : "";
+            const mode = isPack && c.mode_chirp ? c.mode_chirp : chirpMode;
+            return (
+              <tr key={`${c.source_type}-${c.source_row}-${c.source_id}-${i}`} className={`border-t border-border ${rowClass}`}>
+                <td className="px-2 py-1 text-muted-foreground">{c.source_row}</td>
+                <td className="px-2 py-1">{startLoc + i}</td>
+                <td className="px-2 py-1">
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] ${isPack ? "bg-primary/20 text-primary" : "bg-muted text-foreground"}`}>
+                    {isPack ? `PACK · ${c.pack_id}` : "SK6BA"}
+                  </span>
+                </td>
+                <td className="px-2 py-1">
+                  <div className="text-muted-foreground">{c.generated_name_full}</div>
+                  <div className={c.collided ? "text-amber-500" : ""}>{c.generated_name_final}</div>
+                </td>
+                <td className="px-2 py-1">{c.rx_frequency?.toFixed(4)}</td>
+                <td className="px-2 py-1">{c.duplex || "—"}</td>
+                <td className="px-2 py-1">{c.duplex === "split" && c.tx_frequency != null ? c.tx_frequency.toFixed(4) : c.offset.toFixed(3)}</td>
+                <td className="px-2 py-1">{c.ctcss_tx ?? (c.uses_1750 ? "1750" : "—")}</td>
+                <td className="px-2 py-1">{mode}</td>
+                <td className="px-2 py-1 truncate max-w-[10rem]">
+                  {isPack ? `${c.service || "?"} / ${c.category || "?"}` : `${c.type}${c.network ? `/${c.network}` : ""}`}
+                </td>
+                <td className="px-2 py-1 truncate max-w-[10rem]">
+                  {isPack ? `${c.label || ""} ${c.channel ? `(${c.channel})` : ""}`.trim() || c.name_hint : c.city}
+                  {c.rx_only && <span className="ml-1 rounded bg-destructive/20 px-1 text-[9px] text-destructive">RX</span>}
+                  {c.inferred_from_range && <span className="ml-1 rounded bg-amber-500/20 px-1 text-[9px] text-amber-700 dark:text-amber-300">INF</span>}
+                </td>
+                <td className="px-2 py-1 truncate max-w-[10rem] text-muted-foreground">{c.tags.join(", ")}</td>
+                <td className="px-2 py-1 truncate max-w-[14rem] text-muted-foreground" title={c.license_note || c.comment}>{c.comment}</td>
+                <td className="px-2 py-1">{c.warnings.length ? <span title={c.warnings.map((w) => w.message).join("; ")} className="text-amber-500">!{c.warnings.length}</span> : ""}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       {channels.length > shown.length && (
