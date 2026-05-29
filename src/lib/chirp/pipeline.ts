@@ -1,4 +1,4 @@
-import type { NormalizedChannel, RawRow, Settings, Warning } from "./models";
+import type { NormalizedChannel, RawRow, Settings, Warning, NamingSettings } from "./models";
 import { parseNumberLoose } from "./importers/sk6ba";
 import { parseAccess } from "./tones";
 import { parseShift } from "./frequency";
@@ -6,6 +6,7 @@ import { applyFilters } from "./filters";
 import { buildName, resolveCollisions } from "./naming";
 import { sortChannels } from "./sorting";
 import { applyFreqDedupe } from "./dedupe";
+import { DEFAULT_PACK_NAMING } from "./defaults";
 
 function emptyPackFields() {
   return {
