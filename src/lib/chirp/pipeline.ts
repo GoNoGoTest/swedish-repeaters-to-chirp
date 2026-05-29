@@ -99,6 +99,10 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
       lat, lng, locator,
       comment: commentParts.join(" | "),
       ...emptyPackFields(),
+      // Re-apply DCS over the empty pack defaults so SK6BA rows with
+      // access=DCS xxx export as Tone=Cross in the CHIRP exporter.
+      dtcs_code: access.dcs ?? "",
+      dtcs_polarity: access.dcs ? "NN" : "",
       generated_name_full: "",
       generated_name_final: "",
       collided: false,
