@@ -7,7 +7,6 @@ import type { NamingSettings, Settings } from "./models";
 export const DEFAULT_REPEATER_NAMING: NamingSettings = {
   components: ["{city}"],
   separator: "-",
-  maxLength: 6,
   cityMaxLength: 6,
   transliterate: true,
   uppercase: true,
