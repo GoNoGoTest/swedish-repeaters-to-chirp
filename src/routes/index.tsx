@@ -45,7 +45,8 @@ function loadStoredSettings(): Settings {
     const parsed = JSON.parse(raw);
     // Migration: maxLength flyttades från NamingSettings till ChirpSettings.
     const legacyMax = parsed?.naming?.maxLength;
-    const chirpMerged = { ...DEFAULT_SETTINGS.chirp, ...(parsed.chirp ?? {}) };
+    const { cToneFreq: _drop, ...chirpClean } = parsed?.chirp ?? {};
+    const chirpMerged = { ...DEFAULT_SETTINGS.chirp, ...chirpClean };
     if (chirpMerged.maxLength == null && typeof legacyMax === "number") {
       chirpMerged.maxLength = legacyMax;
     }
