@@ -1,0 +1,7 @@
+id,updated,type,band,mode,network,network_id,district,call,city,channel,output,tx_shift,access,status,lat,lng,locator,masl,magl,watt_pep,dir,ant,backup
+1,2024-01-01,Repeater,2,FM,,,6,SK6BA,Borås,RV48,145.6000,-0.6,123.0,QRV,57.7210,12.9401,JO67ho,,,,,,
+2,2024-01-01,Repeater,70,FM,SvxReflector,,6,SK6RR,Skene,RU368,434.6000,-2.0,1750/88.5,QRV,57.49,12.63,,,,,,,
+3,2024-01-01,Repeater,2,DMR,BrandMeister,2403,6,SK6XX,Göteborg,,145.7000,-0.6,CC1,QRV,57.7,11.97,,,,,,,
+4,2024-01-01,Hotspot,70,FM,,,6,SM6HOT,Mark,,438.0000,simplex,,QRV,57.5,12.6,,,,,,,
+5,2024-01-01,Link,2,FM,,,6,SK6LL,Link,,145.0000,foo,,QRV,,,,,,,,,
+6,2024-01-01,Repeater,2,FM,,,6,SK6CL,Borås,RV48,145.6000,-0.6,123.0,QRT,57.7,12.94,,,,,,,
