@@ -156,7 +156,18 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   const sk6baFiltered = applyFilters(exportable, settings.filter);
   const sk6baSorted = sortChannels(sk6baFiltered, settings.sort);
 
-  const validPacks = packChannels.filter((c) => c.rx_frequency != null);
+  // Channel-pack rows come from a module-level cache and are reused across
+  // renders. Clone them and reset per-run state so warnings/duplex/comment
+  // mutations below don't accumulate on every re-render.
+  const validPacks = packChannels
+    .filter((c) => c.rx_frequency != null)
+    .map((c) => ({
+      ...c,
+      warnings: [],
+      collided: false,
+      generated_name_full: "",
+      generated_name_final: "",
+    }));
   const packWithPolicy = applyRxOnlyPolicy(validPacks, settings);
   // Validate split: needs tx_frequency or it can't export properly
   for (const ch of packWithPolicy) {
