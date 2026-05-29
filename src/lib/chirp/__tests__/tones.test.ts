@@ -33,7 +33,13 @@ describe("parseAccess", () => {
 
   it("splits on common delimiters", () => {
     expect(parseAccess("88.5 1750").uses1750).toBe(true);
-    expect(parseAccess("88.5,1750").ctcss).toBeCloseTo(88.5);
+    expect(parseAccess("88.5;1750").ctcss).toBeCloseTo(88.5);
     expect(parseAccess("88.5|1750").ctcss).toBeCloseTo(88.5);
+  });
+
+  it("preserves decimal comma in access (e.g. '1750 / 156,7 / DTMF 6')", () => {
+    const r = parseAccess("1750 / 156,7 / DTMF 6");
+    expect(r.uses1750).toBe(true);
+    expect(r.ctcss).toBeCloseTo(156.7);
   });
 });

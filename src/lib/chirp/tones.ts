@@ -8,7 +8,7 @@ export interface ToneParse {
 export function parseAccess(raw: string | undefined | null): ToneParse {
   if (!raw) return { ctcss: null, uses1750: false };
   const s = String(raw);
-  const parts = s.split(/[\s/|,;]+/).map((p) => p.trim()).filter(Boolean);
+  const parts = s.split(/[\s/|;]+/).map((p) => p.trim()).filter(Boolean);
   let uses1750 = false;
   const candidates: number[] = [];
   for (const p of parts) {
