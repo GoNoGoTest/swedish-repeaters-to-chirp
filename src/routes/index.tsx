@@ -7,6 +7,11 @@ import { DEFAULT_SETTINGS, DEFAULT_PACK_NAMING } from "@/lib/chirp/defaults";
 import { loadMergedPacks, type MergedPack } from "@/lib/chirp/channel_packs/registry";
 import { selectPackChannels, type ParsedPackChannel } from "@/lib/chirp/importers/channel_pack";
 import { buildName } from "@/lib/chirp/naming";
+import {
+  listSavedExports, saveExport, deleteExport, clearAllExports,
+  freshnessOf, relativeTime, formatBytes,
+  type SavedExport,
+} from "@/lib/chirp/saved-exports";
 import type {
   RawRow, Settings, NormalizedChannel, NamingSettings,
   PackPlacement, FreqDupePolicy, RxOnlyPolicy, PackSelectionEntry, HomeDistrictSort,
@@ -70,8 +75,10 @@ function Index() {
   const [columns, setColumns] = useState<string[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [settings, setSettings] = useState<Settings>(() => loadStoredSettings());
-  const [urlInput, setUrlInput] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [savedExports, setSavedExports] = useState<SavedExport[]>([]);
+  // Hydratera först efter mount för att undvika SSR/CSR-mismatch.
+  useEffect(() => { setSavedExports(listSavedExports()); }, []);
 
   useEffect(() => {
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
@@ -98,26 +105,39 @@ function Index() {
     return out;
   }, [packs, settings.packs.placement, settings.packs.selection]);
 
+  const loadCsvText = useCallback((text: string) => {
+    const r = parseSk6baCsv(text);
+    setRows(r.rows); setColumns(r.columns);
+    setSummary(summarize(r.rows, r.columns));
+    return r.rows.length;
+  }, []);
+
   const onFile = useCallback(async (file: File) => {
     setLoadError(null);
     const text = await file.text();
     try {
-      const r = parseSk6baCsv(text);
-      setRows(r.rows); setColumns(r.columns);
-      setSummary(summarize(r.rows, r.columns));
+      const rowCount = loadCsvText(text);
+      saveExport({ filename: file.name, content: text, rowCount });
+      setSavedExports(listSavedExports());
     } catch (e) { setLoadError(String(e)); }
+  }, [loadCsvText]);
+
+  const onPickSaved = useCallback((id: string) => {
+    setLoadError(null);
+    const entry = listSavedExports().find((e) => e.id === id);
+    if (!entry) return;
+    try { loadCsvText(entry.content); } catch (e) { setLoadError(String(e)); }
+  }, [loadCsvText]);
+
+  const onDeleteSaved = useCallback((id: string) => {
+    deleteExport(id);
+    setSavedExports(listSavedExports());
   }, []);
 
-  const onUrl = useCallback(async () => {
-    setLoadError(null);
-    try {
-      const res = await fetch(urlInput);
-      const text = await res.text();
-      const r = parseSk6baCsv(text);
-      setRows(r.rows); setColumns(r.columns);
-      setSummary(summarize(r.rows, r.columns));
-    } catch (e) { setLoadError(`Kunde inte hämta URL: ${e}`); }
-  }, [urlInput]);
+  const onClearSaved = useCallback(() => {
+    clearAllExports();
+    setSavedExports([]);
+  }, []);
 
   const pipeline = useMemo(() => {
     if (!rows) return null;
@@ -180,8 +200,12 @@ function Index() {
             >
               {!rows && (
                 <RepeaterLoader
-                  urlInput={urlInput} setUrlInput={setUrlInput}
-                  onFile={onFile} onUrl={onUrl} loadError={loadError}
+                  onFile={onFile}
+                  loadError={loadError}
+                  savedExports={savedExports}
+                  onPickSaved={onPickSaved}
+                  onDeleteSaved={onDeleteSaved}
+                  onClearSaved={onClearSaved}
                 />
               )}
 
@@ -368,9 +392,13 @@ function MultiSelect({ label, options, value, onChange }: {
 
 /* ───────────── Repeater loader ───────────── */
 
-function RepeaterLoader({ urlInput, setUrlInput, onFile, onUrl, loadError }: {
-  urlInput: string; setUrlInput: (s: string) => void;
-  onFile: (f: File) => void; onUrl: () => void; loadError: string | null;
+function RepeaterLoader({ onFile, loadError, savedExports, onPickSaved, onDeleteSaved, onClearSaved }: {
+  onFile: (f: File) => void;
+  loadError: string | null;
+  savedExports: SavedExport[];
+  onPickSaved: (id: string) => void;
+  onDeleteSaved: (id: string) => void;
+  onClearSaved: () => void;
 }) {
   return (
     <>
@@ -380,21 +408,88 @@ function RepeaterLoader({ urlInput, setUrlInput, onFile, onUrl, loadError }: {
           <span className="text-xs text-muted-foreground">SK6BA / Marks repeater-CSV (.csv)</span>
           <input type="file" accept=".csv,text/csv" className="text-sm"
             onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+          <p className="mt-auto text-xs text-muted-foreground">Sparas automatiskt lokalt så du kan återanvända senare (max 5).</p>
         </label>
-        <div className="flex flex-col gap-2 rounded-md border border-border bg-background p-6">
-          <span className="text-sm font-medium">…eller hämta från URL</span>
-          <input type="url" placeholder="https://..." value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            className="rounded border border-input bg-background px-2 py-1 text-sm" />
-          <button onClick={onUrl} disabled={!urlInput}
-            className="self-start rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
-            Hämta
-          </button>
-          <p className="text-xs text-muted-foreground">CORS kan blockera vissa servrar — ladda upp filen istället om det fallerar.</p>
-        </div>
+        <SavedExportsPanel
+          items={savedExports}
+          onPick={onPickSaved}
+          onDelete={onDeleteSaved}
+          onClear={onClearSaved}
+        />
       </div>
       {loadError && <p className="mt-3 text-sm text-destructive">{loadError}</p>}
     </>
+  );
+}
+
+const FRESHNESS_DOT: Record<"fresh" | "stale" | "old", string> = {
+  fresh: "bg-emerald-500",
+  stale: "bg-amber-500",
+  old: "bg-red-500",
+};
+
+function SavedExportsPanel({ items, onPick, onDelete, onClear }: {
+  items: SavedExport[];
+  onPick: (id: string) => void;
+  onDelete: (id: string) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-border bg-background p-4">
+      <div className="flex items-baseline justify-between">
+        <span className="text-sm font-medium">Sparade exporter</span>
+        <span className="text-[11px] text-muted-foreground">max 5 senaste</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="my-4 text-xs text-muted-foreground">
+          Ingen sparad än. Filer du laddar upp dyker upp här så du kan välja
+          dem direkt nästa gång.
+        </p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-border">
+          {items.map((e) => {
+            const f = freshnessOf(e.savedAt);
+            return (
+              <li key={e.id} className="group flex items-center gap-3 py-2">
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${FRESHNESS_DOT[f]}`}
+                  aria-label={f === "fresh" ? "färsk" : f === "stale" ? "några veckor" : "kan vara gammal"}
+                  title={new Date(e.savedAt).toLocaleString("sv-SE")}
+                />
+                <button
+                  type="button"
+                  onClick={() => onPick(e.id)}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <div className="truncate text-sm font-medium">{e.filename}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {relativeTime(e.savedAt)} · {e.rowCount} rader · {formatBytes(e.byteSize)}
+                    {f === "old" && <span className="ml-1 text-red-600">⚠ kan vara gammal</span>}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(e.id)}
+                  aria-label={`Ta bort ${e.filename}`}
+                  className="rounded p-1 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-muted hover:text-foreground"
+                >
+                  ✕
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {items.length > 0 && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="mt-1 self-end text-[11px] text-muted-foreground/70 underline-offset-2 hover:text-muted-foreground hover:underline"
+        >
+          rensa alla
+        </button>
+      )}
+    </div>
   );
 }
 
