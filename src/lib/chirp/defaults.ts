@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS: Settings = {
     uppercase: true,
     collisionPolicy: "numeric_suffix",
     abbreviations: {
-      type: { Repeater: "R", Link: "L", Hotspot: "H", Beacon: "B" },
+      type: { Repeater: "R", Link: "L", Hotspot: "H", Beacon: "B", Static: "" },
       network: {
         "": "",
         SvxReflector: "SVX",
@@ -29,7 +29,7 @@ export const DEFAULT_SETTINGS: Settings = {
         Brandmeister: "BM",
         "Wires-X": "WX",
       },
-      band: { "2": "2M", "70": "70", "6": "6M", "23": "23" },
+      band: { "2": "2M", "70": "70", "6": "6M", "23": "23", "2m": "2M", "70cm": "70" },
       districtPrefix: "D",
     },
   },
@@ -43,5 +43,11 @@ export const DEFAULT_SETTINGS: Settings = {
   sort: {
     keys: ["district", "geohash", "city"],
     geohashPrecision: 5,
+  },
+  packs: {
+    placement: "off",
+    selection: {},
+    freqDupePolicy: "keep_both",
+    rxOnlyPolicy: "mark",
   },
 };
