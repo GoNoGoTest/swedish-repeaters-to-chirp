@@ -189,15 +189,15 @@ export function runPipeline(input: PipelineInput): PipelineResult {
 
   for (const ch of combined) {
     const n = namingFor(ch);
-    const { full, clipped } = buildName(ch, n);
+    const { full, clipped } = buildName(ch, n, settings.chirp.maxLength);
     ch.generated_name_full = full;
     ch.generated_name_final = clipped || "NONAME";
     if (!clipped) ch.warnings.push({ code: "empty_name", message: "Tomt kanalnamn" });
   }
 
   // Collisions are resolved globally with the repeater naming policy
-  // (we just need a deterministic suffix scheme — maxLength comes from each channel's clipped name).
-  const { unresolved } = resolveCollisions(combined, settings.naming);
+  // (we just need a deterministic suffix scheme — maxLength comes from chirp settings).
+  const { unresolved } = resolveCollisions(combined, settings.naming, settings.chirp.maxLength);
   for (const ch of combined) {
     if (ch.collided) {
       const already = ch.warnings.some((w) => w.code === "name_collision");
