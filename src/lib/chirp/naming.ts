@@ -83,10 +83,11 @@ export function buildName(ch: NormalizedChannel, n: NamingSettings, maxLength: n
 export function resolveCollisions(
   channels: NormalizedChannel[],
   n: NamingSettings,
+  maxLength: number,
 ): { channels: NormalizedChannel[]; unresolved: number } {
   const seen = new Map<string, number>();
   let unresolved = 0;
-  const max = n.maxLength > 0 ? n.maxLength : Infinity;
+  const max = maxLength > 0 ? maxLength : Infinity;
 
   for (const ch of channels) {
     const name = ch.generated_name_final || "NONAME";
