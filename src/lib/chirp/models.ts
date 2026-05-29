@@ -17,7 +17,8 @@ export type WarningCode =
   | "pack_split_unsupported"
   | "freq_duplicate"
   | "rx_only_no_policy"
-  | "rx_only_marked";
+  | "rx_only_marked"
+  | "ctcss_and_dcs";
 
 export interface Warning {
   code: WarningCode;
