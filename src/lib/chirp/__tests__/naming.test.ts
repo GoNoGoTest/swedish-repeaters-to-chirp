@@ -10,7 +10,7 @@ describe("translit/sanitize", () => {
     expect(translit("Åke Örnsköldsvik")).toBe("Ake Ornskoldsvik");
   });
   it("sanitize strips spaces and uppercases", () => {
-    expect(sanitize("Hej världen!", { transliterate: true, uppercase: true })).toBe("HEJVRLDEN");
+    expect(sanitize("Hej världen!", { transliterate: true, uppercase: true })).toBe("HEJVARLDEN");
   });
 });
 

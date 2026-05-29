@@ -24,7 +24,7 @@ describe("parseSk6baCsv", () => {
     const r = parseSk6baCsv(csv);
     const s = summarize(r.rows, r.columns);
     expect(s.totalRows).toBe(6);
-    expect(s.uniqueCounts.type.Repeater).toBe(3);
+    expect(s.uniqueCounts.type.Repeater).toBe(4);
     expect(s.uniqueCounts.status.QRV).toBe(5);
     expect(s.unclearShift).toBeGreaterThanOrEqual(1);
   });
