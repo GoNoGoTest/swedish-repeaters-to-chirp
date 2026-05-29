@@ -758,5 +758,3 @@ function PreviewTable({ channels, chirpMode, startLoc }: { channels: NormalizedC
   );
 }
 
-// Suppress unused-var lints for soon-to-be-used identifiers (columns kept for future inspector views).
-void [columns => columns];
