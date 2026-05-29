@@ -688,8 +688,9 @@ function PackRow({ pack, entry, maxLength, onChange }: {
               value={naming}
               onChange={(n) => onChange({ naming: n })}
               tokens={PACK_TOKENS}
-              hint={`Standard: \`{name_hint}\`, max 6 tecken — funkar för t.ex. "S20", "PMR1", "M16". Skriv egen mall om paketet kräver annat.`}
+              hint={`Standard: \`{name_hint}\`, max ${maxLength} tecken — funkar för t.ex. "S20", "PMR1", "M16". Skriv egen mall om paketet kräver annat.`}
               previewKind="pack"
+              maxLength={maxLength}
               showCityMaxLength={false}
               sampleChannels={pack.channels}
             />
