@@ -30,6 +30,25 @@ describe("runPipeline (sk6ba only)", () => {
     const names = r.channels.map((c) => c.generated_name_final);
     expect(new Set(names).size).toBe(names.length);
   });
+
+  it("DCS access on Link row exports as Cross + DTCS->", () => {
+    const dcsRow: Record<string, string> = {
+      id: "999", type: "Link", status: "QRV", mode: "FM",
+      network: "AllStarLink", access: "DCS 025",
+      output: "145.2375", tx_shift: "0",
+      band: "2", district: "6", city: "Test", call: "SK6TST",
+      channel: "L1", lat: "57.7", lng: "12.9",
+    };
+    const r = runPipeline({
+      sk6baRows: [dcsRow],
+      settings: { ...baseSettings, filter: { ...baseSettings.filter, types: ["Link"], statuses: ["QRV"] } },
+    });
+    const ch = r.channels[0];
+    expect(ch).toBeDefined();
+    expect(ch.dtcs_code).toBe("025");
+    expect(ch.dtcs_polarity).toBe("NN");
+    expect(ch.ctcss_tx).toBeNull();
+  });
 });
 
 describe("runPipeline with channel pack", () => {
