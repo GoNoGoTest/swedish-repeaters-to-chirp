@@ -30,24 +30,30 @@ export function applyFreqDedupe(
 
   for (const [, arr] of groups) {
     if (arr.length < 2) continue;
-    // Tag everyone with a duplicate warning
-    for (const ch of arr) {
-      ch.warnings.push({
-        code: "freq_duplicate",
-        message: `Frekvensdubblett: ${arr.length} rader på ${arr[0].rx_frequency?.toFixed(5)} MHz`,
-      });
-    }
     const hasSk6ba = arr.some((c) => c.source_type === "sk6ba");
     const hasPack = arr.some((c) => c.source_type === "channel_pack");
+    const packCount = arr.filter((c) => c.source_type === "channel_pack").length;
+    // Repeaters legitimately share RX frequencies on amateur bands — only warn
+    // when a channel-pack row collides (pack-vs-sk6ba or pack-vs-pack).
+    const shouldWarn = (hasSk6ba && hasPack) || packCount >= 2;
+    if (shouldWarn) {
+      for (const ch of arr) {
+        ch.warnings.push({
+          code: "freq_duplicate",
+          message: `Frekvensdubblett: ${arr.length} rader på ${arr[0].rx_frequency?.toFixed(5)} MHz`,
+        });
+      }
+    }
 
     if (policy === "keep_both") continue;
-    if (policy === "stop") { stopped = true; continue; }
+    if (policy === "stop" && shouldWarn) { stopped = true; continue; }
     if (policy === "drop_pack" && hasSk6ba && hasPack) {
       for (const c of arr) if (c.source_type === "channel_pack") dropIds.add(c);
     } else if (policy === "drop_sk6ba" && hasSk6ba && hasPack) {
       for (const c of arr) if (c.source_type === "sk6ba") dropIds.add(c);
     }
   }
+
 
   const dropped: NormalizedChannel[] = [];
   const kept = channels.filter((c) => {
