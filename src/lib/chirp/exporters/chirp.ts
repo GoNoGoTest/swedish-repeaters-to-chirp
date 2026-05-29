@@ -39,25 +39,66 @@ function resolveComment(c: NormalizedChannel): string {
   return c.comment;
 }
 
+interface ToneFields {
+  Tone: string;
+  rToneFreq: string;
+  cToneFreq: string;
+  DtcsCode: string;
+  DtcsPolarity: string;
+  RxDtcsCode: string;
+  CrossMode: string;
+}
+
+const EMPTY_TONE: ToneFields = {
+  Tone: "", rToneFreq: "", cToneFreq: "",
+  DtcsCode: "", DtcsPolarity: "", RxDtcsCode: "", CrossMode: "",
+};
+
+function resolveToneFields(c: NormalizedChannel): ToneFields {
+  // Pack-row: explicit tone_raw drives the branch.
+  if (c.source_type === "channel_pack") {
+    const t = (c.tone_raw || "").trim().toUpperCase();
+    if (t === "TSQL") {
+      const f = c.ctone_freq ?? c.rtone_freq ?? c.ctcss_tx;
+      if (f == null) return EMPTY_TONE;
+      return { ...EMPTY_TONE, Tone: "TSQL", rToneFreq: f.toFixed(1), cToneFreq: f.toFixed(1) };
+    }
+    if (t === "DTCS" || t === "DCS") {
+      if (!c.dtcs_code) return EMPTY_TONE;
+      return { ...EMPTY_TONE, Tone: "DTCS", DtcsCode: c.dtcs_code, DtcsPolarity: c.dtcs_polarity || "NN" };
+    }
+    if (t === "TONE" || (t === "" && c.rtone_freq != null)) {
+      const f = c.rtone_freq ?? c.ctcss_tx;
+      if (f == null) return EMPTY_TONE;
+      return { ...EMPTY_TONE, Tone: "Tone", rToneFreq: f.toFixed(1) };
+    }
+    return EMPTY_TONE;
+  }
+  // SK6BA-row: only transmit-CTCSS, never TSQL/DTCS.
+  if (c.ctcss_tx != null) {
+    return { ...EMPTY_TONE, Tone: "Tone", rToneFreq: c.ctcss_tx.toFixed(1) };
+  }
+  return EMPTY_TONE;
+}
+
 export function toChirpRows(channels: NormalizedChannel[], s: ChirpSettings) {
   return channels.map((c, i) => {
     const skip = (s.skipLinks && c.type.toLowerCase() === "link") || c.skip_raw === "S" ? "S" : "";
-    const tone = c.ctcss_tx != null || c.tone_raw ? (c.tone_raw || "Tone") : "";
     const { duplex, offset } = resolveDuplexAndOffset(c);
-    const cTone = c.ctone_freq ?? s.cToneFreq;
+    const tone = resolveToneFields(c);
     return {
       Location: String(s.startLocation + i),
       Name: c.generated_name_final,
       Frequency: c.rx_frequency != null ? formatFrequency(c.rx_frequency) : "",
       Duplex: duplex,
       Offset: offset,
-      Tone: tone,
-      rToneFreq: (c.ctcss_tx ?? c.rtone_freq ?? 88.5).toFixed(1),
-      cToneFreq: cTone.toFixed(1),
-      DtcsCode: c.dtcs_code || "23",
-      DtcsPolarity: c.dtcs_polarity || "NN",
-      RxDtcsCode: "23",
-      CrossMode: "Tone->Tone",
+      Tone: tone.Tone,
+      rToneFreq: tone.rToneFreq,
+      cToneFreq: tone.cToneFreq,
+      DtcsCode: tone.DtcsCode,
+      DtcsPolarity: tone.DtcsPolarity,
+      RxDtcsCode: tone.RxDtcsCode,
+      CrossMode: tone.CrossMode,
       Mode: resolveMode(c, s.mode),
       TStep: resolveTStep(c, s.tStep).toFixed(1),
       Skip: skip,
