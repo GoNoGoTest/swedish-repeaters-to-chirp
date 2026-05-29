@@ -118,7 +118,6 @@ export interface ChirpSettings {
   mode: "NFM" | "FM";
   tStep: number;
   skipLinks: boolean;
-  cToneFreq: number;
   /** Max length for the generated channel name. Hardware-specific (radio display width). */
   maxLength: number;
 }
