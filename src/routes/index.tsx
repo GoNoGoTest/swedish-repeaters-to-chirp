@@ -306,11 +306,17 @@ function Index() {
                     <button onClick={exportReport}
                       className="rounded border border-border px-3 py-1.5 text-xs">Varningar</button>
                     <button onClick={doExport}
-                      className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">
+                      disabled={pipeline.duplicateStop}
+                      className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
                       Exportera CSV ({pipeline.channels.length})
                     </button>
                   </div>
                 }>
+                  {pipeline.duplicateStop && (
+                    <div role="alert" className="mb-3 rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      Export stoppad — frekvensdubbletter enligt policy. Ändra policy eller åtgärda dubbletter.
+                    </div>
+                  )}
                   <div className="grid gap-2 grid-cols-2 md:grid-cols-5 text-sm mb-3">
                     <Stat label="Input totalt" value={pipeline.totalInput} />
                     <Stat label="SK6BA" value={pipeline.sk6baCount} />
