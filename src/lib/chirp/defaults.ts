@@ -2,10 +2,11 @@ import type { NamingSettings, Settings } from "./models";
 
 /**
  * Standardnamn för repeatrar/länkar/hotspots från SK6BA-importen.
- * Korta, ortsdrivna namn som passar typiska radio-displayer på 6 tecken.
+ * Ordning: distrikt – band – nätverk – ort – signal.
+ * Klipps till maxLength i CHIRP-inställningarna.
  */
 export const DEFAULT_REPEATER_NAMING: NamingSettings = {
-  components: ["{city}"],
+  components: ["{district}", "{band}", "{network}", "{city}", "{call}"],
   separator: "-",
   cityMaxLength: 6,
   transliterate: true,
