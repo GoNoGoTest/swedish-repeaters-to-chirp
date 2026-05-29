@@ -3,8 +3,8 @@ import { parseAccess } from "../tones";
 
 describe("parseAccess", () => {
   it("returns null/false for empty", () => {
-    expect(parseAccess("")).toEqual({ ctcss: null, uses1750: false, carrier: false });
-    expect(parseAccess(null)).toEqual({ ctcss: null, uses1750: false, carrier: false });
+    expect(parseAccess("")).toEqual({ ctcss: null, uses1750: false, carrier: false, dcs: null });
+    expect(parseAccess(null)).toEqual({ ctcss: null, uses1750: false, carrier: false, dcs: null });
   });
 
   it("detects 1750 separately from ctcss", () => {
