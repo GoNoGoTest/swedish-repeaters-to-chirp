@@ -153,7 +153,7 @@ function Index() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border">
-        <div className="mx-auto max-w-7xl px-6 py-5">
+        <div className="mx-auto max-w-[1600px] px-6 py-5">
           <h1 className="font-mono text-xl font-semibold tracking-tight">sk6ba → chirp.csv</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Två oberoende källor — repeatrar från SK6BA/Marks och valfria kanalpaket — kombineras till en CHIRP-importerbar CSV. Allt sker lokalt i din webbläsare.
@@ -161,113 +161,123 @@ function Index() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-6 space-y-6">
+      <main className="mx-auto max-w-[1600px] px-6 py-6">
+        <div className={pipeline ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : ""}>
+          <div className="space-y-6 min-w-0">
 
-        {/* ───────────── REPEATERSEKTION ───────────── */}
-        <Section
-          title="Repeatrar (SK6BA / Marks-CSV)"
-          subtitle="Repeatrar, länkar och hotspots från en CSV-export. Egna namngivnings- och filterregler."
-        >
-          {!rows && (
-            <RepeaterLoader
-              urlInput={urlInput} setUrlInput={setUrlInput}
-              onFile={onFile} onUrl={onUrl} loadError={loadError}
-            />
-          )}
-
-          {rows && summary && (
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">
-                  {summary.totalRows} rader · {summary.columns.length} kolumner
-                </div>
-                <button onClick={() => { setRows(null); setSummary(null); }}
-                  className="text-xs text-muted-foreground underline">Byt fil</button>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6 text-sm">
-                <Stat label="Rader" value={summary.totalRows} />
-                <Stat label="Saknad output" value={summary.missingOutput} />
-                <Stat label="Saknade koord." value={summary.missingCoords} />
-                <Stat label="Oklar tx_shift" value={summary.unclearShift} />
-                <Stat label="Saknar CTCSS" value={summary.missingTone} />
-                <Stat label="Distrikt" value={Object.keys(summary.uniqueCounts.district).length} />
-              </div>
-
-              <RepeaterFilterPanel summary={summary} settings={settings} setSettings={setSettings} />
-
-              <div className="border-t border-border pt-4">
-                <SectionLabel>Namngivning av repeatrar</SectionLabel>
-                <NamingEditor
-                  value={settings.naming}
-                  onChange={(n) => setSettings({ ...settings, naming: n })}
-                  tokens={REPEATER_TOKENS}
-                  hint="Repeaterrader får sitt namn via dessa tokens. Tomma tokens droppas och dubbla separatorer undviks."
+            {/* ───────────── REPEATERSEKTION ───────────── */}
+            <Section
+              title="Repeatrar (SK6BA / Marks-CSV)"
+              subtitle="Repeatrar, länkar och hotspots från en CSV-export. Egna namngivnings- och filterregler."
+            >
+              {!rows && (
+                <RepeaterLoader
+                  urlInput={urlInput} setUrlInput={setUrlInput}
+                  onFile={onFile} onUrl={onUrl} loadError={loadError}
                 />
+              )}
+
+              {rows && summary && (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                      {summary.totalRows} rader · {summary.columns.length} kolumner
+                    </div>
+                    <button onClick={() => { setRows(null); setSummary(null); }}
+                      className="text-xs text-muted-foreground underline">Byt fil</button>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6 text-sm">
+                    <Stat label="Rader" value={summary.totalRows} />
+                    <Stat label="Saknad output" value={summary.missingOutput} />
+                    <Stat label="Saknade koord." value={summary.missingCoords} />
+                    <Stat label="Oklar tx_shift" value={summary.unclearShift} />
+                    <Stat label="Saknar CTCSS" value={summary.missingTone} />
+                    <Stat label="Distrikt" value={Object.keys(summary.uniqueCounts.district).length} />
+                  </div>
+
+                  <RepeaterFilterPanel summary={summary} settings={settings} setSettings={setSettings} />
+
+                  <div className="border-t border-border pt-4">
+                    <SectionLabel>Namngivning av repeatrar</SectionLabel>
+                    <NamingEditor
+                      value={settings.naming}
+                      onChange={(n) => setSettings({ ...settings, naming: n })}
+                      tokens={REPEATER_TOKENS}
+                      hint="Repeaterrader får sitt namn via dessa tokens. Tomma tokens droppas och dubbla separatorer undviks."
+                      previewKind="repeater"
+                    />
+                  </div>
+                </div>
+              )}
+            </Section>
+
+            {/* ───────────── KANALPAKETSSEKTION ───────────── */}
+            <Section
+              title="Kanalpaket"
+              subtitle="Fasta kanaler från CSV-paket i /channelpacks (amatör simplex, marin VHF, PMR446 m.fl.). Varje paket har egna inställningar och egen namngivning."
+            >
+              <ChannelPacksPanel
+                packs={packs}
+                settings={settings}
+                setSettings={setSettings}
+                selectedPackCount={enabledPackCount}
+                selectedChannelCount={selectedPackChannels.length}
+              />
+            </Section>
+
+            {/* ───────────── EXPORT / SORTERING / CHIRP ───────────── */}
+            {rows && (
+              <Section
+                title="Sortering & CHIRP-export"
+                subtitle="Hur de kombinerade kanalerna ordnas i radions minne och vilka CHIRP-fält som används."
+              >
+                <ExportPanel
+                  settings={settings} setSettings={setSettings}
+                  hasPacks={enabledPackCount > 0}
+                />
+              </Section>
+            )}
+          </div>
+
+          {/* ───────────── PREVIEW (sticky on xl) ───────────── */}
+          {pipeline && (
+            <div className="min-w-0">
+              <div className="xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
+                <Section title="Förhandsgranska & exportera" right={
+                  <div className="flex gap-2">
+                    <button onClick={exportReport}
+                      className="rounded border border-border px-3 py-1.5 text-xs">Varningar</button>
+                    <button onClick={doExport}
+                      className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">
+                      Exportera CSV ({pipeline.channels.length})
+                    </button>
+                  </div>
+                }>
+                  <div className="grid gap-2 grid-cols-2 md:grid-cols-5 text-sm mb-3">
+                    <Stat label="Input totalt" value={pipeline.totalInput} />
+                    <Stat label="SK6BA" value={pipeline.sk6baCount} />
+                    <Stat label="Kanalpaket" value={pipeline.packCount} />
+                    <Stat label="Filtrerade bort" value={pipeline.filteredOut} />
+                    <Stat label="Varn/Koll/Dupes/RX" value={`${stats?.warned ?? 0}/${stats?.collided ?? 0}/${stats?.dupes ?? 0}/${stats?.rxOnly ?? 0}`} />
+                  </div>
+                  <PreviewTable channels={pipeline.channels} chirpMode={settings.chirp.mode} startLoc={settings.chirp.startLocation} />
+                </Section>
               </div>
             </div>
           )}
-        </Section>
-
-        {/* ───────────── KANALPAKETSSEKTION ───────────── */}
-        <Section
-          title="Kanalpaket"
-          subtitle="Fasta kanaler från CSV-paket i /channelpacks (amatör simplex, marin VHF, PMR446 m.fl.). Varje paket har egna inställningar och egen namngivning."
-        >
-          <ChannelPacksPanel
-            packs={packs}
-            settings={settings}
-            setSettings={setSettings}
-            selectedPackCount={enabledPackCount}
-            selectedChannelCount={selectedPackChannels.length}
-          />
-        </Section>
-
-        {/* ───────────── EXPORT / SORTERING / CHIRP ───────────── */}
-        {rows && (
-          <Section
-            title="Sortering & CHIRP-export"
-            subtitle="Hur de kombinerade kanalerna ordnas i radions minne och vilka CHIRP-fält som används."
-          >
-            <ExportPanel
-              settings={settings} setSettings={setSettings}
-              hasPacks={enabledPackCount > 0}
-            />
-          </Section>
-        )}
-
-        {/* ───────────── PREVIEW ───────────── */}
-        {pipeline && (
-          <Section title="Förhandsgranska & exportera" right={
-            <div className="flex gap-2">
-              <button onClick={exportReport}
-                className="rounded border border-border px-3 py-1.5 text-xs">Ladda ner varningar</button>
-              <button onClick={doExport}
-                className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">
-                Exportera CHIRP-CSV ({pipeline.channels.length} kanaler)
-              </button>
-            </div>
-          }>
-            <div className="grid gap-2 md:grid-cols-5 text-sm mb-3">
-              <Stat label="Input totalt" value={pipeline.totalInput} />
-              <Stat label="SK6BA" value={pipeline.sk6baCount} />
-              <Stat label="Kanalpaket" value={pipeline.packCount} />
-              <Stat label="Filtrerade bort" value={pipeline.filteredOut} />
-              <Stat label="Varn / Koll / Dupes / RX-only" value={`${stats?.warned ?? 0} / ${stats?.collided ?? 0} / ${stats?.dupes ?? 0} / ${stats?.rxOnly ?? 0}`} />
-            </div>
-            <PreviewTable channels={pipeline.channels} chirpMode={settings.chirp.mode} startLoc={settings.chirp.startLocation} />
-          </Section>
-        )}
+        </div>
       </main>
 
       <footer className="border-t border-border mt-12">
-        <div className="mx-auto max-w-7xl px-6 py-4 text-xs text-muted-foreground">
+        <div className="mx-auto max-w-[1600px] px-6 py-4 text-xs text-muted-foreground">
           Verktyget skapar CHIRP-CSV — öppna den i CHIRP och importera till din radioimage. Digitala moder stöds inte i v1.
         </div>
       </footer>
     </div>
   );
 }
+
 
 /* ═══════════════════════════════ HELPERS ═══════════════════════════════ */
 
