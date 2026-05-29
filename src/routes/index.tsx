@@ -513,9 +513,11 @@ function NamingPreview({ naming, kind, sampleChannels }: {
 }
 
 
-function NamingEditor({ value, onChange, tokens, hint, previewKind }: {
+function NamingEditor({ value, onChange, tokens, hint, previewKind, showCityMaxLength = true, sampleChannels }: {
   value: NamingSettings; onChange: (n: NamingSettings) => void;
   tokens: string[]; hint?: string; previewKind?: "repeater" | "pack";
+  showCityMaxLength?: boolean;
+  sampleChannels?: NormalizedChannel[];
 }) {
   const upd = (patch: Partial<NamingSettings>) => onChange({ ...value, ...patch });
   return (
@@ -547,7 +549,9 @@ function NamingEditor({ value, onChange, tokens, hint, previewKind }: {
         <div className="space-y-2">
           <NumberField label="Max längd kanalnamn" value={value.maxLength} onChange={(v) => upd({ maxLength: v })}
             hint="Många radior trunkerar vid 6–7 tecken." />
-          <NumberField label="Max längd ort" value={value.cityMaxLength} onChange={(v) => upd({ cityMaxLength: v })} />
+          {showCityMaxLength && (
+            <NumberField label="Max längd ort" value={value.cityMaxLength} onChange={(v) => upd({ cityMaxLength: v })} />
+          )}
           <Field label="Separator" hint="Tecken mellan tokens. Default: -">
             <input value={value.separator}
               onChange={(e) => upd({ separator: e.target.value })}
@@ -576,10 +580,11 @@ function NamingEditor({ value, onChange, tokens, hint, previewKind }: {
           </Field>
         </div>
       </div>
-      {previewKind && <NamingPreview naming={value} kind={previewKind} />}
+      {previewKind && <NamingPreview naming={value} kind={previewKind} sampleChannels={sampleChannels} />}
     </div>
   );
 }
+
 
 
 /* ───────────── Channel packs panel ───────────── */
