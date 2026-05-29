@@ -646,8 +646,14 @@ function ExportPanel({ settings, setSettings, hasPacks }: {
       )}
 
       <div className="border-t border-border pt-4">
-        <SectionLabel>Sorteringsordning för repeatrar</SectionLabel>
-        <Hint>Klicka för att lägga till/ta bort en sorteringsnyckel. Ordningen styr prioritet.</Hint>
+        <QthHomeDistrictPanel settings={settings} updSort={updSort} />
+      </div>
+
+      <div className="border-t border-border pt-4">
+        <SectionLabel>Sorteringsordning för repeatrar (fallback)</SectionLabel>
+        <Hint>
+          Används när inget hemdistrikt är valt ovan. Klicka för att lägga till/ta bort en sorteringsnyckel. Ordningen styr prioritet.
+        </Hint>
         <div className="flex flex-wrap gap-1 mt-2">
           {(["district","geohash","type","city","frequency"] as const).map((k) => {
             const idx = settings.sort.keys.indexOf(k);
