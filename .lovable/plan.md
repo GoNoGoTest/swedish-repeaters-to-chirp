@@ -1,65 +1,41 @@
-# QTH och hemdistrikt-sortering för repeatrar
+# Repeater-dubbletter + UX-förbättringar för förhandsvisning
 
-Lägg till QTH (Maidenhead-lokator) och hemdistrikt som inställningar. Hemdistriktet sorteras enligt valbar metod (avstånd från QTH som default), övriga distrikt geohash-grupperade i bokstavsordning. Kanalpaketen påverkas inte.
+Tre fristående ändringar mot dagens beteende.
 
-## Nya moduler
+## 1. Sluta varna för sk6ba-vs-sk6ba frekvensdubbletter
 
-**`src/lib/chirp/maidenhead.ts`**
-- `maidenheadToLatLon(grid: string): { lat: number; lon: number } | null`
-- Stöd för 4, 6 och 8 tecken (JO67, JO67bp, JO67bp12)
-- Validering: regex + range-kontroll, returnerar null vid ogiltig input
+I `src/lib/chirp/dedupe.ts`: varna bara när minst en pack-rad krockar med en sk6ba-rad (eller pack-vs-pack). Två SK6BA-rader på samma frekvens är normalt på amatörbanden och ska inte färgas röda.
 
-**`src/lib/chirp/distance.ts`**
-- `haversineKm(a, b): number` — standard haversine, jordradie 6371 km
-- Ren funktion, inga beroenden
+- Behåll dropp-policys (`drop_pack`/`drop_sk6ba`) som idag, men `freq_duplicate`-warningen läggs bara på rader i grupper där `hasSk6ba && hasPack` (eller `packCount >= 2`).
+- Uppdatera `dedupe.test.ts`: ny test "sk6ba-vs-sk6ba does not warn", befintliga pack-vs-sk6ba-tester står kvar.
+- Antalsindikatorn på toppen (rad 124 i `index.tsx`, "X dubbletter") räknar fortfarande `freq_duplicate`-warnings → blir korrekt automatiskt.
 
-**`src/lib/chirp/district.ts`**
-- `extractDistrict(callsign: string): string | null` — plockar ut SM0–SM7, SK0–SK7 etc. ur svenska callsigns (prefix-bokstav + siffra, t.ex. "SK6BA" → "SM6", "SM7XYZ" → "SM7"). Normaliserar SK/SM/SA/SL/SI/7S → distriktssiffra "SM{n}".
-- Hanterar edge cases: utländska anrop returnerar null
+## 2. Split-vy: inställningar vänster, kanal-lista höger på breda skärmar
 
-## Modelländringar
+I `src/routes/index.tsx`, `<main>` (rad 162):
 
-**`src/lib/chirp/models.ts`** — utöka `SortSettings`:
-```ts
-qth_maidenhead?: string;          // "JO67bp"
-home_district?: string | null;    // "SM6" | null
-home_district_sort: "distance" | "geohash" | "alphabetical";
-home_district_first: boolean;     // toggle, default true om hemdistrikt satt
-```
-- Övriga distrikt: alltid geohash inom distriktet, distrikten i bokstavsordning (ej konfigurerbart)
-- Befintlig `sort_keys` blir fallback när inget hemdistrikt är satt
+- På `xl:` och uppåt (≥1280px): tvåkolumnsgrid, `xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]`, gap 6.
+- Vänsterkolumn: alla `<Section>`-block (Källor, Filter, Namngivning, Toner, …, CHIRP-export).
+- Högerkolumn: Förhandsvisning + nedladdningsknapp i en `sticky top-4` container med `max-h-[calc(100vh-2rem)] overflow-auto`.
+- Bredda `max-w-7xl` → `max-w-[1600px]` så det får plats.
+- Under `xl` (inkl. mobil 430px som nu): oförändrat stackad layout.
 
-## Sortering
+Förhandsvisningstabellen får `text-xs` redan idag; inga ändringar i kolumner krävs.
 
-**`src/lib/chirp/sorting.ts`** — ny path för repeatrar när `home_district` är satt:
-1. Dela upp repeater-rader i `home` och `others` baserat på `extractDistrict(callsign) === home_district`
-2. Sortera `home` enligt `home_district_sort`:
-   - `distance` — beräkna avstånd från QTH via maidenhead→latlon→haversine; rader utan koordinater sist
-   - `geohash` — befintlig geohash-logik
-   - `alphabetical` — på callsign/namn
-3. Sortera `others` per distrikt (bokstavsordning), inom varje distrikt geohash
-4. Konkatenera: `home` → `others` (om `home_district_first`) eller infoga `home` på rätt alfabetisk position
-5. Kanalpaket-rader sorteras separat som idag (PackPlacement avgör var de hamnar relativt repeatrarna)
+## 3. Mini-namnförhandsvisning i namngivnings-sektionen
 
-## UI
+I namngivnings-sektionen (runt rad 562 i `index.tsx`):
 
-**`src/routes/index.tsx`** — i Sortering & CHIRP-export-sektionen, ny undersektion "QTH och hemdistrikt" som bara påverkar repeatrar:
-- Textfält: QTH (Maidenhead-lokator), placeholder "JO67bp", live-validering
-- Select: Hemdistrikt (SM0–SM7, "(inget)")
-- Radio: Sortering inom hemdistrikt — Avstånd från QTH / Geohash / Alfabetiskt
-- Checkbox: Visa hemdistrikt först
-- Hjälptext: "Övriga distrikt sorteras geohash-grupperat i bokstavsordning"
-- Disable distansvalet om QTH saknas, med tooltip
+- Lägg till en liten preview-rad under komponentvalen: visa 3 exempelnamn (en SK6BA-repeater, en pack-rad, en lång ortnamns-edge case) byggda via `buildName()` med aktuella inställningar.
+- Render som monospace-chips: `font-mono text-xs px-2 py-1 rounded bg-muted` i en `flex gap-2 flex-wrap`.
+- Exempel-input hårdkodas i en `EXAMPLES`-konstant i samma fil (city/call/channel/district/band) → ingen ny modul behövs.
+- Uppdateras automatiskt via `useMemo` på samma settings som driver pipelinen.
 
-Bumpa localStorage-nyckel till `v4`.
-
-## Tester
-
-- `maidenhead.test.ts` — JO67bp ≈ (57.604, 14.708), invalid input, 4/6/8-tecken
-- `distance.test.ts` — kända avstånd (Göteborg–Stockholm ≈ 397 km)
-- `district.test.ts` — SK6BA→SM6, SM7XYZ→SM7, DL1ABC→null
-- `sorting.test.ts` — utöka: hemdistrikt först, distansordning, fallback utan QTH
+Övriga sektioner (toner, packs, sortering) får ingen mini-preview — namnbygget är det enda där "hur ser ett namn ut" är otydligt utan att scrolla.
 
 ## Verifiering
 
-`bunx vitest run` + `npx tsc --noEmit`, manuell sanity check i preview med en SK6BA-CSV.
+- `bunx vitest run` — dedupe-test grön, sorting/naming opåverkade.
+- Manuell check i preview vid 1440px-bredd: split-layout, sticky preview scrollar med.
+- Mobile 430px: ingen regression, allt stackat som förut.
+- Ladda SK6BA-CSV: två repeatrar på 145.7250 ska INTE längre vara röda.
