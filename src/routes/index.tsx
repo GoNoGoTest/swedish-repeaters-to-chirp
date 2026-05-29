@@ -105,26 +105,39 @@ function Index() {
     return out;
   }, [packs, settings.packs.placement, settings.packs.selection]);
 
+  const loadCsvText = useCallback((text: string) => {
+    const r = parseSk6baCsv(text);
+    setRows(r.rows); setColumns(r.columns);
+    setSummary(summarize(r.rows, r.columns));
+    return r.rows.length;
+  }, []);
+
   const onFile = useCallback(async (file: File) => {
     setLoadError(null);
     const text = await file.text();
     try {
-      const r = parseSk6baCsv(text);
-      setRows(r.rows); setColumns(r.columns);
-      setSummary(summarize(r.rows, r.columns));
+      const rowCount = loadCsvText(text);
+      saveExport({ filename: file.name, content: text, rowCount });
+      setSavedExports(listSavedExports());
     } catch (e) { setLoadError(String(e)); }
+  }, [loadCsvText]);
+
+  const onPickSaved = useCallback((id: string) => {
+    setLoadError(null);
+    const entry = listSavedExports().find((e) => e.id === id);
+    if (!entry) return;
+    try { loadCsvText(entry.content); } catch (e) { setLoadError(String(e)); }
+  }, [loadCsvText]);
+
+  const onDeleteSaved = useCallback((id: string) => {
+    deleteExport(id);
+    setSavedExports(listSavedExports());
   }, []);
 
-  const onUrl = useCallback(async () => {
-    setLoadError(null);
-    try {
-      const res = await fetch(urlInput);
-      const text = await res.text();
-      const r = parseSk6baCsv(text);
-      setRows(r.rows); setColumns(r.columns);
-      setSummary(summarize(r.rows, r.columns));
-    } catch (e) { setLoadError(`Kunde inte hämta URL: ${e}`); }
-  }, [urlInput]);
+  const onClearSaved = useCallback(() => {
+    clearAllExports();
+    setSavedExports([]);
+  }, []);
 
   const pipeline = useMemo(() => {
     if (!rows) return null;
