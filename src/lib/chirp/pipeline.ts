@@ -1,4 +1,4 @@
-import type { NormalizedChannel, RawRow, Settings, Warning } from "./models";
+import type { NormalizedChannel, RawRow, Settings, Warning, NamingSettings } from "./models";
 import { parseNumberLoose } from "./importers/sk6ba";
 import { parseAccess } from "./tones";
 import { parseShift } from "./frequency";
@@ -6,6 +6,7 @@ import { applyFilters } from "./filters";
 import { buildName, resolveCollisions } from "./naming";
 import { sortChannels } from "./sorting";
 import { applyFreqDedupe } from "./dedupe";
+import { DEFAULT_PACK_NAMING } from "./defaults";
 
 function emptyPackFields() {
   return {
@@ -170,26 +171,32 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     combined = sk6baSorted;
   } else if (settings.packs.placement === "prepend") {
     combined = [...packWithPolicy, ...sk6baSorted];
-  } else if (settings.packs.placement === "append") {
-    combined = [...sk6baSorted, ...packWithPolicy];
   } else {
-    // merge_sort
-    combined = sortChannels([...sk6baFiltered, ...packWithPolicy], settings.sort);
+    combined = [...sk6baSorted, ...packWithPolicy];
   }
 
   // Freq dedupe across the whole set
   const dedupe = applyFreqDedupe(combined, settings.packs.freqDupePolicy);
   combined = dedupe.channels;
 
-  // Name everything
+  // Resolve naming per channel using the correct rules
+  // (sk6ba = settings.naming, channel_pack = per-pack override or DEFAULT_PACK_NAMING)
+  const namingFor = (ch: NormalizedChannel): NamingSettings => {
+    if (ch.source_type === "sk6ba") return settings.naming;
+    const override = settings.packs.selection[ch.pack_id]?.naming;
+    return override ?? DEFAULT_PACK_NAMING;
+  };
+
   for (const ch of combined) {
-    const { full, clipped } = buildName(ch, settings.naming);
+    const n = namingFor(ch);
+    const { full, clipped } = buildName(ch, n);
     ch.generated_name_full = full;
     ch.generated_name_final = clipped || "NONAME";
     if (!clipped) ch.warnings.push({ code: "empty_name", message: "Tomt kanalnamn" });
   }
 
-  // Collisions across whole set
+  // Collisions are resolved globally with the repeater naming policy
+  // (we just need a deterministic suffix scheme — maxLength comes from each channel's clipped name).
   const { unresolved } = resolveCollisions(combined, settings.naming);
   for (const ch of combined) {
     if (ch.collided) {
