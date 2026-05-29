@@ -64,7 +64,7 @@ function resolveToken(token: string, ch: NormalizedChannel, n: NamingSettings): 
  * faller vi tillbaka på name_hint / channel / label så att raden får ett vettigt
  * default-namn utan att användaren behöver mecka med tokens.
  */
-export function buildName(ch: NormalizedChannel, n: NamingSettings): { full: string; clipped: string } {
+export function buildName(ch: NormalizedChannel, n: NamingSettings, maxLength: number): { full: string; clipped: string } {
   const parts = n.components
     .map((t) => resolveToken(t, ch, n))
     .map((p) => sanitize(p, { transliterate: n.transliterate, uppercase: n.uppercase }))
@@ -76,7 +76,7 @@ export function buildName(ch: NormalizedChannel, n: NamingSettings): { full: str
     full = sanitize(fallback, { transliterate: n.transliterate, uppercase: n.uppercase });
   }
 
-  const clipped = n.maxLength > 0 ? full.slice(0, n.maxLength) : full;
+  const clipped = maxLength > 0 ? full.slice(0, maxLength) : full;
   return { full, clipped };
 }
 
