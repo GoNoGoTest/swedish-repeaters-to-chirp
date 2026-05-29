@@ -514,9 +514,10 @@ function NamingPreview({ naming, kind, maxLength, sampleChannels }: {
 }
 
 
-function NamingEditor({ value, onChange, tokens, hint, previewKind, showCityMaxLength = true, sampleChannels }: {
+function NamingEditor({ value, onChange, tokens, hint, previewKind, maxLength, showCityMaxLength = true, sampleChannels }: {
   value: NamingSettings; onChange: (n: NamingSettings) => void;
   tokens: string[]; hint?: string; previewKind?: "repeater" | "pack";
+  maxLength: number;
   showCityMaxLength?: boolean;
   sampleChannels?: NormalizedChannel[];
 }) {
@@ -548,8 +549,6 @@ function NamingEditor({ value, onChange, tokens, hint, previewKind, showCityMaxL
           {hint && <Hint>{hint}</Hint>}
         </div>
         <div className="space-y-2">
-          <NumberField label="Max längd kanalnamn" value={value.maxLength} onChange={(v) => upd({ maxLength: v })}
-            hint="Många radior trunkerar vid 6–7 tecken." />
           {showCityMaxLength && (
             <NumberField label="Max längd ort" value={value.cityMaxLength} onChange={(v) => upd({ cityMaxLength: v })} />
           )}
@@ -581,7 +580,7 @@ function NamingEditor({ value, onChange, tokens, hint, previewKind, showCityMaxL
           </Field>
         </div>
       </div>
-      {previewKind && <NamingPreview naming={value} kind={previewKind} sampleChannels={sampleChannels} />}
+      {previewKind && <NamingPreview naming={value} kind={previewKind} maxLength={maxLength} sampleChannels={sampleChannels} />}
     </div>
   );
 }
