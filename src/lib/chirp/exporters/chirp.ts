@@ -5,8 +5,19 @@ import { formatFrequency } from "../frequency";
 export const CHIRP_COLUMNS = [
   "Location","Name","Frequency","Duplex","Offset","Tone","rToneFreq","cToneFreq",
   "DtcsCode","DtcsPolarity","RxDtcsCode","CrossMode","Mode","TStep","Skip",
-  "Comment","URCALL","RPT1CALL","RPT2CALL","DVCODE",
+  "Power","Comment","URCALL","RPT1CALL","RPT2CALL",
 ];
+
+// Technical CSV-import defaults. CHIRP/RMS parse these columns as float/int
+// even when Tone is empty, so the columns must always carry parsable values.
+// These are NOT user-facing access settings.
+const DEFAULT_RTONE = "88.5";
+const DEFAULT_CTONE = "88.5";
+const DEFAULT_DTCS = "023";
+const DEFAULT_DTCS_POL = "NN";
+const DEFAULT_RX_DTCS = "023";
+const DEFAULT_CROSS = "Tone->";
+const DEFAULT_POWER = "10.0W";
 
 function resolveMode(c: NormalizedChannel, fallback: string): string {
   if (c.source_type === "channel_pack" && c.mode_chirp) return c.mode_chirp;
@@ -49,9 +60,17 @@ interface ToneFields {
   CrossMode: string;
 }
 
-const EMPTY_TONE: ToneFields = {
-  Tone: "", rToneFreq: "", cToneFreq: "",
-  DtcsCode: "", DtcsPolarity: "", RxDtcsCode: "", CrossMode: "",
+// Defaults are chosen so CHIRP generic CSV import never trips on
+// `could not convert string to float: ''`. Tone is left empty here when
+// the row has no actual tone; callers override specific fields per branch.
+const DEFAULT_TONE_FIELDS: ToneFields = {
+  Tone: "",
+  rToneFreq: DEFAULT_RTONE,
+  cToneFreq: DEFAULT_CTONE,
+  DtcsCode: DEFAULT_DTCS,
+  DtcsPolarity: DEFAULT_DTCS_POL,
+  RxDtcsCode: DEFAULT_RX_DTCS,
+  CrossMode: DEFAULT_CROSS,
 };
 
 function resolveToneFields(c: NormalizedChannel): ToneFields {
@@ -60,34 +79,39 @@ function resolveToneFields(c: NormalizedChannel): ToneFields {
     const t = (c.tone_raw || "").trim().toUpperCase();
     if (t === "TSQL") {
       const f = c.ctone_freq ?? c.rtone_freq ?? c.ctcss_tx;
-      if (f == null) return EMPTY_TONE;
-      return { ...EMPTY_TONE, Tone: "TSQL", rToneFreq: f.toFixed(1), cToneFreq: f.toFixed(1) };
+      if (f == null) return { ...DEFAULT_TONE_FIELDS };
+      return { ...DEFAULT_TONE_FIELDS, Tone: "TSQL", rToneFreq: f.toFixed(1), cToneFreq: f.toFixed(1) };
     }
     if (t === "DTCS" || t === "DCS") {
-      if (!c.dtcs_code) return EMPTY_TONE;
-      return { ...EMPTY_TONE, Tone: "DTCS", DtcsCode: c.dtcs_code, DtcsPolarity: c.dtcs_polarity || "NN" };
+      if (!c.dtcs_code) return { ...DEFAULT_TONE_FIELDS };
+      return {
+        ...DEFAULT_TONE_FIELDS,
+        Tone: "DTCS",
+        DtcsCode: c.dtcs_code,
+        DtcsPolarity: c.dtcs_polarity || "NN",
+      };
     }
     if (t === "TONE" || (t === "" && c.rtone_freq != null)) {
       const f = c.rtone_freq ?? c.ctcss_tx;
-      if (f == null) return EMPTY_TONE;
-      return { ...EMPTY_TONE, Tone: "Tone", rToneFreq: f.toFixed(1) };
+      if (f == null) return { ...DEFAULT_TONE_FIELDS };
+      return { ...DEFAULT_TONE_FIELDS, Tone: "Tone", rToneFreq: f.toFixed(1) };
     }
-    return EMPTY_TONE;
+    return { ...DEFAULT_TONE_FIELDS };
   }
-  // SK6BA-row: CTCSS-TX wins; otherwise DCS-from-access → Cross; else empty.
+  // SK6BA-row: CTCSS-TX wins; otherwise DCS-from-access → Cross; else defaults.
   if (c.ctcss_tx != null) {
-    return { ...EMPTY_TONE, Tone: "Tone", rToneFreq: c.ctcss_tx.toFixed(1) };
+    return { ...DEFAULT_TONE_FIELDS, Tone: "Tone", rToneFreq: c.ctcss_tx.toFixed(1) };
   }
   if (c.dtcs_code) {
     return {
-      ...EMPTY_TONE,
+      ...DEFAULT_TONE_FIELDS,
       Tone: "Cross",
       DtcsCode: c.dtcs_code,
       DtcsPolarity: c.dtcs_polarity || "NN",
       CrossMode: "DTCS->",
     };
   }
-  return EMPTY_TONE;
+  return { ...DEFAULT_TONE_FIELDS };
 }
 
 export function toChirpRows(channels: NormalizedChannel[], s: ChirpSettings) {
@@ -109,13 +133,13 @@ export function toChirpRows(channels: NormalizedChannel[], s: ChirpSettings) {
       RxDtcsCode: tone.RxDtcsCode,
       CrossMode: tone.CrossMode,
       Mode: resolveMode(c, s.mode),
-      TStep: resolveTStep(c, s.tStep).toFixed(1),
+      TStep: resolveTStep(c, s.tStep).toFixed(2),
       Skip: skip,
+      Power: DEFAULT_POWER,
       Comment: resolveComment(c),
       URCALL: "",
       RPT1CALL: "",
       RPT2CALL: "",
-      DVCODE: "",
     };
   });
 }

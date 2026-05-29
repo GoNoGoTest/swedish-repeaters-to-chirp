@@ -5,10 +5,16 @@ import { makeChannel } from "../helpers";
 
 const chirp = DEFAULT_SETTINGS.chirp;
 
+const EXPECTED_HEADER =
+  "Location,Name,Frequency,Duplex,Offset,Tone,rToneFreq,cToneFreq,DtcsCode,DtcsPolarity,RxDtcsCode,CrossMode,Mode,TStep,Skip,Power,Comment,URCALL,RPT1CALL,RPT2CALL";
+
 describe("CHIRP exporter", () => {
-  it("emits header with CHIRP columns", () => {
+  it("emits the RMS/CHIRP-compatible header (Power before Comment, no DVCODE)", () => {
     const csv = exportChirpCsv([], chirp);
-    expect(csv.split(/\r?\n/)[0]).toBe(CHIRP_COLUMNS.join(","));
+    const header = csv.split(/\r?\n/)[0];
+    expect(header).toBe(EXPECTED_HEADER);
+    expect(CHIRP_COLUMNS).not.toContain("DVCODE");
+    expect(CHIRP_COLUMNS.indexOf("Power")).toBeLessThan(CHIRP_COLUMNS.indexOf("Comment"));
   });
 
   it("formats frequency to 6 decimals and sets Location starting at startLocation", () => {
@@ -57,26 +63,34 @@ describe("CHIRP exporter", () => {
     expect(rows[0].Comment).toContain("src=SSA");
   });
 
-  it("sets Tone when ctcss_tx present, leaves cTone/DTCS empty", () => {
+  it("includes Power default of 10.0W", () => {
+    const c = makeChannel({ generated_name_final: "X" });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Power).toBe("10.0W");
+  });
+
+  it("sets Tone when ctcss_tx present, with numeric defaults in unused tone fields", () => {
     const c = makeChannel({ generated_name_final: "X", ctcss_tx: 123.0 });
     const rows = toChirpRows([c], chirp);
     expect(rows[0].Tone).toBe("Tone");
     expect(rows[0].rToneFreq).toBe("123.0");
-    expect(rows[0].cToneFreq).toBe("");
-    expect(rows[0].DtcsCode).toBe("");
-    expect(rows[0].DtcsPolarity).toBe("");
-    expect(rows[0].RxDtcsCode).toBe("");
-    expect(rows[0].CrossMode).toBe("");
+    expect(rows[0].cToneFreq).toBe("88.5");
+    expect(rows[0].DtcsCode).toBe("023");
+    expect(rows[0].DtcsPolarity).toBe("NN");
+    expect(rows[0].RxDtcsCode).toBe("023");
+    expect(rows[0].CrossMode).toBe("Tone->");
   });
 
-  it("SK6BA without CTCSS leaves all tone fields empty", () => {
+  it("SK6BA without any tone leaves Tone empty but writes numeric defaults", () => {
     const c = makeChannel({ generated_name_final: "X" });
     const rows = toChirpRows([c], chirp);
     expect(rows[0].Tone).toBe("");
-    expect(rows[0].rToneFreq).toBe("");
-    expect(rows[0].cToneFreq).toBe("");
-    expect(rows[0].DtcsCode).toBe("");
-    expect(rows[0].DtcsPolarity).toBe("");
+    expect(rows[0].rToneFreq).toBe("88.5");
+    expect(rows[0].cToneFreq).toBe("88.5");
+    expect(rows[0].DtcsCode).toBe("023");
+    expect(rows[0].DtcsPolarity).toBe("NN");
+    expect(rows[0].RxDtcsCode).toBe("023");
+    expect(rows[0].CrossMode).toBe("Tone->");
   });
 
   it("pack with tone=TSQL fills rTone and cTone", () => {
@@ -88,10 +102,10 @@ describe("CHIRP exporter", () => {
     expect(rows[0].Tone).toBe("TSQL");
     expect(rows[0].rToneFreq).toBe("123.0");
     expect(rows[0].cToneFreq).toBe("123.0");
-    expect(rows[0].DtcsCode).toBe("");
+    expect(rows[0].DtcsCode).toBe("023");
   });
 
-  it("pack with tone=DTCS fills only DTCS fields", () => {
+  it("pack with tone=DTCS fills only DTCS fields, defaults on tone freqs", () => {
     const c = makeChannel({
       source_type: "channel_pack", generated_name_final: "X",
       tone_raw: "DTCS", dtcs_code: "411", dtcs_polarity: "NN",
@@ -100,27 +114,28 @@ describe("CHIRP exporter", () => {
     expect(rows[0].Tone).toBe("DTCS");
     expect(rows[0].DtcsCode).toBe("411");
     expect(rows[0].DtcsPolarity).toBe("NN");
-    expect(rows[0].rToneFreq).toBe("");
-    expect(rows[0].cToneFreq).toBe("");
+    expect(rows[0].rToneFreq).toBe("88.5");
+    expect(rows[0].cToneFreq).toBe("88.5");
   });
 
-  it("pack with empty tone and no rtone_freq leaves tone fields empty", () => {
+  it("pack with empty tone leaves Tone empty but writes numeric defaults", () => {
     const c = makeChannel({ source_type: "channel_pack", generated_name_final: "X" });
     const rows = toChirpRows([c], chirp);
     expect(rows[0].Tone).toBe("");
-    expect(rows[0].rToneFreq).toBe("");
-    expect(rows[0].cToneFreq).toBe("");
+    expect(rows[0].rToneFreq).toBe("88.5");
+    expect(rows[0].cToneFreq).toBe("88.5");
   });
 
-  it("SK6BA with DCS access exports as Cross + DTCS->", () => {
+  it("SK6BA with DCS access exports as Cross + DTCS-> with numeric tone defaults", () => {
     const c = makeChannel({ generated_name_final: "X", dtcs_code: "025", dtcs_polarity: "NN" });
     const rows = toChirpRows([c], chirp);
     expect(rows[0].Tone).toBe("Cross");
     expect(rows[0].DtcsCode).toBe("025");
     expect(rows[0].DtcsPolarity).toBe("NN");
     expect(rows[0].CrossMode).toBe("DTCS->");
-    expect(rows[0].rToneFreq).toBe("");
-    expect(rows[0].cToneFreq).toBe("");
+    expect(rows[0].rToneFreq).toBe("88.5");
+    expect(rows[0].cToneFreq).toBe("88.5");
+    expect(rows[0].RxDtcsCode).toBe("023");
   });
 
   it("SK6BA with both CTCSS and DCS prefers CTCSS", () => {
@@ -128,7 +143,27 @@ describe("CHIRP exporter", () => {
     const rows = toChirpRows([c], chirp);
     expect(rows[0].Tone).toBe("Tone");
     expect(rows[0].rToneFreq).toBe("123.0");
-    expect(rows[0].DtcsCode).toBe("");
-    expect(rows[0].CrossMode).toBe("");
+    expect(rows[0].DtcsCode).toBe("023");
+    expect(rows[0].CrossMode).toBe("Tone->");
+  });
+
+  it("never produces empty rToneFreq, cToneFreq, DtcsCode, DtcsPolarity, RxDtcsCode or CrossMode", () => {
+    const channels = [
+      makeChannel({ generated_name_final: "A" }),
+      makeChannel({ generated_name_final: "B", ctcss_tx: 77.0 }),
+      makeChannel({ generated_name_final: "C", dtcs_code: "025", dtcs_polarity: "NN" }),
+      makeChannel({ source_type: "channel_pack", generated_name_final: "D" }),
+    ];
+    const rows = toChirpRows(channels, chirp);
+    for (const r of rows) {
+      expect(r.rToneFreq).not.toBe("");
+      expect(r.cToneFreq).not.toBe("");
+      expect(r.DtcsCode).not.toBe("");
+      expect(r.DtcsPolarity).not.toBe("");
+      expect(r.RxDtcsCode).not.toBe("");
+      expect(r.CrossMode).not.toBe("");
+      expect(Number.isFinite(parseFloat(r.rToneFreq))).toBe(true);
+      expect(Number.isFinite(parseFloat(r.cToneFreq))).toBe(true);
+    }
   });
 });
