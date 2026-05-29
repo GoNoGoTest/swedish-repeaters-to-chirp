@@ -74,9 +74,18 @@ function resolveToneFields(c: NormalizedChannel): ToneFields {
     }
     return EMPTY_TONE;
   }
-  // SK6BA-row: only transmit-CTCSS, never TSQL/DTCS.
+  // SK6BA-row: CTCSS-TX wins; otherwise DCS-from-access → Cross; else empty.
   if (c.ctcss_tx != null) {
     return { ...EMPTY_TONE, Tone: "Tone", rToneFreq: c.ctcss_tx.toFixed(1) };
+  }
+  if (c.dtcs_code) {
+    return {
+      ...EMPTY_TONE,
+      Tone: "Cross",
+      DtcsCode: c.dtcs_code,
+      DtcsPolarity: c.dtcs_polarity || "NN",
+      CrossMode: "DTCS->",
+    };
   }
   return EMPTY_TONE;
 }
