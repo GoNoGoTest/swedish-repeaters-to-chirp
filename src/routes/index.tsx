@@ -623,9 +623,10 @@ function ChannelPacksPanel({
   );
 }
 
-function PackRow({ pack, entry, onChange }: {
+function PackRow({ pack, entry, maxLength, onChange }: {
   pack: MergedPack;
   entry: PackSelectionEntry | undefined;
+  maxLength: number;
   onChange: (patch: Partial<PackSelectionEntry>) => void;
 }) {
   const [open, setOpen] = useState(false);
