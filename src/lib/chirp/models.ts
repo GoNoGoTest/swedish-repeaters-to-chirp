@@ -101,7 +101,6 @@ export interface FilterSettings {
 export interface NamingSettings {
   components: string[];
   separator: string;
-  maxLength: number;
   cityMaxLength: number;
   transliterate: boolean;
   uppercase: boolean;
