@@ -127,20 +127,26 @@ export interface SortSettings {
   geohashPrecision: number;
 }
 
-export type PackPlacement = "off" | "prepend" | "append" | "merge_sort";
+export type PackPlacement = "off" | "prepend" | "append";
 export type FreqDupePolicy = "keep_both" | "drop_pack" | "drop_sk6ba" | "stop";
 export type RxOnlyPolicy = "mark" | "duplex_off" | "skip" | "stop";
 
+export interface PackSelectionEntry {
+  /** Pack is included in export at all */
+  enabled: boolean;
+  bands: string[];
+  categories: string[];
+  tags: string[];
+  /** Restrict to rows where enabled_default=true */
+  useEnabledDefault: boolean;
+  /** Manual allowlist of source_ids — overrides band/cat/tag/enabled_default */
+  manualSourceIds?: string[];
+  /** Per-pack naming override. If omitted, DEFAULT_PACK_NAMING from defaults.ts is used. */
+  naming?: NamingSettings;
+}
+
 export interface PackSelection {
-  // pack_id -> { enabled, bands, categories, tags, sourceIds (manual overrides) }
-  [packId: string]: {
-    bands: string[];
-    categories: string[];
-    tags: string[];
-    useEnabledDefault: boolean;
-    /** If non-empty: an explicit allowlist of source_ids. Overrides band/cat/tag/enabled_default. */
-    manualSourceIds?: string[];
-  };
+  [packId: string]: PackSelectionEntry;
 }
 
 export interface ChannelPackSettings {
