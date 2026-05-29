@@ -200,8 +200,12 @@ function Index() {
             >
               {!rows && (
                 <RepeaterLoader
-                  urlInput={urlInput} setUrlInput={setUrlInput}
-                  onFile={onFile} onUrl={onUrl} loadError={loadError}
+                  onFile={onFile}
+                  loadError={loadError}
+                  savedExports={savedExports}
+                  onPickSaved={onPickSaved}
+                  onDeleteSaved={onDeleteSaved}
+                  onClearSaved={onClearSaved}
                 />
               )}
 
