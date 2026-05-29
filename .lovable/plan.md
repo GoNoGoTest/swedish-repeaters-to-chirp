@@ -1,61 +1,48 @@
 ## Mål
 
-Stötta DCS/DTCS som accessmetod för SK6BA-rader. När access innehåller `DCS 025` (eller varianter) ska CHIRP-exporten skriva `Tone=Cross`, `DtcsCode=025`, `DtcsPolarity=NN`, `CrossMode=DTCS->`, utan att röra `rToneFreq`/`cToneFreq`. Pack-grenens befintliga DTCS-hantering (`tone_raw=DTCS`) lämnas orörd.
+Reversera den tidigare "fyll med defaults"-fixen i CHIRP-CSV-exporten. Ton-/DCS-kolumner ska bara innehålla värden när raden faktiskt använder respektive funktion. Övriga defaults (Mode, TStep, Power, Offset) lämnas orörda.
+
+## Varning
+
+Detta upphäver den tidigare fixen som löste `could not convert string to float: ''` i CHIRP/Nicsure RMS. Du har bekräftat att vi kör ändå.
 
 ## Ändringar
 
-### 1. `src/lib/chirp/tones.ts`
+### 1. `src/lib/chirp/exporters/chirp.ts`
 
-Utöka `ToneParse`:
+- Ta bort konstanterna `DEFAULT_RTONE`, `DEFAULT_CTONE`, `DEFAULT_DTCS`, `DEFAULT_DTCS_POL`, `DEFAULT_RX_DTCS`, `DEFAULT_CROSS` och `DEFAULT_TONE_FIELDS`.
+- Behåll `DEFAULT_POWER = "10.0W"`.
+- Skriv om `resolveToneFields` så den returnerar tomma strängar i alla fält som inte är semantiskt aktiva för raden:
+  - **Ingen access / Carrier / 1750 only / okänd:** alla sju ton-/DCS-fält tomma.
+  - **CTCSS (SK6BA `ctcss_tx` eller pack `Tone`):** `Tone="Tone"`, `rToneFreq=<freq>`, övriga tomma. (cToneFreq tomt — inte TSQL.)
+  - **Pack TSQL:** `Tone="TSQL"`, `rToneFreq` och `cToneFreq` satta, övriga tomma.
+  - **Pack DTCS:** `Tone="DTCS"`, `DtcsCode`, `DtcsPolarity` satta, övriga tomma.
+  - **SK6BA DCS från access:** `Tone="Cross"`, `DtcsCode`, `DtcsPolarity="NN"`, `CrossMode="DTCS->"`, övriga tomma (inkl. `rToneFreq`/`cToneFreq`/`RxDtcsCode`).
+- CTCSS-före-DCS-prioriteringen behålls.
 
-```ts
-export interface ToneParse {
-  ctcss: number | null;
-  uses1750: boolean;
-  carrier: boolean;
-  dcs: string | null; // normaliserad 3-siffrig DCS-kod
-}
-```
+### 2. `src/lib/chirp/__tests__/exporters/chirp.test.ts`
 
-Tokeniserings­logik:
+Uppdatera de befintliga testerna som idag förväntar sig defaults:
+- `"SK6BA without any tone leaves Tone empty but writes numeric defaults"` → byt namn och förvänta tomma fält.
+- `"sets Tone when ctcss_tx present, with numeric defaults in unused tone fields"` → förvänta `cToneFreq=""`, `DtcsCode=""`, `DtcsPolarity=""`, `RxDtcsCode=""`, `CrossMode=""`.
+- `"pack with tone=TSQL fills rTone and cTone"` → `DtcsCode=""`.
+- `"pack with tone=DTCS fills only DTCS fields, defaults on tone freqs"` → `rToneFreq=""`, `cToneFreq=""`.
+- `"pack with empty tone leaves Tone empty but writes numeric defaults"` → förvänta tomt.
+- `"SK6BA with DCS access exports as Cross + DTCS-> with numeric tone defaults"` → `rToneFreq=""`, `cToneFreq=""`, `RxDtcsCode=""`.
+- `"SK6BA with both CTCSS and DCS prefers CTCSS"` → `DtcsCode=""`, `CrossMode=""`.
+- `"never produces empty rToneFreq, cToneFreq, ..."` → ersätt med motsatt invariant: ton-/DCS-fält är tomma om inte radens accessmodell aktivt använder dem; 88.5/023/NN/`Tone->` förekommer aldrig som filler.
 
-- Splitta som idag på `[\s/|;]+`.
-- Före nuvarande number-loop: skanna tokens efter DCS-mönster:
-  - Token-par: `DCS`/`DTCS` följt av rent siffer­token (1–3 siffror) → fånga koden.
-  - Enkel token: `^(?:DCS|DTCS)0*(\d{1,3})$` (sammanskrivet, t.ex. `DCS025`).
-  - Enkel token: `^D0*(\d{1,3})$` endast om token är exakt 4 tecken och börjar med `D` följt av siffror, för att inte kollidera med t.ex. `D7` som distriktsnotation om sådan dyker upp i access. Säker eftersom access-fält.
-- Normalisera koden via `String(n).padStart(3, "0")`.
-- Konsumera de tokens som matchats så att `025` inte sen råkar gå in i CTCSS-loopen (i praktiken faller 25 utanför 40–300, men explicit konsumtion är säkrare).
-- Returnera `dcs: string | null`.
+Lägg till regressionsfall enligt specen:
+- Carrier-rad (`access="Carrier"`) → alla sju ton-/DCS-fält tomma.
+- 1750-only (`uses_1750=true`) → alla sju tomma.
+- CTCSS 146.2 och 114.8 → endast `Tone` + `rToneFreq`.
 
-Prioritet i parsern: ren parsning, ingen prioritet — den görs i exporten/normaliseraren.
+### 3. Övrigt
 
-### 2. `src/lib/chirp/pipeline.ts` (normalize)
+- Header och kolumnordning (inkl. `Power` före `Comment`, inget `DVCODE`) behålls oförändrad.
+- `pipeline.ts`, `tones.ts`, `models.ts` orörda — accessparsern fungerar redan.
 
-- Plocka `access.dcs` och lagra på SK6BA-kanalen. Förslag: återanvänd `dtcs_code` (pack-fältet) — den är tomsträng för SK6BA idag och fyller exakt samma roll. Sätt även `dtcs_polarity = "NN"` när `dcs` finns. (Alternativt nytt fält `ctcss_tx_dcs`; återanvändning är minimalt invasivt.)
-- Lägg varning `unknown_access` redan idag-villkor utvidgas: `!ctcss && !uses1750 && !carrier && !dcs && r.access`.
-- Lägg varning `ctcss_and_dcs` när både `access.ctcss` och `access.dcs` finns (informativ).
+## Verifiering
 
-### 3. `src/lib/chirp/exporters/chirp.ts` (`resolveToneFields`, SK6BA-grenen)
-
-Ny prioritetsordning i SK6BA-grenen:
-
-1. `c.ctcss_tx != null` → `Tone=Tone`, `rToneFreq` (oförändrat).
-2. Annars `c.dtcs_code` (från access-DCS) → `Tone=Cross`, `DtcsCode=c.dtcs_code`, `DtcsPolarity="NN"`, `CrossMode="DTCS->"`, övriga tomma.
-3. Annars `EMPTY_TONE`.
-
-Pack-grenen (`source_type === "channel_pack"`) lämnas helt orörd — den styrs av `tone_raw`.
-
-### 4. Tester
-
-- `src/lib/chirp/__tests__/tones.test.ts`: parsa `DCS 025`, `DCS025`, `DTCS 025`, `DTCS025`, `D025` → `dcs === "025"`. Parsa `25` (utan DCS-prefix) → `dcs === null`. Parsa `1750/DCS 025` → `dcs === "025"`, `uses1750 === true`. Parsa `123.0/DCS 025` → båda satta.
-- `src/lib/chirp/__tests__/exporters/chirp.test.ts`: SK6BA-kanal med `dtcs_code="025"`, `dtcs_polarity="NN"` (utan `ctcss_tx`) → `Tone=Cross`, `DtcsCode=025`, `DtcsPolarity=NN`, `CrossMode=DTCS->`, `rToneFreq` och `cToneFreq` tomma. CTCSS+DCS samtidigt → CTCSS vinner.
-- `src/lib/chirp/__tests__/pipeline.test.ts`: regressionsfall — rad med `type=Link`, `mode=FM`, `network=AllStarLink`, `access="DCS 025"`, `output=145.2375`, `tx_shift=Simplex` → exporterad kanal med rätt fält och `Frequency=145.237500`.
-
-## Det jag avråder från i förslaget
-
-- Att lägga in `D025` som obligatoriskt format om källdata aldrig använder det — risk för fel­matchning. Stöder det defensivt (endast `D` + siffror, exakt fyra tecken), men det är inte ett krav.
-
-## Risker
-
-Låga. Pack-export­logiken är isolerad via `source_type`-check och rörs inte. `EMPTY_TONE`-fallback gäller fortfarande för rader utan CTCSS och utan DCS. Inga API-ändringar utåt; bara `ToneParse` får ett nytt fält och en SK6BA-kanal kan nu få `dtcs_code` ifyllt.
+- `bunx vitest run` — alla tester (inkl. uppdaterade) ska passera.
+- Manuell visuell kontroll: en KULLAVIK-liknande rad utan access ska få sju tomma kolumner mellan `Offset` och `Mode`.
