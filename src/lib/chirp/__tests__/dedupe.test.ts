@@ -27,9 +27,9 @@ describe("applyFreqDedupe", () => {
     expect(r.channels).toEqual([b]);
   });
 
-  it("stop sets stopped flag without removing", () => {
-    const a = makeChannel({ rx_frequency: 145.6 });
-    const b = makeChannel({ rx_frequency: 145.6 });
+  it("stop sets stopped flag without removing (pack vs sk6ba)", () => {
+    const a = makeChannel({ rx_frequency: 145.6, source_type: "sk6ba" });
+    const b = makeChannel({ rx_frequency: 145.6, source_type: "channel_pack" });
     const r = applyFreqDedupe([a, b], "stop");
     expect(r.stopped).toBe(true);
     expect(r.channels).toHaveLength(2);
@@ -41,4 +41,21 @@ describe("applyFreqDedupe", () => {
     applyFreqDedupe([a, b], "keep_both");
     expect(a.warnings).toEqual([]);
   });
+
+  it("sk6ba-vs-sk6ba does not warn (repeaters share frequencies legitimately)", () => {
+    const a = makeChannel({ rx_frequency: 145.725, source_type: "sk6ba" });
+    const b = makeChannel({ rx_frequency: 145.725, source_type: "sk6ba" });
+    const r = applyFreqDedupe([a, b], "keep_both");
+    expect(r.channels).toHaveLength(2);
+    expect(a.warnings).toEqual([]);
+    expect(b.warnings).toEqual([]);
+  });
+
+  it("pack-vs-pack does warn", () => {
+    const a = makeChannel({ rx_frequency: 446.00625, source_type: "channel_pack" });
+    const b = makeChannel({ rx_frequency: 446.00625, source_type: "channel_pack" });
+    applyFreqDedupe([a, b], "keep_both");
+    expect(a.warnings.some((w) => w.code === "freq_duplicate")).toBe(true);
+  });
 });
+
