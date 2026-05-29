@@ -1,50 +1,65 @@
-## Mål
+# QTH och hemdistrikt-sortering för repeatrar
 
-Installera Vitest och bygga en testsvit som täcker importer, pipeline, naming, export och channel pack-stöd enligt punkt 1–23 i specen.
+Lägg till QTH (Maidenhead-lokator) och hemdistrikt som inställningar. Hemdistriktet sorteras enligt valbar metod (avstånd från QTH som default), övriga distrikt geohash-grupperade i bokstavsordning. Kanalpaketen påverkas inte.
 
-## Steg
+## Nya moduler
 
-1. **Installera devberoenden**
-   - `vitest`, `@vitest/ui`, `@types/node` (om saknas)
-   - Lägg till `"test": "vitest run"` och `"test:watch": "vitest"` i `package.json`
-   - Skapa minimal `vitest.config.ts` med alias `@` → `src` (matchar Vite-config)
+**`src/lib/chirp/maidenhead.ts`**
+- `maidenheadToLatLon(grid: string): { lat: number; lon: number } | null`
+- Stöd för 4, 6 och 8 tecken (JO67, JO67bp, JO67bp12)
+- Validering: regex + range-kontroll, returnerar null vid ogiltig input
 
-2. **Testkatalog**
-   - `src/lib/chirp/__tests__/` med en fil per modul
+**`src/lib/chirp/distance.ts`**
+- `haversineKm(a, b): number` — standard haversine, jordradie 6371 km
+- Ren funktion, inga beroenden
 
-3. **Testfiler och täckning**
+**`src/lib/chirp/district.ts`**
+- `extractDistrict(callsign: string): string | null` — plockar ut SM0–SM7, SK0–SK7 etc. ur svenska callsigns (prefix-bokstav + siffra, t.ex. "SK6BA" → "SM6", "SM7XYZ" → "SM7"). Normaliserar SK/SM/SA/SL/SI/7S → distriktssiffra "SM{n}".
+- Hanterar edge cases: utländska anrop returnerar null
 
-   - `frequency.test.ts` — parse av MHz-strängar, shift-tolkning (`+`, `-`, `±`, numeriska kHz/MHz), edge cases
-   - `tones.test.ts` — CTCSS-parsning ur access-fältet (Hz, "1750", DCS), normalisering till CHIRP-toner
-   - `naming.test.ts` — komponentordning, maxlängd-trunkering, smart-join utan dubbla separatorer, tomma tokens, kollisionssuffix
-   - `filters.test.ts` — default-filter (Repeater/Link/Hotspot), mode=FM, exkludering av digitala lägen
-   - `geohash.test.ts` / `sorting.test.ts` — sort stabilitet, geohash-fallback när koordinater saknas
-   - `importers/sk6ba.test.ts` — parsning av exempelraderna från Marks-CSV (litet inline-fixture), tx_shift, access, comment-bevarande av 1750
-   - `importers/channel_pack.test.ts` — CSV-parsning, validering av obligatoriska fält, `rx_only`, `tx_allowed`, `license_note`, varning vid duplicerade `source_id` (ej hård-fail)
-   - `channel_packs/registry.test.ts` — laddar medföljande 2 m/70 cm-pack, kontroll av antal kanaler och band-metadata
-   - `dedupe.test.ts` — frekvenskollision mellan SK6BA och pack enligt policy
-   - `pipeline.test.ts` — end-to-end: SK6BA + pack → placement `prepend`/`append`/`merge_sort`, namn-kollisioner globalt, RX-only-policy (`Duplex=off` vs skip)
-   - `exporters/chirp.test.ts` — CHIRP-CSV-header och radformat, `Duplex=split` med `tx_frequency`, `Comment` innehåller license_note + 1750/access, korrekt escaping
+## Modelländringar
 
-4. **Fixtures**
-   - `src/lib/chirp/__tests__/fixtures/sk6ba-sample.csv` — minimal utdrag (~10 rader) som täcker repeater, link, hotspot, 1750, CTCSS, digital (filtreras bort)
-   - Återanvänd befintliga `channelpacks/*.csv` via `?raw`-import eller `fs.readFileSync` i Node-testmiljön
+**`src/lib/chirp/models.ts`** — utöka `SortSettings`:
+```ts
+qth_maidenhead?: string;          // "JO67bp"
+home_district?: string | null;    // "SM6" | null
+home_district_sort: "distance" | "geohash" | "alphabetical";
+home_district_first: boolean;     // toggle, default true om hemdistrikt satt
+```
+- Övriga distrikt: alltid geohash inom distriktet, distrikten i bokstavsordning (ej konfigurerbart)
+- Befintlig `sort_keys` blir fallback när inget hemdistrikt är satt
 
-5. **Konfiguration**
-   - `vitest.config.ts`: `environment: 'node'`, inkludera `.csv?raw` via samma plugin-setup som Vite (eller läs filer med `fs` för enkelhet)
+## Sortering
 
-6. **Verifiering**
-   - Kör `bun run test` → alla gröna
-   - Kör `npx tsc --noEmit` → fortsatt grön
+**`src/lib/chirp/sorting.ts`** — ny path för repeatrar när `home_district` är satt:
+1. Dela upp repeater-rader i `home` och `others` baserat på `extractDistrict(callsign) === home_district`
+2. Sortera `home` enligt `home_district_sort`:
+   - `distance` — beräkna avstånd från QTH via maidenhead→latlon→haversine; rader utan koordinater sist
+   - `geohash` — befintlig geohash-logik
+   - `alphabetical` — på callsign/namn
+3. Sortera `others` per distrikt (bokstavsordning), inom varje distrikt geohash
+4. Konkatenera: `home` → `others` (om `home_district_first`) eller infoga `home` på rätt alfabetisk position
+5. Kanalpaket-rader sorteras separat som idag (PackPlacement avgör var de hamnar relativt repeatrarna)
 
-## Teknik
+## UI
 
-- Inga ändringar i produktionskoden förväntas, men om ett test avslöjar en bugg lagas den i samma omgång och noteras i svaret.
-- Tester körs i Node-miljö (ingen jsdom behövs — ingen UI testas i denna omgång).
-- UI-komponenter (`src/routes/index.tsx`) testas ej nu; fokus på ren logik per spec.
+**`src/routes/index.tsx`** — i Sortering & CHIRP-export-sektionen, ny undersektion "QTH och hemdistrikt" som bara påverkar repeatrar:
+- Textfält: QTH (Maidenhead-lokator), placeholder "JO67bp", live-validering
+- Select: Hemdistrikt (SM0–SM7, "(inget)")
+- Radio: Sortering inom hemdistrikt — Avstånd från QTH / Geohash / Alfabetiskt
+- Checkbox: Visa hemdistrikt först
+- Hjälptext: "Övriga distrikt sorteras geohash-grupperat i bokstavsordning"
+- Disable distansvalet om QTH saknas, med tooltip
 
-## Ej i scope
+Bumpa localStorage-nyckel till `v4`.
 
-- Komponent-/E2E-tester
-- CI-konfiguration
-- Nya channel pack-CSV:er
+## Tester
+
+- `maidenhead.test.ts` — JO67bp ≈ (57.604, 14.708), invalid input, 4/6/8-tecken
+- `distance.test.ts` — kända avstånd (Göteborg–Stockholm ≈ 397 km)
+- `district.test.ts` — SK6BA→SM6, SM7XYZ→SM7, DL1ABC→null
+- `sorting.test.ts` — utöka: hemdistrikt först, distansordning, fallback utan QTH
+
+## Verifiering
+
+`bunx vitest run` + `npx tsc --noEmit`, manuell sanity check i preview med en SK6BA-CSV.
