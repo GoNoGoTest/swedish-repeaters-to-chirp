@@ -1,16 +1,21 @@
-import pack2m from "../../../../channelpacks/se_amateur_2m_channel_pack.csv?raw";
-import pack70cm from "../../../../channelpacks/se_amateur_70cm_channel_pack.csv?raw";
 import { parseChannelPackCsv, type PackParseResult } from "../importers/channel_pack";
+
+// Auto-discover all CSV files in /channelpacks at build time.
+// New files added to that directory are picked up without code changes.
+const RAW_MODULES = import.meta.glob("../../../../channelpacks/*.csv", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
+const RAW_PACKS: Array<{ fileName: string; text: string }> = Object.entries(RAW_MODULES)
+  .map(([path, text]) => ({ fileName: path.split("/").pop() ?? path, text }))
+  .sort((a, b) => a.fileName.localeCompare(b.fileName));
 
 export interface RegisteredPack {
   fileName: string;
   result: PackParseResult;
 }
-
-const RAW_PACKS: Array<{ fileName: string; text: string }> = [
-  { fileName: "se_amateur_2m_channel_pack.csv", text: pack2m },
-  { fileName: "se_amateur_70cm_channel_pack.csv", text: pack70cm },
-];
 
 let cache: RegisteredPack[] | null = null;
 
@@ -23,14 +28,20 @@ export function loadRegisteredPacks(): RegisteredPack[] {
   return cache;
 }
 
+export interface MergedPack {
+  packId: string;
+  channels: PackParseResult["channels"];
+  fileNames: string[];
+  headerWarnings: string[];
+}
+
 /**
  * Merge packs that share the same logical pack_id so the UI shows one entry
- * with combined rows (the medföljande 2m and 70cm-filer båda säger
- * `se_amateur_2m_70cm`).
+ * with combined rows (e.g. 2m + 70cm split across two CSVs).
  */
-export function loadMergedPacks() {
+export function loadMergedPacks(): MergedPack[] {
   const all = loadRegisteredPacks();
-  const map = new Map<string, { packId: string; channels: PackParseResult["channels"]; fileNames: string[]; headerWarnings: string[] }>();
+  const map = new Map<string, MergedPack>();
   for (const r of all) {
     const id = r.result.packId;
     const existing = map.get(id);
@@ -47,5 +58,5 @@ export function loadMergedPacks() {
       });
     }
   }
-  return Array.from(map.values());
+  return Array.from(map.values()).sort((a, b) => a.packId.localeCompare(b.packId));
 }

@@ -1,4 +1,48 @@
-import type { Settings } from "./models";
+import type { NamingSettings, Settings } from "./models";
+
+/**
+ * Standardnamn för repeatrar/länkar/hotspots från SK6BA-importen.
+ * Korta, ortsdrivna namn som passar typiska radio-displayer på 6 tecken.
+ */
+export const DEFAULT_REPEATER_NAMING: NamingSettings = {
+  components: ["{city}"],
+  separator: "-",
+  maxLength: 6,
+  cityMaxLength: 6,
+  transliterate: true,
+  uppercase: true,
+  collisionPolicy: "numeric_suffix",
+  abbreviations: {
+    type: { Repeater: "R", Link: "L", Hotspot: "H", Beacon: "B", Static: "" },
+    network: {
+      "": "",
+      SvxReflector: "SVX",
+      SvxLink: "SVX",
+      Echolink: "EL",
+      BrandMeister: "BM",
+      Brandmeister: "BM",
+      "Wires-X": "WX",
+    },
+    band: { "2": "2M", "70": "70", "6": "6M", "23": "23", "2m": "2M", "70cm": "70" },
+    districtPrefix: "D",
+  },
+};
+
+/**
+ * Standardnamn för kanalpaketsrader. Kanalpaket har ingen ort eller call,
+ * så vi prioriterar `name_hint` som ofta innehåller t.ex. "S20", "M01", "PMR1".
+ * Tomma fallbacks hanteras i naming.ts: name_hint → channel → label → category.
+ */
+export const DEFAULT_PACK_NAMING: NamingSettings = {
+  components: ["{name_hint}"],
+  separator: "-",
+  maxLength: 6,
+  cityMaxLength: 6,
+  transliterate: true,
+  uppercase: true,
+  collisionPolicy: "numeric_suffix",
+  abbreviations: DEFAULT_REPEATER_NAMING.abbreviations,
+};
 
 export const DEFAULT_SETTINGS: Settings = {
   filter: {
@@ -10,29 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
     districts: [],
     includeUnknownDistricts: false,
   },
-  naming: {
-    components: ["{city}"],
-    separator: "",
-    maxLength: 6,
-    cityMaxLength: 6,
-    transliterate: true,
-    uppercase: true,
-    collisionPolicy: "numeric_suffix",
-    abbreviations: {
-      type: { Repeater: "R", Link: "L", Hotspot: "H", Beacon: "B", Static: "" },
-      network: {
-        "": "",
-        SvxReflector: "SVX",
-        SvxLink: "SVX",
-        Echolink: "EL",
-        BrandMeister: "BM",
-        Brandmeister: "BM",
-        "Wires-X": "WX",
-      },
-      band: { "2": "2M", "70": "70", "6": "6M", "23": "23", "2m": "2M", "70cm": "70" },
-      districtPrefix: "D",
-    },
-  },
+  naming: DEFAULT_REPEATER_NAMING,
   chirp: {
     startLocation: 1,
     mode: "NFM",
@@ -45,9 +67,9 @@ export const DEFAULT_SETTINGS: Settings = {
     geohashPrecision: 5,
   },
   packs: {
-    placement: "off",
+    placement: "append",
     selection: {},
     freqDupePolicy: "keep_both",
-    rxOnlyPolicy: "mark",
+    rxOnlyPolicy: "duplex_off",
   },
 };
