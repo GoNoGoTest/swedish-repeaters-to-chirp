@@ -616,6 +616,7 @@ function ChannelPacksPanel({
       {packs.map((pack) => (
         <PackRow key={pack.packId} pack={pack}
           entry={settings.packs.selection[pack.packId]}
+          maxLength={settings.chirp.maxLength}
           onChange={(patch) => updPack(pack.packId, patch)} />
       ))}
     </div>
