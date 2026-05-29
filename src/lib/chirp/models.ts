@@ -119,6 +119,8 @@ export interface ChirpSettings {
   tStep: number;
   skipLinks: boolean;
   cToneFreq: number;
+  /** Max length for the generated channel name. Hardware-specific (radio display width). */
+  maxLength: number;
 }
 
 export type HomeDistrictSort = "distance" | "geohash" | "alphabetical";
