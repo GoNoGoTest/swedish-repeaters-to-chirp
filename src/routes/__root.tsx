@@ -72,14 +72,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Repeaterlista till CHIRP CSV" },
+      { name: "description", content: "Webbapp för att skapa CHIRP-kompatibla CSV-filer från amatörradiorepeaterdata." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Repeaterlista till CHIRP CSV" },
+      { property: "og:description", content: "Webbapp för att skapa CHIRP-kompatibla CSV-filer från amatörradiorepeaterdata." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Repeaterlista till CHIRP CSV" },
+      { name: "twitter:description", content: "Webbapp för att skapa CHIRP-kompatibla CSV-filer från amatörradiorepeaterdata." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c8e666bd-1ef0-4e9b-b118-3e1c7a29fb6f/id-preview-bba663de--db2969d4-ed1c-4c58-b7e9-5ab13597afa3.lovable.app-1780062435177.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/c8e666bd-1ef0-4e9b-b118-3e1c7a29fb6f/id-preview-bba663de--db2969d4-ed1c-4c58-b7e9-5ab13597afa3.lovable.app-1780062435177.png" },
     ],
     links: [
       {
