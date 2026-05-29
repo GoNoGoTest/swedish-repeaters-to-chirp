@@ -466,9 +466,10 @@ function makeExampleChannel(over: Partial<NormalizedChannel>): NormalizedChannel
   };
 }
 
-function NamingPreview({ naming, kind, sampleChannels }: {
+function NamingPreview({ naming, kind, maxLength, sampleChannels }: {
   naming: NamingSettings;
   kind: "repeater" | "pack";
+  maxLength: number;
   sampleChannels?: NormalizedChannel[];
 }) {
   const examples = useMemo(() => {
@@ -479,7 +480,7 @@ function NamingPreview({ naming, kind, sampleChannels }: {
         : [0, Math.floor(n / 2), n - 1];
       return idxs.map((i) => {
         const ch = sampleChannels[i];
-        const { full, clipped } = buildName(ch, naming);
+        const { full, clipped } = buildName(ch, naming, maxLength);
         const label = `${ch.service || ""} ${ch.name_hint || ch.channel || ch.label || ""}`.trim().slice(0, 24) || "—";
         return { label, full, clipped };
       });
@@ -487,16 +488,16 @@ function NamingPreview({ naming, kind, sampleChannels }: {
     const seeds = kind === "repeater" ? REPEATER_EXAMPLES : PACK_EXAMPLES;
     return seeds.map((seed) => {
       const ch = makeExampleChannel(seed);
-      const { full, clipped } = buildName(ch, naming);
+      const { full, clipped } = buildName(ch, naming, maxLength);
       const label = kind === "repeater"
         ? `${seed.city || seed.call || "?"}${seed.channel ? `/${seed.channel}` : ""}`
         : `${seed.service || ""} ${seed.name_hint || seed.label || ""}`.trim();
       return { label, full, clipped };
     });
-  }, [naming, kind, sampleChannels]);
+  }, [naming, kind, maxLength, sampleChannels]);
   return (
     <div className="mt-3">
-      <div className="text-xs text-muted-foreground mb-1">Förhandsvisning</div>
+      <div className="text-xs text-muted-foreground mb-1">Förhandsvisning (max {maxLength} tecken)</div>
       <div className="flex flex-wrap gap-2">
         {examples.map((ex, i) => (
           <div key={i} className="rounded border border-border bg-muted/40 px-2 py-1">
