@@ -206,6 +206,7 @@ function Index() {
                       tokens={REPEATER_TOKENS}
                       hint="Repeaterrader får sitt namn via dessa tokens. Tomma tokens droppas och dubbla separatorer undviks."
                       previewKind="repeater"
+                      maxLength={settings.chirp.maxLength}
                     />
                   </div>
                 </div>
