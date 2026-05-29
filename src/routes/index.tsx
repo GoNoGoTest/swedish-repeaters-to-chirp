@@ -6,11 +6,13 @@ import { exportChirpCsv } from "@/lib/chirp/exporters/chirp";
 import { DEFAULT_SETTINGS, DEFAULT_PACK_NAMING } from "@/lib/chirp/defaults";
 import { loadMergedPacks, type MergedPack } from "@/lib/chirp/channel_packs/registry";
 import { selectPackChannels, type ParsedPackChannel } from "@/lib/chirp/importers/channel_pack";
+import { buildName } from "@/lib/chirp/naming";
 import type {
   RawRow, Settings, NormalizedChannel, NamingSettings,
   PackPlacement, FreqDupePolicy, RxOnlyPolicy, PackSelectionEntry, HomeDistrictSort,
 } from "@/lib/chirp/models";
 import { isValidMaidenhead } from "@/lib/chirp/maidenhead";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
