@@ -791,11 +791,14 @@ function ExportPanel({ settings, setSettings, hasPacks }: {
       </div>
 
       <div className="border-t border-border pt-4">
-        <SectionLabel>CHIRP-fält</SectionLabel>
-        <div className="grid gap-3 md:grid-cols-4">
+        <SectionLabel>CHIRP-fält & radio</SectionLabel>
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
           <NumberField label="Startnummer (Location)" value={settings.chirp.startLocation}
             onChange={(v) => updChirp({ startLocation: v })}
             hint="Första minnesposition i radion. T.ex. 1 om du vill skriva från början, 100 om du vill lägga repeatrarna efter befintliga kanaler." />
+          <NumberField label="Max längd kanalnamn" value={settings.chirp.maxLength}
+            onChange={(v) => updChirp({ maxLength: v })}
+            hint="Hårdvarubegränsning — många radior trunkerar vid 6–7 tecken. Gäller alla kanaler (både repeatrar och paket)." />
           <Field label="Mode" hint="NFM = smal FM (12,5 kHz) — standard för amatörradio idag. FM = bred (25 kHz), äldre repeatrar.">
             <select value={settings.chirp.mode}
               onChange={(e) => updChirp({ mode: e.target.value as Settings["chirp"]["mode"] })}
