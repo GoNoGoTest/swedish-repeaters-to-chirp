@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useCallback, useEffect } from "react";
+import Papa from "papaparse";
 import { parseSk6baCsv, summarize, type Summary } from "@/lib/chirp/importers/sk6ba";
 import { runPipeline } from "@/lib/chirp/pipeline";
 import { exportChirpCsv } from "@/lib/chirp/exporters/chirp";
@@ -48,9 +49,11 @@ function loadStoredSettings(): Settings {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw);
-    // Migration: maxLength flyttades från NamingSettings till ChirpSettings.
+    // Migration: maxLength flyttades från NamingSettings till ChirpSettings;
+    // cToneFreq togs bort helt.
     const legacyMax = parsed?.naming?.maxLength;
-    const { cToneFreq: _drop, ...chirpClean } = parsed?.chirp ?? {};
+    const { cToneFreq: _dropCTone, ...chirpClean } = parsed?.chirp ?? {};
+    const { maxLength: _dropLegacyMax, ...namingClean } = parsed?.naming ?? {};
     const chirpMerged = { ...DEFAULT_SETTINGS.chirp, ...chirpClean };
     if (chirpMerged.maxLength == null && typeof legacyMax === "number") {
       chirpMerged.maxLength = legacyMax;
@@ -58,7 +61,7 @@ function loadStoredSettings(): Settings {
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
-      naming: { ...DEFAULT_SETTINGS.naming, ...(parsed.naming ?? {}) },
+      naming: { ...DEFAULT_SETTINGS.naming, ...namingClean },
       chirp: chirpMerged,
       packs: { ...DEFAULT_SETTINGS.packs, ...(parsed.packs ?? {}) },
       sort: { ...DEFAULT_SETTINGS.sort, ...(parsed.sort ?? {}) },
@@ -148,7 +151,16 @@ function Index() {
   const pipeline = useMemo(() => {
     if (!rows) return null;
     return runPipeline({ sk6baRows: rows, packChannels: selectedPackChannels, settings });
-  }, [rows, settings, selectedPackChannels]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    rows,
+    selectedPackChannels,
+    settings.filter,
+    settings.naming,
+    settings.packs,
+    settings.sort,
+    settings.chirp,
+  ]);
 
   const stats = useMemo(() => {
     if (!pipeline) return null;
@@ -163,26 +175,32 @@ function Index() {
   }, [pipeline]);
 
   const doExport = () => {
-    if (!pipeline) return;
-    if (pipeline.duplicateStop) {
-      alert("Export stoppad p.g.a. frekvensdubblett-policy. Ändra policyn eller åtgärda dubbletter först.");
-      return;
-    }
+    if (!pipeline || pipeline.duplicateStop) return;
     download("chirp.csv", exportChirpCsv(pipeline.channels, settings.chirp));
   };
 
   const exportReport = () => {
     if (!pipeline) return;
-    const lines = ["source_type,source_row,source_id,pack_id,name,warnings"];
-    for (const c of pipeline.channels) {
-      if (c.warnings.length) {
-        lines.push(`${c.source_type},${c.source_row},${c.source_id},${c.pack_id},${c.generated_name_final},"${c.warnings.map((w) => w.message).join("; ")}"`);
-      }
-    }
-    download("varningar.csv", lines.join("\n"));
+    const reportRows = pipeline.channels
+      .filter((c) => c.warnings.length)
+      .map((c) => ({
+        source_type: c.source_type,
+        source_row: c.source_row,
+        source_id: c.source_id,
+        pack_id: c.pack_id,
+        name: c.generated_name_final,
+        warnings: c.warnings.map((w) => w.message).join("; "),
+      }));
+    const csv = Papa.unparse(reportRows, {
+      columns: ["source_type", "source_row", "source_id", "pack_id", "name", "warnings"],
+    });
+    download("varningar.csv", csv);
   };
 
-  const enabledPackCount = Object.values(settings.packs.selection).filter((s) => s.enabled).length;
+  const enabledPackCount = useMemo(
+    () => Object.values(settings.packs.selection).filter((s) => s.enabled).length,
+    [settings.packs.selection],
+  );
 
   return (
     <div className="min-h-screen bg-background text-foreground">
