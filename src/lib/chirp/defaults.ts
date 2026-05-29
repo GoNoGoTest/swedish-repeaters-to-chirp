@@ -59,7 +59,6 @@ export const DEFAULT_SETTINGS: Settings = {
     mode: "NFM",
     tStep: 5.0,
     skipLinks: false,
-    cToneFreq: 88.5,
     maxLength: 6,
   },
   sort: {
