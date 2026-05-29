@@ -8,8 +8,9 @@ import { loadMergedPacks, type MergedPack } from "@/lib/chirp/channel_packs/regi
 import { selectPackChannels, type ParsedPackChannel } from "@/lib/chirp/importers/channel_pack";
 import type {
   RawRow, Settings, NormalizedChannel, NamingSettings,
-  PackPlacement, FreqDupePolicy, RxOnlyPolicy, PackSelectionEntry,
+  PackPlacement, FreqDupePolicy, RxOnlyPolicy, PackSelectionEntry, HomeDistrictSort,
 } from "@/lib/chirp/models";
+import { isValidMaidenhead } from "@/lib/chirp/maidenhead";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const STORAGE_KEY = "sk6ba-chirp-settings-v3";
+const STORAGE_KEY = "sk6ba-chirp-settings-v4";
 
 const REPEATER_TOKENS = ["{type}", "{network}", "{band}", "{district}", "{city}", "{channel}", "{call}"];
 const PACK_TOKENS = ["{service}", "{category}", "{label}", "{name_hint}", "{channel}", "{band}"];
@@ -45,6 +46,7 @@ function loadStoredSettings(): Settings {
       ...parsed,
       naming: { ...DEFAULT_SETTINGS.naming, ...(parsed.naming ?? {}) },
       packs: { ...DEFAULT_SETTINGS.packs, ...(parsed.packs ?? {}) },
+      sort: { ...DEFAULT_SETTINGS.sort, ...(parsed.sort ?? {}) },
     };
   } catch { return DEFAULT_SETTINGS; }
 }
@@ -644,8 +646,14 @@ function ExportPanel({ settings, setSettings, hasPacks }: {
       )}
 
       <div className="border-t border-border pt-4">
-        <SectionLabel>Sorteringsordning för repeatrar</SectionLabel>
-        <Hint>Klicka för att lägga till/ta bort en sorteringsnyckel. Ordningen styr prioritet.</Hint>
+        <QthHomeDistrictPanel settings={settings} updSort={updSort} />
+      </div>
+
+      <div className="border-t border-border pt-4">
+        <SectionLabel>Sorteringsordning för repeatrar (fallback)</SectionLabel>
+        <Hint>
+          Används när inget hemdistrikt är valt ovan. Klicka för att lägga till/ta bort en sorteringsnyckel. Ordningen styr prioritet.
+        </Hint>
         <div className="flex flex-wrap gap-1 mt-2">
           {(["district","geohash","type","city","frequency"] as const).map((k) => {
             const idx = settings.sort.keys.indexOf(k);
@@ -696,7 +704,87 @@ function ExportPanel({ settings, setSettings, hasPacks }: {
   );
 }
 
-/* ───────────── Preview table ───────────── */
+/* ───────────── QTH + home district ───────────── */
+
+function QthHomeDistrictPanel({ settings, updSort }: {
+  settings: Settings; updSort: (patch: Partial<Settings["sort"]>) => void;
+}) {
+  const qth = settings.sort.qth_maidenhead ?? "";
+  const qthValid = qth === "" || isValidMaidenhead(qth);
+  const home = settings.sort.home_district ?? "";
+  const sortMode = settings.sort.home_district_sort;
+  const hasQth = qth !== "" && qthValid;
+
+  return (
+    <div>
+      <SectionLabel>QTH och hemdistrikt (för repeatersortering)</SectionLabel>
+      <Hint>
+        När hemdistrikt är valt sorteras dess repeatrar enligt valet nedan. Övriga distrikt grupperas geohash-mässigt
+        i nummerordning (SM1, SM2, … SM7). Påverkar inte kanalpaket.
+      </Hint>
+      <div className="grid gap-3 md:grid-cols-4 mt-3">
+        <Field label="QTH (Maidenhead-lokator)" hint="6 tecken rek., t.ex. JO67bp. Tomt = ingen distanssortering.">
+          <input
+            value={qth}
+            placeholder="JO67bp"
+            onChange={(e) => updSort({ qth_maidenhead: e.target.value })}
+            className={`w-full rounded border px-2 py-1 text-sm font-mono ${
+              qthValid ? "border-input bg-background" : "border-destructive bg-destructive/5"
+            }`}
+          />
+          {!qthValid && <Hint>Ogiltig lokator (förväntar t.ex. JO67 eller JO67bp).</Hint>}
+        </Field>
+        <Field label="Hemdistrikt" hint="Distrikt vars repeatrar sorteras separat.">
+          <select
+            value={home}
+            onChange={(e) => updSort({ home_district: e.target.value || null })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm font-mono"
+          >
+            <option value="">(inget — använd fallback nedan)</option>
+            {["0","1","2","3","4","5","6","7"].map((d) => (
+              <option key={d} value={d}>SM{d}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Sortering inom hemdistrikt">
+          <div className="flex flex-col gap-1">
+            {([
+              ["distance","Avstånd från QTH"],
+              ["geohash","Geohash (regional)"],
+              ["alphabetical","Alfabetiskt"],
+            ] as Array<[HomeDistrictSort,string]>).map(([k,label]) => {
+              const disabled = k === "distance" && !hasQth;
+              return (
+                <label key={k} className={`flex items-center gap-2 text-sm ${disabled ? "opacity-50" : ""}`}
+                  title={disabled ? "Kräver giltig QTH-lokator" : ""}>
+                  <input
+                    type="radio"
+                    name="home_district_sort"
+                    checked={sortMode === k}
+                    disabled={disabled}
+                    onChange={() => updSort({ home_district_sort: k })}
+                  />
+                  {label}
+                </label>
+              );
+            })}
+          </div>
+        </Field>
+        <Field label="Placering">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={settings.sort.home_district_first}
+              onChange={(e) => updSort({ home_district_first: e.target.checked })}
+            />
+            Visa hemdistrikt först
+          </label>
+          <Hint>Avmarkera för att lägga hemdistriktet sist istället.</Hint>
+        </Field>
+      </div>
+    </div>
+  );
+}
 
 function PreviewTable({ channels, chirpMode, startLoc }: { channels: NormalizedChannel[]; chirpMode: string; startLoc: number }) {
   const shown = channels.slice(0, 300);
