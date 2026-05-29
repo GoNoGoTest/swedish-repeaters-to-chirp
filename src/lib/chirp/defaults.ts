@@ -60,6 +60,7 @@ export const DEFAULT_SETTINGS: Settings = {
     tStep: 5.0,
     skipLinks: false,
     cToneFreq: 88.5,
+    maxLength: 6,
   },
   sort: {
     keys: ["district", "geohash", "city"],
