@@ -1,36 +1,11 @@
-## Orsak
+Kör #1–4 i `src/routes/index.tsx`:
 
-`useState<Settings>(() => loadStoredSettings())` på rad 77 läser `localStorage` synkront under första klient-renderingen. Servern (SSR/prerender) har ingen `window` → får `DEFAULT_SETTINGS` (0 valda paket). Klienten läser sin sparade selection (t.ex. 8 valda) redan i första renderingen → text-noden blir "8" vs "0" → hydration mismatch i `ChannelPacksPanel`-headern.
+**#1 Säker CSV-escaping i `exportReport`** — använd `Papa.unparse` med kolumnordning `["source_type","source_row","source_id","pack_id","name","warnings"]` istället för manuell strängbyggnad. Hanterar komman och citattecken korrekt.
 
-Samma mönster är redan löst korrekt strax under för `savedExports` (mountas tomt, hydreras i `useEffect`).
+**#2 Ersätt `alert()` med inline-banner** — ta bort `alert(...)` i `doExport`. Lägg en röd banner ovanför Exportera-knappen i preview-sektionen som visas när `pipeline.duplicateStop === true`: text "Export stoppad — frekvensdubbletter enligt policy. Ändra policy eller åtgärda dubbletter." `doExport` blir bara `if (!pipeline || pipeline.duplicateStop) return;`. Disable också Exportera-knappen (`disabled` + `opacity-50 cursor-not-allowed`) när stoppen är aktiv.
 
-## Fix
+**#3 Migration: nollställ legacy-fält i localStorage** — utvidga destructuring i `loadStoredSettings`: `const { maxLength: _dropLegacyMax, ...namingClean } = parsed?.naming ?? {};` och använd `namingClean` när naming spreadas. `legacyMax`-fallbacken till `chirp.maxLength` behålls. Resultat: vid nästa persist-skrivning försvinner `naming.maxLength` och `chirp.cToneFreq` ur localStorage.
 
-Ändra `src/routes/index.tsx`:
+**#4 Splittra `pipeline`-useMemo-deps** — ändra dep-array från `[rows, settings, selectedPackChannels]` till de fält som faktiskt påverkar pipeline: `[rows, selectedPackChannels, settings.filter, settings.naming, settings.packs, settings.sort, settings.chirp]`. Wrappar också `enabledPackCount` i `useMemo` på `settings.packs.selection`.
 
-```ts
-const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-const [settingsHydrated, setSettingsHydrated] = useState(false);
-
-useEffect(() => {
-  setSettings(loadStoredSettings());
-  setSettingsHydrated(true);
-}, []);
-
-useEffect(() => {
-  if (!settingsHydrated) return; // undvik att skriva tillbaka DEFAULT över sparade
-  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
-}, [settings, settingsHydrated]);
-```
-
-`settingsHydrated`-flaggan behövs för att den befintliga persist-`useEffect` annars körs en gång med `DEFAULT_SETTINGS` innan hydreringen hinner sätta sparade värden, och skulle skriva över localStorage.
-
-## Verifiera
-
-- Ladda om sidan med valda paket → ingen hydration-varning i konsollen.
-- Selection bibehålls efter omladdning (localStorage skrivs inte över).
-- Vid första renderingen visas kort "0 valda" innan localStorage hydreras — acceptabelt, samma mönster som `savedExports`.
-
-## Inte berört
-
-Övrig hydrerings-säker logik (savedExports) är redan korrekt.
+Inga API-ändringar, inga nya filer, inga tester ska påverkas. Kör vitest efteråt för regression.
