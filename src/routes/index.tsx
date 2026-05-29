@@ -74,15 +74,21 @@ function Index() {
   const [rows, setRows] = useState<RawRow[] | null>(null);
   const [columns, setColumns] = useState<string[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [settings, setSettings] = useState<Settings>(() => loadStoredSettings());
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [savedExports, setSavedExports] = useState<SavedExport[]>([]);
   // Hydratera först efter mount för att undvika SSR/CSR-mismatch.
   useEffect(() => { setSavedExports(listSavedExports()); }, []);
+  useEffect(() => {
+    setSettings(loadStoredSettings());
+    setSettingsHydrated(true);
+  }, []);
 
   useEffect(() => {
+    if (!settingsHydrated) return;
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
-  }, [settings]);
+  }, [settings, settingsHydrated]);
 
   const packs = useMemo(() => loadMergedPacks(), []);
 
