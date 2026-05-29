@@ -1,28 +1,40 @@
-## Problem
+## Analys
 
-`parseAccess()` i `src/lib/chirp/tones.ts` splittar access-fältet på `[\s/|,;]+`. Kommatecknet används som separator, så `"1750 / 156,7 / DTMF 6"` blir delarna `["1750", "156", "7", "DTMF", "6"]`. `156` hamnar i CTCSS-intervallet (40–300) och väljs som ton → exporten får `rToneFreq=156.0` istället för `156.7`.
+Den andra LLM:n har rätt. `parseAccess()` returnerar bara `{ctcss, uses1750}` — alla andra värden (Carrier, "ingen", "open", tomt) hamnar i samma "okänt"-fack och triggar `missing_access_tone`-varningen i `pipeline.ts:51`.
 
-`parseNumberLoose` hanterar redan decimalkomma korrekt (`"156,7"` → `156.7`), så lösningen är att inte använda komma som separator.
+**"Carrier" är en explicit accessmetod** = öppen bärvågstrigger, ingen ton. Den ska inte varna.
 
 ## Fix
 
-I `src/lib/chirp/tones.ts`, ändra split-regex från `/[\s/|,;]+/` till `/[\s/|;]+/` (ta bort kommat). Då bevaras `"156,7"` som en del och parseNumberLoose returnerar 156.7.
-
-## Test
-
-Lägg till ett fall i `src/lib/chirp/__tests__/tones.test.ts`:
-
+**1. `src/lib/chirp/tones.ts`** — utöka `ToneParse`:
 ```ts
-it("parses decimal comma in access (e.g. '1750 / 156,7 / DTMF 6')", () => {
-  const r = parseAccess("1750 / 156,7 / DTMF 6");
-  expect(r.uses1750).toBe(true);
-  expect(r.ctcss).toBeCloseTo(156.7);
-});
+export interface ToneParse {
+  ctcss: number | null;
+  uses1750: boolean;
+  carrier: boolean;     // explicit "Carrier" / "open" / "no tone"
+}
 ```
 
-Verifiera att övriga tester (separator-mix med flera toner avgränsade med komma utan decimaler) fortfarande passerar — om någon befintlig fixtur använder `,` som ren separator mellan heltalstoner behöver den uppdateras till `/` eller `;`.
+Lägg till detektion i `parseAccess()` innan candidates-loopen — om någon del matchar `/^(carrier|open|none|ingen|no\s*tone)$/i` → `carrier=true`.
 
-## Vad jag inte rör
+**2. `src/lib/chirp/pipeline.ts:46-52`** — skippa varningen när `access.carrier` är true:
+```ts
+if (!access.ctcss && !access.uses1750 && !access.carrier && r.access) {
+  warnings.push({ code: "missing_access_tone", ... });
+}
+```
 
-- Hydrerings-varningen om "5 vs 0" i `ChannelPacksPanel` (annat problem, nämner du om du vill att jag fixar det separat).
-- `parseNumberLoose` — den är redan rätt.
+Comment-strängen behåller redan `access=Carrier` (rad 65–67), så användaren ser ändå informationen.
+
+**3. Export (`exporters/chirp.ts`)** — ingen ändring behövs. SK6BA-rader utan `ctcss_tx` exporteras redan med tomma ton-fält (`resolveToneFields`). Carrier → `ctcss_tx=null` → tomma fält. ✅
+
+**4. Tester** — i `__tests__/tones.test.ts`:
+- `parseAccess("Carrier")` → `{ctcss: null, uses1750: false, carrier: true}`
+- `parseAccess("1750/Carrier")` → carrier=true, uses1750=true (bevarad)
+- `parseAccess("88.5")` → carrier=false
+
+Plus uppdatera befintliga `toEqual({ctcss, uses1750})`-assertions till att inkludera `carrier: false`.
+
+## Inte berört
+
+- Hydreringsvarningen "8 vs 0" i `ChannelPacksPanel` (separat fråga — säg till om jag ska titta på den).
