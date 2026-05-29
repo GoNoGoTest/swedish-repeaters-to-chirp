@@ -466,8 +466,24 @@ function makeExampleChannel(over: Partial<NormalizedChannel>): NormalizedChannel
   };
 }
 
-function NamingPreview({ naming, kind }: { naming: NamingSettings; kind: "repeater" | "pack" }) {
+function NamingPreview({ naming, kind, sampleChannels }: {
+  naming: NamingSettings;
+  kind: "repeater" | "pack";
+  sampleChannels?: NormalizedChannel[];
+}) {
   const examples = useMemo(() => {
+    if (sampleChannels && sampleChannels.length > 0) {
+      // Pick up to 3 spread-out samples (first, middle, last) for variety.
+      const n = sampleChannels.length;
+      const idxs = n <= 3 ? Array.from({ length: n }, (_, i) => i)
+        : [0, Math.floor(n / 2), n - 1];
+      return idxs.map((i) => {
+        const ch = sampleChannels[i];
+        const { full, clipped } = buildName(ch, naming);
+        const label = `${ch.service || ""} ${ch.name_hint || ch.channel || ch.label || ""}`.trim().slice(0, 24) || "—";
+        return { label, full, clipped };
+      });
+    }
     const seeds = kind === "repeater" ? REPEATER_EXAMPLES : PACK_EXAMPLES;
     return seeds.map((seed) => {
       const ch = makeExampleChannel(seed);
@@ -477,7 +493,7 @@ function NamingPreview({ naming, kind }: { naming: NamingSettings; kind: "repeat
         : `${seed.service || ""} ${seed.name_hint || seed.label || ""}`.trim();
       return { label, full, clipped };
     });
-  }, [naming, kind]);
+  }, [naming, kind, sampleChannels]);
   return (
     <div className="mt-3">
       <div className="text-xs text-muted-foreground mb-1">Förhandsvisning</div>
@@ -495,6 +511,7 @@ function NamingPreview({ naming, kind }: { naming: NamingSettings; kind: "repeat
     </div>
   );
 }
+
 
 function NamingEditor({ value, onChange, tokens, hint, previewKind }: {
   value: NamingSettings; onChange: (n: NamingSettings) => void;
