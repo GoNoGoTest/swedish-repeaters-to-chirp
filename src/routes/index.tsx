@@ -75,8 +75,10 @@ function Index() {
   const [columns, setColumns] = useState<string[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [settings, setSettings] = useState<Settings>(() => loadStoredSettings());
-  const [urlInput, setUrlInput] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [savedExports, setSavedExports] = useState<SavedExport[]>([]);
+  // Hydratera först efter mount för att undvika SSR/CSR-mismatch.
+  useEffect(() => { setSavedExports(listSavedExports()); }, []);
 
   useEffect(() => {
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
