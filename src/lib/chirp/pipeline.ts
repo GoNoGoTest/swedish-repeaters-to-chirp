@@ -47,8 +47,11 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
     if (shift.unclear) warnings.push({ code: "unclear_shift", message: `Oklar tx_shift: ${r.tx_shift}` });
 
     const access = parseAccess(r.access);
-    if (!access.ctcss && !access.uses1750 && !access.carrier && r.access) {
+    if (!access.ctcss && !access.uses1750 && !access.carrier && !access.dcs && r.access) {
       warnings.push({ code: "missing_access_tone", message: `Otydlig access: ${r.access}` });
+    }
+    if (access.ctcss != null && access.dcs) {
+      warnings.push({ code: "ctcss_and_dcs", message: `Både CTCSS och DCS hittades; CTCSS valdes för analog CHIRP-export.` });
     }
 
     const lat = parseNumberLoose(r.lat);
