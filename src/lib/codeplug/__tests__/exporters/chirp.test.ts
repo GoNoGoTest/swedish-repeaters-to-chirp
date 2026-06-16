@@ -3,7 +3,7 @@ import { exportChirpCsv, toChirpRows, CHIRP_COLUMNS } from "../../exporters/chir
 import { DEFAULT_SETTINGS } from "../../defaults";
 import { makeChannel } from "../helpers";
 
-import { CHIRP_GENERIC_DEFAULTS } from "@/lib/chirp/targets";
+import { CHIRP_GENERIC_DEFAULTS } from "@/lib/codeplug/targets";
 const chirp = CHIRP_GENERIC_DEFAULTS;
 
 const EXPECTED_HEADER =

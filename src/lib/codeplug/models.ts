@@ -169,7 +169,7 @@ export interface ChannelPackSettings {
 
 /**
  * Per-target settings storage. `targetId` selects the active export target
- * (see src/lib/chirp/targets/registry.ts). `perTarget` holds the user's
+ * (see src/lib/codeplug/targets/registry.ts). `perTarget` holds the user's
  * settings for each target id; shape is target-defined (e.g. ChirpSettings
  * for "chirp-generic").
  */

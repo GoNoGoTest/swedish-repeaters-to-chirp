@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { CHIRP_GENERIC_TARGET, CHIRP_GENERIC_DEFAULTS } from "@/lib/chirp/targets/chirp-generic";
-import { exportChirpCsv } from "@/lib/chirp/exporters/chirp";
+import { CHIRP_GENERIC_TARGET, CHIRP_GENERIC_DEFAULTS } from "@/lib/codeplug/targets/chirp-generic";
+import { exportChirpCsv } from "@/lib/codeplug/exporters/chirp";
 import { makeChannel } from "../helpers";
 
 describe("targets/chirp-generic", () => {

@@ -1,24 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useCallback, useEffect } from "react";
 import Papa from "papaparse";
-import { parseSk6baCsv, summarize, type Summary } from "@/lib/chirp/importers/sk6ba";
-import { runPipeline } from "@/lib/chirp/pipeline";
-import { listTargets, requireTarget } from "@/lib/chirp/targets";
-import type { ChirpSettings } from "@/lib/chirp/models";
-import { DEFAULT_SETTINGS, DEFAULT_PACK_NAMING } from "@/lib/chirp/defaults";
-import { loadMergedPacks, type MergedPack } from "@/lib/chirp/channel_packs/registry";
-import { selectPackChannels, type ParsedPackChannel } from "@/lib/chirp/importers/channel_pack";
-import { buildName } from "@/lib/chirp/naming";
+import { parseSk6baCsv, summarize, type Summary } from "@/lib/codeplug/importers/sk6ba";
+import { runPipeline } from "@/lib/codeplug/pipeline";
+import { listTargets, requireTarget } from "@/lib/codeplug/targets";
+import type { ChirpSettings } from "@/lib/codeplug/models";
+import { DEFAULT_SETTINGS, DEFAULT_PACK_NAMING } from "@/lib/codeplug/defaults";
+import { loadMergedPacks, type MergedPack } from "@/lib/codeplug/channel_packs/registry";
+import { selectPackChannels, type ParsedPackChannel } from "@/lib/codeplug/importers/channel_pack";
+import { buildName } from "@/lib/codeplug/naming";
 import {
   listSavedExports, saveExport, deleteExport, clearAllExports,
   freshnessOf, relativeTime, formatBytes,
   type SavedExport,
-} from "@/lib/chirp/saved-exports";
+} from "@/lib/codeplug/saved-exports";
 import type {
   RawRow, Settings, NormalizedChannel, NamingSettings,
   PackPlacement, FreqDupePolicy, RxOnlyPolicy, PackSelectionEntry, HomeDistrictSort,
-} from "@/lib/chirp/models";
-import { isValidMaidenhead } from "@/lib/chirp/maidenhead";
+} from "@/lib/codeplug/models";
+import { isValidMaidenhead } from "@/lib/codeplug/maidenhead";
 
 
 export const Route = createFileRoute("/")({
@@ -93,7 +93,7 @@ function Index() {
   const packs = useMemo(() => loadMergedPacks(), []);
 
   // Active export target + its current settings. Targets are pluggable
-  // (see src/lib/chirp/targets/registry.ts). For now only "chirp-generic"
+  // (see src/lib/codeplug/targets/registry.ts). For now only "chirp-generic"
   // exists; new formats (e.g. VGC N76) plug in here without UI rewrites.
   const target = useMemo(() => requireTarget(settings.export.targetId), [settings.export.targetId]);
   const targetSettings = (settings.export.perTarget[settings.export.targetId] ?? target.defaultSettings) as Record<string, unknown>;
@@ -971,7 +971,7 @@ function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, setTarget
       <div className="border-t border-border pt-4">
         <SectionLabel>Exportmål</SectionLabel>
         <Hint>
-          Välj vilket app- eller radiospecifikt format CSV-filen ska skrivas i. Nya format läggs till i <code className="font-mono">src/lib/chirp/targets/</code>.
+          Välj vilket app- eller radiospecifikt format CSV-filen ska skrivas i. Nya format läggs till i <code className="font-mono">src/lib/codeplug/targets/</code>.
         </Hint>
         <div className="mt-2">
           <select value={settings.export.targetId}
