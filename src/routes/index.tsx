@@ -93,13 +93,12 @@ function Index() {
   const packs = useMemo(() => loadMergedPacks(), []);
 
   // Active export target + its current settings. Targets are pluggable
-  // (see src/lib/codeplug/targets/registry.ts). For now only "chirp-generic"
-  // exists; new formats (e.g. VGC N76) plug in here without UI rewrites.
+  // (see src/lib/codeplug/targets/registry.ts). New formats plug in here
+  // without UI rewrites — each target may render its own settings panel.
   const target = useMemo(() => requireTarget(settings.export.targetId), [settings.export.targetId]);
   const targetSettings = (settings.export.perTarget[settings.export.targetId] ?? target.defaultSettings) as Record<string, unknown>;
-  // CHIRP-typed view of the active settings. Safe today because the only
-  // shipped target is chirp-generic; when more targets land, each panel
-  // will cast to its own settings type.
+  // Narrow view used by the legacy CHIRP panel. Only safe to read when the
+  // active target is "chirp-generic" — guarded by isChirpTarget below.
   const chirpSettings = targetSettings as unknown as ChirpSettings;
   const maxNameLength = target.resolveMaxNameLength
     ? target.resolveMaxNameLength(targetSettings as never)
