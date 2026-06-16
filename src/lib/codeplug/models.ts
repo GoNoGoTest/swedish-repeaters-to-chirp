@@ -18,7 +18,11 @@ export type WarningCode =
   | "freq_duplicate"
   | "rx_only_no_policy"
   | "rx_only_marked"
-  | "ctcss_and_dcs";
+  | "ctcss_and_dcs"
+  | "vgc_over_group_limit"
+  | "vgc_dcs_polarity_lost"
+  | "vgc_title_truncated"
+  | "vgc_unsupported_mode";
 
 export interface Warning {
   code: WarningCode;
@@ -169,7 +173,7 @@ export interface ChannelPackSettings {
 
 /**
  * Per-target settings storage. `targetId` selects the active export target
- * (see src/lib/chirp/targets/registry.ts). `perTarget` holds the user's
+ * (see src/lib/codeplug/targets/registry.ts). `perTarget` holds the user's
  * settings for each target id; shape is target-defined (e.g. ChirpSettings
  * for "chirp-generic").
  */

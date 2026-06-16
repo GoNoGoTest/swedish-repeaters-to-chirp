@@ -1,24 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useCallback, useEffect } from "react";
 import Papa from "papaparse";
-import { parseSk6baCsv, summarize, type Summary } from "@/lib/chirp/importers/sk6ba";
-import { runPipeline } from "@/lib/chirp/pipeline";
-import { listTargets, requireTarget } from "@/lib/chirp/targets";
-import type { ChirpSettings } from "@/lib/chirp/models";
-import { DEFAULT_SETTINGS, DEFAULT_PACK_NAMING } from "@/lib/chirp/defaults";
-import { loadMergedPacks, type MergedPack } from "@/lib/chirp/channel_packs/registry";
-import { selectPackChannels, type ParsedPackChannel } from "@/lib/chirp/importers/channel_pack";
-import { buildName } from "@/lib/chirp/naming";
+import { parseSk6baCsv, summarize, type Summary } from "@/lib/codeplug/importers/sk6ba";
+import { runPipeline } from "@/lib/codeplug/pipeline";
+import { listTargets, requireTarget } from "@/lib/codeplug/targets";
+import type { ChirpSettings } from "@/lib/codeplug/models";
+import type { VgcN76Settings } from "@/lib/codeplug/targets";
+import { DEFAULT_SETTINGS, DEFAULT_PACK_NAMING } from "@/lib/codeplug/defaults";
+import { loadMergedPacks, type MergedPack } from "@/lib/codeplug/channel_packs/registry";
+import { selectPackChannels, type ParsedPackChannel } from "@/lib/codeplug/importers/channel_pack";
+import { buildName } from "@/lib/codeplug/naming";
 import {
   listSavedExports, saveExport, deleteExport, clearAllExports,
   freshnessOf, relativeTime, formatBytes,
   type SavedExport,
-} from "@/lib/chirp/saved-exports";
+} from "@/lib/codeplug/saved-exports";
 import type {
   RawRow, Settings, NormalizedChannel, NamingSettings,
   PackPlacement, FreqDupePolicy, RxOnlyPolicy, PackSelectionEntry, HomeDistrictSort,
-} from "@/lib/chirp/models";
-import { isValidMaidenhead } from "@/lib/chirp/maidenhead";
+} from "@/lib/codeplug/models";
+import { isValidMaidenhead } from "@/lib/codeplug/maidenhead";
 
 
 export const Route = createFileRoute("/")({
@@ -93,13 +94,12 @@ function Index() {
   const packs = useMemo(() => loadMergedPacks(), []);
 
   // Active export target + its current settings. Targets are pluggable
-  // (see src/lib/chirp/targets/registry.ts). For now only "chirp-generic"
-  // exists; new formats (e.g. VGC N76) plug in here without UI rewrites.
+  // (see src/lib/codeplug/targets/registry.ts). New formats plug in here
+  // without UI rewrites — each target may render its own settings panel.
   const target = useMemo(() => requireTarget(settings.export.targetId), [settings.export.targetId]);
   const targetSettings = (settings.export.perTarget[settings.export.targetId] ?? target.defaultSettings) as Record<string, unknown>;
-  // CHIRP-typed view of the active settings. Safe today because the only
-  // shipped target is chirp-generic; when more targets land, each panel
-  // will cast to its own settings type.
+  // Narrow view used by the legacy CHIRP panel. Only safe to read when the
+  // active target is "chirp-generic" — guarded by isChirpTarget below.
   const chirpSettings = targetSettings as unknown as ChirpSettings;
   const maxNameLength = target.resolveMaxNameLength
     ? target.resolveMaxNameLength(targetSettings as never)
@@ -322,6 +322,7 @@ function Index() {
                   settings={settings} setSettings={setSettings}
                   hasPacks={enabledPackCount > 0}
                   chirpSettings={chirpSettings}
+                  targetSettings={targetSettings}
                   setTargetSettings={setTargetSettings}
                 />
               </Section>
@@ -355,7 +356,16 @@ function Index() {
                     <Stat label="Filtrerade bort" value={pipeline.filteredOut} />
                     <Stat label="Varn/Koll/Dupes/RX" value={`${stats?.warned ?? 0}/${stats?.collided ?? 0}/${stats?.dupes ?? 0}/${stats?.rxOnly ?? 0}`} />
                   </div>
-                  <PreviewTable channels={pipeline.channels} chirpMode={chirpSettings.mode} startLoc={chirpSettings.startLocation} />
+                  {pipeline && target.validate && (() => {
+                    const tw = target.validate!(pipeline.channels, targetSettings as never);
+                    if (tw.length === 0) return null;
+                    return (
+                      <ul className="mb-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+                        {tw.map((w, i) => <li key={i}>⚠ {w.message}</li>)}
+                      </ul>
+                    );
+                  })()}
+                  <PreviewTable channels={pipeline.channels} chirpMode={target.id === "chirp-generic" ? chirpSettings.mode : "NFM"} startLoc={target.id === "chirp-generic" ? chirpSettings.startLocation : 1} />
                 </Section>
               </div>
             </div>
@@ -869,11 +879,12 @@ function PackRow({ pack, entry, maxLength, onChange }: {
 
 /* ───────────── Export / CHIRP / sortering ───────────── */
 
-function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, setTargetSettings }: {
+function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, targetSettings, setTargetSettings }: {
   settings: Settings;
   setSettings: (s: Settings) => void;
   hasPacks: boolean;
   chirpSettings: ChirpSettings;
+  targetSettings: Record<string, unknown>;
   setTargetSettings: (patch: Record<string, unknown>) => void;
 }) {
   const updPacks = (patch: Partial<Settings["packs"]>) => setSettings({ ...settings, packs: { ...settings.packs, ...patch } });
@@ -971,7 +982,7 @@ function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, setTarget
       <div className="border-t border-border pt-4">
         <SectionLabel>Exportmål</SectionLabel>
         <Hint>
-          Välj vilket app- eller radiospecifikt format CSV-filen ska skrivas i. Nya format läggs till i <code className="font-mono">src/lib/chirp/targets/</code>.
+          Välj vilket app- eller radiospecifikt format CSV-filen ska skrivas i. Nya format läggs till i <code className="font-mono">src/lib/codeplug/targets/</code>.
         </Hint>
         <div className="mt-2">
           <select value={settings.export.targetId}
@@ -990,34 +1001,93 @@ function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, setTarget
         </div>
       </div>
 
-      <div className="border-t border-border pt-4">
-        <SectionLabel>CHIRP-fält & radio</SectionLabel>
-        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
-          <NumberField label="Startnummer (Location)" value={chirpSettings.startLocation}
-            onChange={(v) => updChirp({ startLocation: v })}
-            hint="Första minnesposition i radion. T.ex. 1 om du vill skriva från början, 100 om du vill lägga repeatrarna efter befintliga kanaler." />
-          <NumberField label="Max längd kanalnamn" value={chirpSettings.maxLength}
-            onChange={(v) => updChirp({ maxLength: v })}
-            hint="Hårdvarubegränsning — många radior trunkerar vid 6–7 tecken. Gäller alla kanaler (både repeatrar och paket)." />
-          <Field label="Mode" hint="NFM = smal FM (12,5 kHz) — standard för amatörradio idag. FM = bred (25 kHz), äldre repeatrar.">
-            <select value={chirpSettings.mode}
-              onChange={(e) => updChirp({ mode: e.target.value as ChirpSettings["mode"] })}
-              className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
-              <option value="NFM">NFM (smal FM)</option>
-              <option value="FM">FM (bred)</option>
-            </select>
-          </Field>
-          <NumberField label="TStep (kHz)" step={0.5} value={chirpSettings.tStep}
-            onChange={(v) => updChirp({ tStep: v })}
-            hint="Frekvensraster vid manuell rattning på radion. 5 kHz funkar för 2m/70cm i Sverige. PMR/marin sätter eget per kanal." />
+      {settings.export.targetId === "chirp-generic" && (
+        <div className="border-t border-border pt-4">
+          <SectionLabel>CHIRP-fält & radio</SectionLabel>
+          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
+            <NumberField label="Startnummer (Location)" value={chirpSettings.startLocation}
+              onChange={(v) => updChirp({ startLocation: v })}
+              hint="Första minnesposition i radion. T.ex. 1 om du vill skriva från början, 100 om du vill lägga repeatrarna efter befintliga kanaler." />
+            <NumberField label="Max längd kanalnamn" value={chirpSettings.maxLength}
+              onChange={(v) => updChirp({ maxLength: v })}
+              hint="Hårdvarubegränsning — många radior trunkerar vid 6–7 tecken. Gäller alla kanaler (både repeatrar och paket)." />
+            <Field label="Mode" hint="NFM = smal FM (12,5 kHz) — standard för amatörradio idag. FM = bred (25 kHz), äldre repeatrar.">
+              <select value={chirpSettings.mode}
+                onChange={(e) => updChirp({ mode: e.target.value as ChirpSettings["mode"] })}
+                className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+                <option value="NFM">NFM (smal FM)</option>
+                <option value="FM">FM (bred)</option>
+              </select>
+            </Field>
+            <NumberField label="TStep (kHz)" step={0.5} value={chirpSettings.tStep}
+              onChange={(v) => updChirp({ tStep: v })}
+              hint="Frekvensraster vid manuell rattning på radion. 5 kHz funkar för 2m/70cm i Sverige. PMR/marin sätter eget per kanal." />
+          </div>
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={chirpSettings.skipLinks}
+              onChange={(e) => updChirp({ skipLinks: e.target.checked })} />
+            Hoppa över länkar och hotspots vid skanning i radion
+            <span className="text-xs text-muted-foreground">(sätter Skip=S på Link/Hotspot — kanalen finns kvar men skannas inte)</span>
+          </label>
         </div>
-        <label className="mt-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={chirpSettings.skipLinks}
-            onChange={(e) => updChirp({ skipLinks: e.target.checked })} />
-          Hoppa över länkar och hotspots vid skanning i radion
-          <span className="text-xs text-muted-foreground">(sätter Skip=S på Link/Hotspot — kanalen finns kvar men skannas inte)</span>
-        </label>
+      )}
+
+      {settings.export.targetId === "vgc-n76" && (
+        <VgcN76Panel
+          settings={targetSettings as unknown as VgcN76Settings}
+          update={setTargetSettings}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ───────────── VGC N76 panel ───────────── */
+
+function VgcN76Panel({ settings, update }: {
+  settings: VgcN76Settings;
+  update: (patch: Record<string, unknown>) => void;
+}) {
+  return (
+    <div className="border-t border-border pt-4">
+      <SectionLabel>VGC N76-fält</SectionLabel>
+      <Hint>
+        VGC:s iOS/Android-app importerar denna CSV direkt — inga andra verktyg behövs. Frekvenser skrivs i Hz, CTCSS som Hz×100, DCS som decimal-form av oktal-koden. DCS-polaritet (N/I) går inte att uttrycka i filen och defaultas till N.
+      </Hint>
+      <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5 mt-2">
+        <NumberField label="Max längd title" value={settings.maxLength}
+          onChange={(v) => update({ maxLength: v })}
+          hint="N76 visar 16 tecken. Längre namn trunkeras och flaggas som varning." />
+        <Field label="Default sändareffekt" hint="H/M/L. Per-rad-override stöds inte i v1.">
+          <select value={settings.defaultPower}
+            onChange={(e) => update({ defaultPower: e.target.value as VgcN76Settings["defaultPower"] })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+            <option value="H">H (hög)</option>
+            <option value="M">M (medel)</option>
+            <option value="L">L (låg)</option>
+          </select>
+        </Field>
+        <Field label="Default bandbredd" hint="Används när kanalpaket inte anger NFM/FM. 12500 = smal, 25000 = bred.">
+          <select value={settings.defaultBandwidth}
+            onChange={(e) => update({ defaultBandwidth: Number(e.target.value) as VgcN76Settings["defaultBandwidth"] })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+            <option value={12500}>12500 (NFM)</option>
+            <option value={25000}>25000 (FM)</option>
+          </select>
+        </Field>
+        <NumberField label="Kanaler per grupp" value={settings.channelsPerGroup}
+          onChange={(v) => update({ channelsPerGroup: v })}
+          hint="N76 grupperar i klumpar om 32. Överskrids gränsen visas en varning — uppdelning sker manuellt i v1." />
+        <NumberField label="Padda till antal rader" value={settings.padToChannels ?? 0}
+          onChange={(v) => update({ padToChannels: v > 0 ? v : null })}
+          hint="0 = ingen padding. Sätt t.ex. 32 om appens template kräver fast längd." />
       </div>
+      <label className="mt-3 flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={settings.skipLinks}
+          onChange={(e) => update({ skipLinks: e.target.checked })} />
+        Hoppa över länkar och hotspots vid skanning
+        <span className="text-xs text-muted-foreground">(sätter scan=0 på Link/Hotspot-rader)</span>
+      </label>
     </div>
   );
 }

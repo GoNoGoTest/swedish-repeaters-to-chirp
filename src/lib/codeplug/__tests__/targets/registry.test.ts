@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { registerTarget, getTarget, requireTarget, listTargets, __resetTargetsForTests } from "@/lib/chirp/targets/registry";
-import type { ExportTarget } from "@/lib/chirp/targets/types";
+import { registerTarget, getTarget, requireTarget, listTargets, __resetTargetsForTests } from "@/lib/codeplug/targets/registry";
+import type { ExportTarget } from "@/lib/codeplug/targets/types";
 
 const dummy: ExportTarget<{ x: number }> = {
   id: "dummy-target",
