@@ -869,12 +869,32 @@ function PackRow({ pack, entry, maxLength, onChange }: {
 
 /* ───────────── Export / CHIRP / sortering ───────────── */
 
-function ExportPanel({ settings, setSettings, hasPacks }: {
-  settings: Settings; setSettings: (s: Settings) => void; hasPacks: boolean;
+function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, setTargetSettings }: {
+  settings: Settings;
+  setSettings: (s: Settings) => void;
+  hasPacks: boolean;
+  chirpSettings: ChirpSettings;
+  setTargetSettings: (patch: Record<string, unknown>) => void;
 }) {
   const updPacks = (patch: Partial<Settings["packs"]>) => setSettings({ ...settings, packs: { ...settings.packs, ...patch } });
-  const updChirp = (patch: Partial<Settings["chirp"]>) => setSettings({ ...settings, chirp: { ...settings.chirp, ...patch } });
+  const updChirp = (patch: Partial<ChirpSettings>) => setTargetSettings(patch as Record<string, unknown>);
   const updSort = (patch: Partial<Settings["sort"]>) => setSettings({ ...settings, sort: { ...settings.sort, ...patch } });
+
+  const targets = listTargets();
+  const setTargetId = (id: string) => {
+    const t = requireTarget(id);
+    setSettings({
+      ...settings,
+      export: {
+        targetId: id,
+        perTarget: {
+          ...settings.export.perTarget,
+          [id]: settings.export.perTarget[id] ?? { ...(t.defaultSettings as object) },
+        },
+      },
+    });
+  };
+
 
   return (
     <div className="space-y-5">
@@ -949,28 +969,50 @@ function ExportPanel({ settings, setSettings, hasPacks }: {
       </div>
 
       <div className="border-t border-border pt-4">
+        <SectionLabel>Exportmål</SectionLabel>
+        <Hint>
+          Välj vilket app- eller radiospecifikt format CSV-filen ska skrivas i. Nya format läggs till i <code className="font-mono">src/lib/chirp/targets/</code>.
+        </Hint>
+        <div className="mt-2">
+          <select value={settings.export.targetId}
+            onChange={(e) => setTargetId(e.target.value)}
+            className="rounded border border-input bg-background px-2 py-1 text-sm">
+            {Object.entries(
+              targets.reduce<Record<string, typeof targets>>((acc, t) => {
+                (acc[t.vendor] ||= []).push(t); return acc;
+              }, {}),
+            ).map(([vendor, group]) => (
+              <optgroup key={vendor} label={vendor}>
+                {group.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="border-t border-border pt-4">
         <SectionLabel>CHIRP-fält & radio</SectionLabel>
         <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
-          <NumberField label="Startnummer (Location)" value={settings.chirp.startLocation}
+          <NumberField label="Startnummer (Location)" value={chirpSettings.startLocation}
             onChange={(v) => updChirp({ startLocation: v })}
             hint="Första minnesposition i radion. T.ex. 1 om du vill skriva från början, 100 om du vill lägga repeatrarna efter befintliga kanaler." />
-          <NumberField label="Max längd kanalnamn" value={settings.chirp.maxLength}
+          <NumberField label="Max längd kanalnamn" value={chirpSettings.maxLength}
             onChange={(v) => updChirp({ maxLength: v })}
             hint="Hårdvarubegränsning — många radior trunkerar vid 6–7 tecken. Gäller alla kanaler (både repeatrar och paket)." />
           <Field label="Mode" hint="NFM = smal FM (12,5 kHz) — standard för amatörradio idag. FM = bred (25 kHz), äldre repeatrar.">
-            <select value={settings.chirp.mode}
-              onChange={(e) => updChirp({ mode: e.target.value as Settings["chirp"]["mode"] })}
+            <select value={chirpSettings.mode}
+              onChange={(e) => updChirp({ mode: e.target.value as ChirpSettings["mode"] })}
               className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
               <option value="NFM">NFM (smal FM)</option>
               <option value="FM">FM (bred)</option>
             </select>
           </Field>
-          <NumberField label="TStep (kHz)" step={0.5} value={settings.chirp.tStep}
+          <NumberField label="TStep (kHz)" step={0.5} value={chirpSettings.tStep}
             onChange={(v) => updChirp({ tStep: v })}
             hint="Frekvensraster vid manuell rattning på radion. 5 kHz funkar för 2m/70cm i Sverige. PMR/marin sätter eget per kanal." />
         </div>
         <label className="mt-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={settings.chirp.skipLinks}
+          <input type="checkbox" checked={chirpSettings.skipLinks}
             onChange={(e) => updChirp({ skipLinks: e.target.checked })} />
           Hoppa över länkar och hotspots vid skanning i radion
           <span className="text-xs text-muted-foreground">(sätter Skip=S på Link/Hotspot — kanalen finns kvar men skannas inte)</span>
