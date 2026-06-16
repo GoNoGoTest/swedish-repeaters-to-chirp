@@ -1,100 +1,46 @@
 ## Mål
 
-1. Lyft **val av exportformat** till toppen av sidan så att resten av GUI:t (namnlängd, warnings, split-alternativ) anpassar sig direkt.
-2. Lägg till **uppdelning per distrikt** + **chunkning vid hårdvarugräns** för repeaterexporten, levererat som ZIP när flera filer.
-3. Sätt **VGC N76 `maxNameLength = 8`** som default.
-4. Behåll nuvarande arbetsflöde; ingen stor ombyggnad.
+I VGC-fallet ska channel-packs alltid delas upp i filer om ≤ `limits.maxChannelsPerGroup` (32) — oavsett vilket split-läge användaren valt (`single`, `per_district`, `per_district_chunked`). Districts/repeaters ska däremot fortsätta följa användarens val.
 
-## Ny sidstruktur
+## Varför
 
-```text
-┌─ Header
-├─ [NY] Exportformat            ← target-väljare + kort beskrivning + limits
-├─ Repeatrar (SK6BA / Marks)
-├─ Kanalpaket
-├─ Sortering & export           ← target-specifik panel + split-block
-└─ Förhandsgranska & exportera  ← knapp visar "Exportera VGC N76 (n) [ZIP]" vid split
-```
+Channel-packs har inget distrikt och bucketas till `packs`. Idag chunkas de bara om hela exporten är i `per_district_chunked`. Eftersom N76 hårdvarumässigt är begränsad till 32 kanaler per grupp blir en `_packs.csv` med 80 rader oanvändbar i appen.
 
-Format-väljaren blir en egen `<Section>` överst med:
-- Dropdown över `listTargets()`
-- Visar `target.limits` (maxChannels, channelsPerGroup, maxNameLength) som chips
-- Liten infotext per target (källa: ny `target.description`-fält)
+## Ändringar
 
-Befintliga `chirp-specifika` UI-bitar (mode, startLocation) renderas bara när `targetId === "chirp-generic"`. VGC-panelen finns redan.
+### 1. `src/lib/codeplug/targets/split.ts`
 
-## Split-block (ny, target-agnostisk inställning)
+Lägg till en valfri `packsChunkSize?: number` på `buildSplitFiles`-options. Regler vid bygg av filer från `packs`-bucketen:
 
-Lagras under `settings.export.split` (ej per-target — gemensam för alla format
-som har `channelsPerGroup`-gräns):
+- `single`-läge: oförändrat — packs läggs i en fil (om vi splittar packs här bryter vi förväntningen att `single` ger exakt en fil). Se sektion "Frågetecken" nedan.
+- `per_district`: om `packsChunkSize` är satt, chunka packs med det värdet. Districts chunkas inte.
+- `per_district_chunked`: chunka packs med `min(split.chunkSize, packsChunkSize ?? Infinity)`. Districts chunkas med `split.chunkSize` som idag.
 
-```ts
-type SplitSettings = {
-  mode: "single" | "per_district" | "per_district_chunked";
-  // chunkSize default = target.limits.channelsPerGroup ?? maxChannels
-  chunkSize?: number;
-};
-```
+Implementation: behåll en `chunkSize`-beräkning per bucket istället för en gemensam.
 
-UI (radio + ett nummerfält):
-- ☉ En enda fil (default)
-- ○ En fil per distrikt → `repeaters_distrikt_<n>.csv`
-- ○ Per distrikt + chunka vid `[ 32 ]` kanaler → `..._<n>_#1.csv`, `..._<n>_#2.csv`
+### 2. `src/lib/codeplug/targets/vgc-n76.ts`
 
-Endast repeaterkanaler grupperas per distrikt (har `district`). Kanalpaketkanaler
-hamnar i en separat fil `packs.csv` (eller chunkad: `packs_#1.csv`).
+I `exportMany`, skicka `packsChunkSize: VGC_N76_LIMITS.maxChannelsPerGroup` (= 32) till `buildSplitFiles`.
 
-Vid `mode !== "single"`: lägg alla filer i en ZIP via `jszip` och ladda ner
-`<target.filenameBase>.zip`. Vid `single`: oförändrat beteende.
+### 3. `src/lib/codeplug/targets/chirp-generic.ts`
 
-Warning vid t.ex. mode=per_district och distrikt 6 har 47 kanaler men
-chunkSize saknas → `vgc_over_group_limit` (befintlig kod) men UI-meddelandet
-föreslår att slå på chunkning.
+Oförändrad — skickar ingen `packsChunkSize` (CHIRP har ingen gruppgräns).
 
-## VGC `maxNameLength = 8`
+### 4. Tester — `src/lib/codeplug/__tests__/targets/split.test.ts`
 
-Ändra `vgc-n76.ts`:
-- `defaultSettings.maxLength: 16` → `8`
-- `limits.maxNameLength: 16` → `8`
-- Uppdatera testen som kollar 16-tecken trunkering till 8.
+Nya fall:
 
-Settings i localStorage återställs (vi har redan accepterat reset vid uppgradering).
+- VGC `per_district` med 50 paketrader → en `_distrikt_X.csv` per distrikt + `_packs_part1.csv` (32 rader) + `_packs_part2.csv` (18 rader).
+- VGC `per_district_chunked` med `chunkSize: 50` och 80 paketrader → `_packs_part1..3.csv` med 32/32/16 (min-regeln slår in).
+- VGC `per_district_chunked` med `chunkSize: 10` och 25 paketrader → `_packs_part1..3.csv` med 10/10/5 (user-värdet vinner).
+- CHIRP `per_district` med 100 paketrader → fortfarande en enda `_packs.csv` (ingen `packsChunkSize`).
 
-## Tekniska detaljer
+## Filnamn
 
-**Targets-API utökas (icke-brytande):**
-```ts
-type ExportTarget = {
-  …
-  description?: string;          // kort text för format-väljaren
-  exportMany?(channels, settings, split): Array<{filename, content}>;
-};
-```
-Om `exportMany` saknas faller vi tillbaka till `export()` och ignorerar split.
-Både chirp-generic och vgc-n76 implementerar `exportMany` genom att gruppera
-på `c.district` och chunka med `chunkSize`.
+Inga nya regler — befintlig `chunkFilename` ger `vgc-n76_packs_part1.csv` osv. när `totalChunks > 1`.
 
-**Filnamnskonvention:**
-- Per distrikt: `<base>_distrikt_<n>.csv` (n = distriktssiffra, "0" om saknas)
-- Chunkad: `<base>_distrikt_<n>_part<k>.csv`
-- Kanalpaket: `<base>_packs.csv` (+ `_part<k>` vid chunkning)
-- ZIP-namn: `<base>.zip`
+## Frågetecken / icke-mål
 
-**Beroenden:** `bun add jszip`.
-
-## Tester
-
-- `vgc-n76.test.ts`: uppdatera trunkeringstest till 8 tecken.
-- Ny `exportMany.test.ts`:
-  - per_district splittar i N filer baserat på `district`
-  - per_district_chunked respekterar chunkSize
-  - kanaler utan distrikt → `packs.csv`
-  - filordning deterministisk (distrikt sorterat numeriskt)
-- Bekräfta att 122 befintliga tester fortsatt passerar.
-
-## Inte med i denna PR
-
-- Per-pack split (paket fyller sällan en grupp).
-- Anpassad mappning av distrikt→gruppnamn på radion (görs i appen efter import).
-- RT Systems / DMR / N76 zone-fil.
-- Drag-and-drop ordning av distrikt i export.
+- **`single`-läget chunkar inte packs.** Det är det principielt minst förvånande: användaren har sagt "en fil". Vill du istället att VGC i `single`-läget alltid emittierar separata pack-filer (vilket gör att läget bryter sitt eget namn) — säg till så lägger jag in det.
+- UI-ändringar — ingen. Användaren ser bara fler filer i ZIP:en när det behövs.
+- Per-distrikt-gruppgränsen (max 32/distrikt på N76) hanteras separat i `per_district_chunked` om användaren sätter `chunkSize: 32`; ingen automatisk capping av distrikten i den här ändringen.
