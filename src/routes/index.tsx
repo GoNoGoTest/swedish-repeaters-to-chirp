@@ -395,7 +395,7 @@ function Index() {
                     <button onClick={doExport}
                       disabled={pipeline.duplicateStop}
                       className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-                      Exportera {target.label} ({pipeline.channels.length}){willSplit ? " [ZIP]" : ""}
+                      Exportera {target.label} ({exportChannels.length}){willSplit ? " [ZIP]" : ""}
                     </button>
                   </div>
                 }>
@@ -411,8 +411,14 @@ function Index() {
                     <Stat label="Filtrerade bort" value={pipeline.filteredOut} />
                     <Stat label="Varn/Koll/Dupes/RX" value={`${stats?.warned ?? 0}/${stats?.collided ?? 0}/${stats?.dupes ?? 0}/${stats?.rxOnly ?? 0}`} />
                   </div>
+                  {excludedKeys.size > 0 && (
+                    <div className="mb-3 flex items-center justify-between rounded border border-border bg-muted/40 px-3 py-2 text-xs">
+                      <span>Exkluderade rader: <strong>{excludedKeys.size}</strong> (visas i previewen men tas inte med i exporten)</span>
+                      <button onClick={resetExcluded} className="rounded border border-border px-2 py-1">Återställ</button>
+                    </div>
+                  )}
                   {pipeline && target.validate && (() => {
-                    const tw = target.validate!(pipeline.channels, targetSettings as never);
+                    const tw = target.validate!(exportChannels, targetSettings as never);
                     if (tw.length === 0) return null;
                     return (
                       <ul className="mb-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200 space-y-1">
@@ -420,7 +426,13 @@ function Index() {
                       </ul>
                     );
                   })()}
-                  <PreviewTable channels={pipeline.channels} chirpMode={target.id === "chirp-generic" ? chirpSettings.mode : "NFM"} startLoc={target.id === "chirp-generic" ? chirpSettings.startLocation : 1} />
+                  <PreviewTable
+                    channels={pipeline.channels}
+                    excludedKeys={excludedKeys}
+                    onToggleExclude={toggleExclude}
+                    chirpMode={target.id === "chirp-generic" ? chirpSettings.mode : "NFM"}
+                    startLoc={target.id === "chirp-generic" ? chirpSettings.startLocation : 1}
+                  />
                 </Section>
               </div>
             </div>
