@@ -1,127 +1,114 @@
+# Refactor: codeplug-mapp + VGC N76-exporter
 
-# Refactor: pluggbart exportlager
+Två sammanhängande steg i samma PR. CHIRP-output förblir byte-identisk (regression-test vaktar).
 
-## Mål
+## 1. Rename `src/lib/chirp/` → `src/lib/codeplug/`
 
-Förbereda appen för fler exportformat (näst på tur: VGC N76; senare RT Systems, DMR-varianter osv) utan att röra det som fungerar idag. Import, `NormalizedChannel`, pipeline (filter/sort/dedupe/naming) och UI för repeatrar+kanalpaket lämnas orörda. Inget nytt format implementeras nu — bara CHIRP flyttas in i den nya strukturen så att tillägg av N76 senare bara blir "lägg till en fil i `targets/`".
+Mappnamnet `chirp` är vilseledande nu när vi också skriver för VGC-appen, RT Systems m.fl. — det är "codeplug-byggaren" som är gemensam, inte CHIRP.
 
-Bakåtkompatibilitet för sparade `localStorage`-settings nedprioriteras (vi bumpar versionsnyckeln och resettar tyst).
+- `git mv src/lib/chirp src/lib/codeplug`
+- Uppdatera imports i:
+  - `src/routes/index.tsx`
+  - `src/lib/codeplug/models.ts` (interna paths)
+  - `src/lib/codeplug/__tests__/targets/chirp-generic.test.ts`
+  - `src/lib/codeplug/__tests__/targets/registry.test.ts`
+  - `src/lib/codeplug/__tests__/exporters/chirp.test.ts`
+- **Behåll** undermappen `targets/chirp-generic.ts` — CHIRP är fortsatt ett target, bara inte längre roten.
+- **Behåll** STORAGE_KEY `v5` — strukturen ändras inte, bara modulnamn. Inga migrations behövs.
+- `targets/registry.ts` och `targets/index.ts` får uppdaterade interna kommentarer som hänvisar till `codeplug/`.
 
-## Centralt koncept: "exportmål" (ExportTarget)
+Filer som flyttas (oförändrat innehåll utöver imports): `dedupe.ts`, `defaults.ts`, `distance.ts`, `district.ts`, `filters.ts`, `frequency.ts`, `geohash.ts`, `maidenhead.ts`, `models.ts`, `naming.ts`, `pipeline.ts`, `saved-exports.ts`, `sorting.ts`, `tones.ts`, samt undermapparna `__tests__/`, `channel_packs/`, `exporters/`, `importers/`, `targets/`.
 
-Ett exportmål = en konkret kombination av appstöd och radiogränser som ger en importerbar fil. Exempel:
+## 2. Ny export-target: `vgc-n76`
 
-- `chirp-generic` — CHIRP generic CSV, gränser från en "generic CHIRP"-radio (det vi har idag).
-- `vgc-n76` (senare) — N76:s egna CSV, 32 kanaler/grupp, egen maxLength, egna tonkolumner.
-- `rt-systems-ftm500` (senare) — RT Systems CSV för en specifik Yaesu-radio.
+### Filer
+- `src/lib/codeplug/targets/vgc-n76.ts` — target-modul (exporter + settings-typ + validate).
+- `src/lib/codeplug/targets/vgc-n76.panel.tsx` — settings-UI (power-default, bandwidth-default, max title-längd).
+- `src/lib/codeplug/__tests__/targets/vgc-n76.test.ts` — regressions mot båda uppladdade sample-filerna.
+- Registrering i `src/lib/codeplug/targets/index.ts`.
 
-Vissa dialekter (t.ex. CHIRP) kan i framtiden återanvändas av flera mål med olika gränser; men det är en optimering — vi börjar med "ett mål = en exporter + en gränsuppsättning".
-
-## Ny struktur
-
+### CSV-format (16 kolumner, exakt headerrad som samplen)
 ```text
-src/lib/chirp/                    (behålls; namnet "chirp" är historiskt)
-  exporters/
-    chirp.ts                      (oförändrad implementation, blir leverantör till chirp-generic-målet)
-  targets/                        (NY)
-    types.ts                      (ExportTarget, HardwareLimits, ExportContext, ExportResult)
-    registry.ts                   (registerTarget / listTargets / getTarget)
-    chirp-generic.ts              (registrerar CHIRP-målet, defaults, validering, anropar exporters/chirp.ts)
-    index.ts                      (importerar alla targets så registret fylls vid app-start)
+title,tx_freq,rx_freq,tx_sub_audio(...),rx_sub_audio(...),tx_power(H/M/L),
+bandwidth(12500/25000),scan,talk around,pre_de_emph_bypass,sign,tx_dis,
+bclo,mute,rx_modulation,tx_modulation
 ```
 
-### `types.ts` (skiss, inte slutgiltig kod)
+### Fältmappning från `NormalizedChannel`
+| VGC-kolumn | Källa | Regel |
+|---|---|---|
+| `title` | `generated_name_final` | Trunka till `maxLength` (setting, default 16). UTF-8 OK. |
+| `tx_freq` | `rx_frequency + tx_shift` (eller `tx_frequency` för packs) | Hz som heltal: `Math.round(MHz * 1_000_000)`. |
+| `rx_freq` | `rx_frequency` | Hz som heltal. |
+| `tx_sub_audio` | `ctcss_tx` ‖ `dtcs_code` | Se ton-kodning nedan. |
+| `rx_sub_audio` | `ctone_freq` ‖ `dtcs_code` | Se ton-kodning nedan. |
+| `tx_power` | setting `defaultPower` | `H`/`M`/`L`, default `H`. Per-rad-override ej i v1. |
+| `bandwidth` | `mode_chirp` / `is_analog_fm` | `NFM` → `12500`, `FM` → `25000`. Default `12500`. |
+| `scan` | `skip_raw` ∨ `skipLinks`-setting | `1` om kanalen ska skannas, annars `0`. Spegla nuvarande CHIRP-skip-logik (inverterad). |
+| `talk around` | konstant `0` | Inte i mellanlagret. |
+| `pre_de_emph_bypass` | konstant `0` | – |
+| `sign` | konstant `1` | (samma som båda samplen) |
+| `tx_dis` | `rx_only` | `1` om RX-only, annars `0`. |
+| `bclo` | konstant `0` | – |
+| `mute` | konstant `0` | – |
+| `rx_modulation` | konstant `0` (FM) | AM-stöd kräver fält i mellanlagret — TODO. |
+| `tx_modulation` | konstant `0` (FM) | dito. |
 
-```text
-HardwareLimits {
-  maxChannels?: number
-  maxChannelsPerGroup?: number
-  maxNameLength: number
-  supportedModes: Array<"NFM"|"FM"|"AM"|"USB"|"LSB"|"CW"|"DMR"|"DSTAR"|"C4FM"|...>
-  supportsSplit: boolean
-  supportsCtcss: boolean
-  supportsDcs: boolean
-  toneStepHz?: number[]
-}
+### Ton-kodning (bekräftat mot sample 2)
+- **Ingen ton** → `0`
+- **CTCSS** (Hz × 100): `114.8 Hz` → `11480`. Intervall ~6700–25410.
+- **DCS** (oktal-kod som decimaltal): `D023` → `23`, `D731` → `731`. Intervall 0–777.
+- **Disambiguering vid läsning** (för framtida import): `value < 1000` ⇒ DCS, `≥ 1000` ⇒ CTCSS. Här bara relevant för tester.
+- **Polaritet (N/I) och andra DCS-paret är inte representerbara** i CSV:n. Vi emitterar bara N-polaritet. Varning `vgc_dcs_polarity_lost` om `dtcs_polarity` ≠ `NN`.
 
-ExportTarget<TSettings> {
-  id: string                      // "chirp-generic"
-  label: string                   // "CHIRP generic CSV"
-  vendor: string                  // "CHIRP"  — för gruppering i UI
-  fileExtension: "csv" | "txt" | ...
-  limits: HardwareLimits
-  defaultSettings: TSettings
-  validate?(channels, settings): Warning[]   // pre-export validering mot limits
-  export(channels: NormalizedChannel[], settings: TSettings): ExportResult
-}
-
-ExportResult { filename: string; content: string; warnings: Warning[] }
-```
-
-### `chirp-generic.ts`
-
-Wrappar nuvarande `exportChirpCsv` + `ChirpSettings`. Ingen logikändring; bara registrering.
-
-## Settings-modell
-
-`Settings.chirp` ersätts av ett generiskt schema. Versionsnyckeln i `localStorage` bumpas från `sk6ba-chirp-settings-v4` till `v5`, gammal nyckel ignoreras (ingen migrationskod).
-
-```text
-Settings {
-  filter, naming, sort, packs            // oförändrade
-  export: {
-    targetId: string                     // default "chirp-generic"
-    perTarget: Record<string, unknown>   // typad via target.defaultSettings vid läsning
-  }
+### Settings (lagras i `Settings.export.perTarget["vgc-n76"]`)
+```ts
+interface VgcN76Settings {
+  maxLength: number;            // default 16
+  defaultPower: "H" | "M" | "L"; // default "H"
+  defaultBandwidth: 12500 | 25000; // default 12500
+  channelsPerGroup: number;      // default 32 (för validate-varning)
+  padToChannels: number | null;  // null = ingen padding; t.ex. 500 för full template
 }
 ```
 
-`ChirpSettings.maxLength` blir kvar i CHIRP-målets settings (där den hör hemma: hårdvarugräns för radions display). Inget flyttas till `NamingSettings`.
+### Validate-varningar
+Returneras från `target.validate(channels, settings)`, visas över exportknappen:
+- `vgc_over_group_limit` — när antal kanaler > `channelsPerGroup` (default 32). Ej blockerande; appen importerar ändå, men användaren måste dela upp manuellt i v1.
+- `vgc_dcs_polarity_lost` — när någon rad har DCS med I-polaritet eller ett andra par (info-varning).
+- `vgc_title_truncated` — när någon `title` trunkerats.
 
-Nya warning-koder reserveras: `exceeds_max_channels`, `exceeds_group_size`, `unsupported_mode_for_target`, `name_too_long_for_target`.
+### Nya WarningCodes
+Lägg till i `models.ts`: `vgc_over_group_limit`, `vgc_dcs_polarity_lost`, `vgc_title_truncated`.
 
-## UI-ändringar (minimala i denna runda)
+### Hårdvarugränser (HardwareLimits)
+`vgc-n76` sätter:
+```ts
+{ maxChannels: 500, channelsPerGroup: 32, maxNameLength: 16 }
+```
+`pipeline.runPipeline` får redan `maxNameLength` via parameter — target läser från `limits.maxNameLength`. Truncation/splitting görs **inte** i v1 (bara varningar) per tidigare beslut.
 
-I `Sortering & CHIRP-export`-sektionen i `src/routes/index.tsx`:
+### Padding / trailing tomma rader
+Sample-filerna har 16 rader (data + tomma) i sample 2 och 32 rader i sample 1. Trolig orsak: appens template fyller alltid till nästa gruppgräns. **Default: ingen padding** (`padToChannels: null`). Användaren kan sätta `padToChannels: 32` om det krävs av appen — bekräftas i nästa runda om import till N76 faktiskt klagar utan padding.
 
-1. Lägg till en målväljare överst: `<select>` grupperad per `vendor`, listar `registry.listTargets()`. Default `chirp-generic`.
-2. Rendera målets settings-panel via en liten dispatcher. CHIRP-panelen flyttas ut från `ExportPanel` till `targets/chirp-generic.panel.tsx` (samma fält som idag: startLocation, mode, tStep, skipLinks, maxLength).
-3. Exportknappens text blir `Exportera {target.label} ({n})` och anropar `target.export(...)` istället för `exportChirpCsv` direkt.
-4. Visa eventuella `target.validate()`-varningar (t.ex. för många kanaler för radion) ovanför exportknappen — utan att blockera om man inte vill.
-
-Inga ändringar i repeater-, kanalpakets- eller preview-sektionerna.
-
-Sektionsrubriken byts från `Sortering & CHIRP-export` till `Sortering & export`.
+### UI
+`Sortering & export` har redan target-väljaren. När `vgc-n76` är valt:
+- Visa `VgcN76Panel` (ersätter CHIRP-panelen) med fält för max title-längd, default power, default bandwidth, channels-per-group, padding.
+- Exportknappens varningslista visar `target.validate(...)`-resultat.
 
 ## Tester
+- `vgc-n76.test.ts`:
+  - Header-rad exakt = sample-headern.
+  - Mappar en repeater (rx 145.125, +600 shift, NFM, CTCSS 114.8) till sample-1-radens exakta värden för Kungsbacka-fallet.
+  - Mappar en kanal med DCS-023/D731 till `tx_sub=731, rx_sub=23` (sample 2 rad 2).
+  - 33 kanaler → exakt 1 instans av `vgc_over_group_limit`.
+  - DCS med I-polaritet → exakt 1 instans av `vgc_dcs_polarity_lost`.
+  - Title "ABCDEFGHIJKLMNOPQ" med maxLength=16 → trunkerad + varning.
+- Befintliga 109 CHIRP-tester ska fortsatt passera oförändrade efter rename.
 
-- `targets/registry.test.ts`: register tar emot mål, hittar via id, kastar på dubblett-id.
-- `targets/chirp-generic.test.ts`: målet producerar identisk output med nuvarande `exportChirpCsv` för en uppsättning fixturer (regressionsskydd — vi får inte ändra CHIRP-output).
-- Behåll alla befintliga tester i `__tests__/exporters/chirp.test.ts` orörda. De fortsätter testa `chirp.ts` direkt.
-- Snapshot av CSV-headern via målet, så att framtida targets inte oavsiktligt kan ändra CHIRP-kolumnordningen.
-
-## Vad som *inte* görs nu (medvetet uppskjutet)
-
-- VGC N76-exporter, N76-UI för kanalgrupper, 32/grupp-uppdelning.
-- RT Systems-varianter.
-- DMR/digitala mode-fält i `NormalizedChannel` (kräver att import/Marks-CSV-mappningen utökas; egen plan).
-- Per-radio bandfilter, automatisk skip-out av kanaler som överskrider limits.
-- Tillämpning av `HardwareLimits` (utöver att lagra dem och köra `validate`). Faktisk trunkering/uppdelning per radio kommer när första radiospecifika målet implementeras.
-
-## Tekniska detaljer / risker
-
-- "chirp"-namnet i mappstrukturen (`src/lib/chirp/`) blir missvisande när andra format finns. Vi behåller det i denna refactor för att minimera diff; en eventuell omdöpning till `src/lib/radio/` kan göras som separat städ-PR.
-- `Pipeline.duplicateStop` och övrig pipeline-logik är format-agnostisk och rörs inte.
-- Filnamnsgenerering (idag hårdkodat `chirp.csv` i `download(...)`) byts till `${target.id}.${target.fileExtension}` eller liknande.
-- Sparade exporter i localStorage (SK6BA-CSV-cache) är input-relaterade och påverkas inte.
-
-## Leverans
-
-En PR/iteration som:
-
-1. Skapar `targets/`-strukturen och flyttar in CHIRP som första mål.
-2. Bumpar settings-versionen och uppdaterar `loadStoredSettings`.
-3. Lägger till målväljare + dispatcher i export-sektionen.
-4. Lägger till registertester + CHIRP-regressionstest.
-
-Efter mergen kan VGC N76 läggas till i en separat, mycket mindre PR: en fil i `targets/`, en panel-komponent, och eventuellt nya fält i `NormalizedChannel` om N76 behöver något vi inte redan har.
+## Inte i denna PR
+- AM-stöd (`rx/tx_modulation=1`) — kräver nytt fält i `NormalizedChannel`.
+- Automatisk uppdelning i grupper om >32 — bara varning nu.
+- Per-rad power/bandwidth-override.
+- Import från VGC-CSV (vi bara exporterar).
+- RT Systems, DMR/digitala moder.
