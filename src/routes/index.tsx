@@ -22,6 +22,11 @@ import type {
   SplitMode, SplitSettings,
 } from "@/lib/codeplug/models";
 import { isValidMaidenhead } from "@/lib/codeplug/maidenhead";
+import { Switch } from "@/components/ui/switch";
+
+function channelKey(c: NormalizedChannel): string {
+  return `${c.source_type}:${c.pack_id ?? ""}:${c.source_id}:${c.source_row}`;
+}
 
 
 export const Route = createFileRoute("/")({
