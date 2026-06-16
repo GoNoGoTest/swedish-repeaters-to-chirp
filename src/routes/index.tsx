@@ -239,7 +239,7 @@ function Index() {
   const doExport = async () => {
     if (!pipeline || pipeline.duplicateStop) return;
     if (willSplit && target.exportMany) {
-      const files = target.exportMany(pipeline.channels, targetSettings as never, split);
+      const files = target.exportMany(exportChannels, targetSettings as never, split);
       if (files.length === 1) {
         download(files[0].filename, files[0].content);
       } else {
@@ -248,14 +248,14 @@ function Index() {
       }
       return;
     }
-    const result = target.export(pipeline.channels, targetSettings as never);
+    const result = target.export(exportChannels, targetSettings as never);
     download(result.filename, result.content);
   };
 
 
   const exportReport = () => {
     if (!pipeline) return;
-    const reportRows = pipeline.channels
+    const reportRows = exportChannels
       .filter((c) => c.warnings.length)
       .map((c) => ({
         source_type: c.source_type,
