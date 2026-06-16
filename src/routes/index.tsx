@@ -754,13 +754,14 @@ function NamingEditor({ value, onChange, tokens, hint, previewKind, maxLength, s
 /* ───────────── Channel packs panel ───────────── */
 
 function ChannelPacksPanel({
-  packs, settings, setSettings, selectedPackCount, selectedChannelCount,
+  packs, settings, setSettings, selectedPackCount, selectedChannelCount, maxNameLength,
 }: {
   packs: MergedPack[];
   settings: Settings;
   setSettings: (s: Settings) => void;
   selectedPackCount: number;
   selectedChannelCount: number;
+  maxNameLength: number;
 }) {
   const updPack = (packId: string, patch: Partial<PackSelectionEntry>) => {
     const cur = settings.packs.selection[packId] ?? defaultPackEntry();
@@ -779,7 +780,7 @@ function ChannelPacksPanel({
       {packs.map((pack) => (
         <PackRow key={pack.packId} pack={pack}
           entry={settings.packs.selection[pack.packId]}
-          maxLength={settings.chirp.maxLength}
+          maxLength={maxNameLength}
           onChange={(patch) => updPack(pack.packId, patch)} />
       ))}
     </div>
