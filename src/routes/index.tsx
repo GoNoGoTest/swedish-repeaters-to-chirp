@@ -5,6 +5,7 @@ import { parseSk6baCsv, summarize, type Summary } from "@/lib/codeplug/importers
 import { runPipeline } from "@/lib/codeplug/pipeline";
 import { listTargets, requireTarget } from "@/lib/codeplug/targets";
 import type { ChirpSettings } from "@/lib/codeplug/models";
+import type { VgcN76Settings } from "@/lib/codeplug/targets";
 import { DEFAULT_SETTINGS, DEFAULT_PACK_NAMING } from "@/lib/codeplug/defaults";
 import { loadMergedPacks, type MergedPack } from "@/lib/codeplug/channel_packs/registry";
 import { selectPackChannels, type ParsedPackChannel } from "@/lib/codeplug/importers/channel_pack";
