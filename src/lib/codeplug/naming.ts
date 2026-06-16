@@ -87,38 +87,70 @@ export function resolveCollisions(
   n: NamingSettings,
   maxLength: number,
 ): { channels: NormalizedChannel[]; unresolved: number } {
-  const seen = new Map<string, number>();
-  let unresolved = 0;
   const max = maxLength > 0 ? maxLength : Infinity;
+  let unresolved = 0;
 
+  // Pass 1: tally initial names so we know which ones collide. When a name
+  // appears more than once we want EVERY occurrence to get a suffix
+  // (LUND1, LUND2, …) rather than the first staying bare (LUND, LUND1, …).
+  const counts = new Map<string, number>();
   for (const ch of channels) {
     const name = ch.generated_name_final || "NONAME";
-    if (!seen.has(name)) {
-      seen.set(name, 1);
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+
+  if (n.collisionPolicy === "stop") {
+    const occ = new Map<string, number>();
+    for (const ch of channels) {
+      const name = ch.generated_name_final || "NONAME";
+      const seen = occ.get(name) ?? 0;
+      if (seen >= 1) {
+        ch.collided = true;
+        unresolved++;
+      }
+      occ.set(name, seen + 1);
+    }
+    return { channels, unresolved };
+  }
+
+  const suffixFor = (attempt: number): string =>
+    n.collisionPolicy === "numeric_suffix"
+      ? String(attempt)
+      : String.fromCharCode(64 + Math.min(26, attempt));
+
+  // `taken` tracks every final name we've assigned so we don't accidentally
+  // collide a suffixed name with an existing unique name.
+  const taken = new Set<string>();
+  for (const ch of channels) {
+    const name = ch.generated_name_final || "NONAME";
+    if ((counts.get(name) ?? 0) <= 1) {
+      taken.add(name);
+    }
+  }
+
+  // Per-base counter — assigns 1, 2, 3… in document order to each occurrence
+  // of a colliding base name.
+  const perBase = new Map<string, number>();
+  for (const ch of channels) {
+    const name = ch.generated_name_final || "NONAME";
+    if ((counts.get(name) ?? 0) <= 1) {
       ch.generated_name_final = name;
       continue;
     }
     ch.collided = true;
-    if (n.collisionPolicy === "stop") {
-      unresolved++;
-      continue;
-    }
-    let attempt = 1;
-    let candidate = name;
-    while (seen.has(candidate)) {
-      if (n.collisionPolicy === "numeric_suffix") {
-        const suffix = String(attempt);
-        const base = name.slice(0, Math.max(1, Math.min(name.length, max - suffix.length)));
-        candidate = (base + suffix).slice(0, max);
-      } else {
-        const suffix = String.fromCharCode(64 + Math.min(26, attempt));
-        const base = name.slice(0, Math.max(1, Math.min(name.length, max - 1)));
-        candidate = (base + suffix).slice(0, max);
-      }
+    let attempt = (perBase.get(name) ?? 0) + 1;
+    let candidate = "";
+    let safety = 0;
+    while (true) {
+      const suffix = suffixFor(attempt);
+      const base = name.slice(0, Math.max(1, Math.min(name.length, max - suffix.length)));
+      candidate = (base + suffix).slice(0, max);
+      if (!taken.has(candidate)) break;
       attempt++;
-      if (attempt > 200) { unresolved++; break; }
+      if (++safety > 200) { unresolved++; break; }
     }
-    seen.set(candidate, 1);
+    perBase.set(name, attempt);
+    taken.add(candidate);
     ch.generated_name_final = candidate;
   }
   return { channels, unresolved };

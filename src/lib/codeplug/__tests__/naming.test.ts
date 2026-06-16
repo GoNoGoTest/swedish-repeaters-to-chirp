@@ -53,17 +53,25 @@ describe("buildName", () => {
 });
 
 describe("resolveCollisions", () => {
-  it("appends numeric suffixes on collision", () => {
+  it("appends numeric suffixes on collision, including the first occurrence", () => {
     const a = makeChannel({ generated_name_final: "BORAS" });
     const b = makeChannel({ generated_name_final: "BORAS" });
     const c = makeChannel({ generated_name_final: "BORAS" });
     const { unresolved } = resolveCollisions([a, b, c], { ...naming, collisionPolicy: "numeric_suffix" }, 6);
     expect(unresolved).toBe(0);
-    expect(a.generated_name_final).toBe("BORAS");
-    expect(b.generated_name_final).not.toBe(a.generated_name_final);
-    expect(c.generated_name_final).not.toBe(a.generated_name_final);
-    expect(c.generated_name_final).not.toBe(b.generated_name_final);
+    expect(a.generated_name_final).toBe("BORAS1");
+    expect(b.generated_name_final).toBe("BORAS2");
+    expect(c.generated_name_final).toBe("BORAS3");
+    expect(a.collided).toBe(true);
     expect(b.collided).toBe(true);
+  });
+
+  it("leaves unique names untouched", () => {
+    const a = makeChannel({ generated_name_final: "LUND" });
+    const b = makeChannel({ generated_name_final: "MALMO" });
+    resolveCollisions([a, b], { ...naming, collisionPolicy: "numeric_suffix" }, 6);
+    expect(a.generated_name_final).toBe("LUND");
+    expect(b.generated_name_final).toBe("MALMO");
   });
 
   it("policy=stop leaves collisions unresolved", () => {
