@@ -47,6 +47,16 @@ function download(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
+async function downloadZip(filename: string, files: { filename: string; content: string }[]) {
+  const zip = new JSZip();
+  for (const f of files) zip.file(f.filename, f.content);
+  const blob = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 function loadStoredSettings(): Settings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
   try {
