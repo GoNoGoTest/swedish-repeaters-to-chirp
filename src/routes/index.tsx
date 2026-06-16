@@ -1016,25 +1016,7 @@ function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, targetSet
       </div>
 
       <div className="border-t border-border pt-4">
-        <SectionLabel>Exportmål</SectionLabel>
-        <Hint>
-          Välj vilket app- eller radiospecifikt format CSV-filen ska skrivas i. Nya format läggs till i <code className="font-mono">src/lib/codeplug/targets/</code>.
-        </Hint>
-        <div className="mt-2">
-          <select value={settings.export.targetId}
-            onChange={(e) => setTargetId(e.target.value)}
-            className="rounded border border-input bg-background px-2 py-1 text-sm">
-            {Object.entries(
-              targets.reduce<Record<string, typeof targets>>((acc, t) => {
-                (acc[t.vendor] ||= []).push(t); return acc;
-              }, {}),
-            ).map(([vendor, group]) => (
-              <optgroup key={vendor} label={vendor}>
-                {group.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-              </optgroup>
-            ))}
-          </select>
-        </div>
+        <SplitPanel settings={settings} setSettings={setSettings} />
       </div>
 
       {settings.export.targetId === "chirp-generic" && (
