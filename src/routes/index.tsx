@@ -97,6 +97,15 @@ function Index() {
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [savedExports, setSavedExports] = useState<SavedExport[]>([]);
+  const [excludedKeys, setExcludedKeys] = useState<Set<string>>(new Set());
+  const toggleExclude = useCallback((key: string) => {
+    setExcludedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+  const resetExcluded = useCallback(() => setExcludedKeys(new Set()), []);
   // Hydratera först efter mount för att undvika SSR/CSR-mismatch.
   useEffect(() => { setSavedExports(listSavedExports()); }, []);
   useEffect(() => {
