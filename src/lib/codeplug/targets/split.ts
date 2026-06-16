@@ -160,7 +160,7 @@ export function buildSplitFiles(
   const districtChunkSize = split.mode === "per_district_chunked" ? Math.max(1, split.chunkSize) : Infinity;
   const out: { filename: string; content: string }[] = [];
   for (const bucket of buckets) {
-    const isPacks = bucket.key === "packs";
+    const isPacks = bucket.isPack === true;
     const packsCap = isPacks && opts.packsChunkSize && opts.packsChunkSize > 0
       ? opts.packsChunkSize
       : Infinity;
