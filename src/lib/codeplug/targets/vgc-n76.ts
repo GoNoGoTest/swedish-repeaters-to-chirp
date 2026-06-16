@@ -50,11 +50,15 @@ const VGC_N76_LIMITS: HardwareLimits = {
   maxChannels: 500,
   maxChannelsPerGroup: 32,
   maxNameLength: 8,
-  supportedModes: ["NFM", "FM"],
+  supportedModes: ["NFM", "FM", "AM"],
   supportsSplit: true,
   supportsCtcss: true,
   supportsDcs: true,
 };
+
+function isAm(c: NormalizedChannel): boolean {
+  return (c.mode_chirp || "").toUpperCase() === "AM";
+}
 
 // Exact header as emitted by the VGC app — every paren spec must match
 // byte-for-byte or the app rejects the file silently.
