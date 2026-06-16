@@ -215,17 +215,23 @@ function Index() {
   ]);
 
 
+  const exportChannels = useMemo(() => {
+    if (!pipeline) return [] as NormalizedChannel[];
+    if (excludedKeys.size === 0) return pipeline.channels;
+    return pipeline.channels.filter((c) => !excludedKeys.has(channelKey(c)));
+  }, [pipeline, excludedKeys]);
+
   const stats = useMemo(() => {
     if (!pipeline) return null;
     let warned = 0, collided = 0, rxOnly = 0, dupes = 0;
-    for (const c of pipeline.channels) {
+    for (const c of exportChannels) {
       if (c.warnings.length) warned++;
       if (c.collided) collided++;
       if (c.rx_only) rxOnly++;
       if (c.warnings.some((w) => w.code === "freq_duplicate")) dupes++;
     }
     return { warned, collided, rxOnly, dupes };
-  }, [pipeline]);
+  }, [pipeline, exportChannels]);
 
   const split = settings.export.split;
   const willSplit = split.mode !== "single" && !!target.exportMany;
