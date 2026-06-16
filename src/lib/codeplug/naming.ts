@@ -100,12 +100,15 @@ export function resolveCollisions(
   }
 
   if (n.collisionPolicy === "stop") {
+    const occ = new Map<string, number>();
     for (const ch of channels) {
       const name = ch.generated_name_final || "NONAME";
-      if ((counts.get(name) ?? 0) > 1) {
+      const seen = occ.get(name) ?? 0;
+      if (seen >= 1) {
         ch.collided = true;
         unresolved++;
       }
+      occ.set(name, seen + 1);
     }
     return { channels, unresolved };
   }
