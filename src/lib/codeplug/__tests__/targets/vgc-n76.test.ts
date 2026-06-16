@@ -9,7 +9,7 @@ describe("targets/vgc-n76", () => {
     expect(VGC_N76_TARGET.vendor).toBe("VGC");
     expect(VGC_N76_TARGET.fileExtension).toBe("csv");
     expect(VGC_N76_TARGET.limits.maxChannelsPerGroup).toBe(32);
-    expect(VGC_N76_TARGET.limits.maxNameLength).toBe(16);
+    expect(VGC_N76_TARGET.limits.maxNameLength).toBe(8);
   });
 
   it("header row matches the exact VGC app spec", () => {
@@ -92,7 +92,7 @@ describe("targets/vgc-n76", () => {
   it("truncates title beyond maxLength and warns", () => {
     const ch = makeChannel({ generated_name_final: "ABCDEFGHIJKLMNOPQ" }); // 17 chars
     const { rows, warnings } = toVgcN76Rows([ch], VGC_N76_DEFAULTS);
-    expect(rows[0].title).toBe("ABCDEFGHIJKLMNOP"); // 16
+    expect(rows[0].title).toBe("ABCDEFGH"); // 8
     expect(warnings.filter((w) => w.code === "vgc_title_truncated")).toHaveLength(1);
   });
 

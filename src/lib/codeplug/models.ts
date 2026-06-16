@@ -172,6 +172,23 @@ export interface ChannelPackSettings {
 }
 
 /**
+ * Splitting behaviour for export. Target-agnostic — targets that don't
+ * implement `exportMany` ignore this and emit a single file.
+ *  - "single"                 : one CSV (default, unchanged behaviour)
+ *  - "per_district"           : one CSV per repeater district + one for packs
+ *  - "per_district_chunked"   : same as above, but each file is further
+ *                               chunked at `chunkSize` rows (to fit
+ *                               radio per-group limits like VGC's 32).
+ */
+export type SplitMode = "single" | "per_district" | "per_district_chunked";
+
+export interface SplitSettings {
+  mode: SplitMode;
+  /** Chunk size when mode === "per_district_chunked". */
+  chunkSize: number;
+}
+
+/**
  * Per-target settings storage. `targetId` selects the active export target
  * (see src/lib/codeplug/targets/registry.ts). `perTarget` holds the user's
  * settings for each target id; shape is target-defined (e.g. ChirpSettings
@@ -180,6 +197,7 @@ export interface ChannelPackSettings {
 export interface ExportSettings {
   targetId: string;
   perTarget: Record<string, unknown>;
+  split: SplitSettings;
 }
 
 export interface Settings {

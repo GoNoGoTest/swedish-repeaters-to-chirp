@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useCallback, useEffect } from "react";
 import Papa from "papaparse";
+import JSZip from "jszip";
 import { parseSk6baCsv, summarize, type Summary } from "@/lib/codeplug/importers/sk6ba";
 import { runPipeline } from "@/lib/codeplug/pipeline";
 import { listTargets, requireTarget } from "@/lib/codeplug/targets";
@@ -18,6 +19,7 @@ import {
 import type {
   RawRow, Settings, NormalizedChannel, NamingSettings,
   PackPlacement, FreqDupePolicy, RxOnlyPolicy, PackSelectionEntry, HomeDistrictSort,
+  SplitMode, SplitSettings,
 } from "@/lib/codeplug/models";
 import { isValidMaidenhead } from "@/lib/codeplug/maidenhead";
 
@@ -32,13 +34,23 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const STORAGE_KEY = "sk6ba-chirp-settings-v5";
+const STORAGE_KEY = "sk6ba-chirp-settings-v6";
 
 const REPEATER_TOKENS = ["{type}", "{network}", "{band}", "{district}", "{city}", "{channel}", "{call}"];
 const PACK_TOKENS = ["{service}", "{category}", "{label}", "{name_hint}", "{channel}", "{band}"];
 
 function download(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function downloadZip(filename: string, files: { filename: string; content: string }[]) {
+  const zip = new JSZip();
+  for (const f of files) zip.file(f.filename, f.content);
+  const blob = await zip.generateAsync({ type: "blob" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = filename; a.click();
@@ -62,6 +74,7 @@ function loadStoredSettings(): Settings {
       export: {
         targetId: parsed?.export?.targetId ?? DEFAULT_SETTINGS.export.targetId,
         perTarget: { ...DEFAULT_SETTINGS.export.perTarget, ...(parsed?.export?.perTarget ?? {}) },
+        split: { ...DEFAULT_SETTINGS.export.split, ...(parsed?.export?.split ?? {}) },
       },
     };
   } catch { return DEFAULT_SETTINGS; }
@@ -200,8 +213,21 @@ function Index() {
     return { warned, collided, rxOnly, dupes };
   }, [pipeline]);
 
-  const doExport = () => {
+  const split = settings.export.split;
+  const willSplit = split.mode !== "single" && !!target.exportMany;
+
+  const doExport = async () => {
     if (!pipeline || pipeline.duplicateStop) return;
+    if (willSplit && target.exportMany) {
+      const files = target.exportMany(pipeline.channels, targetSettings as never, split);
+      if (files.length === 1) {
+        download(files[0].filename, files[0].content);
+      } else {
+        const base = target.filenameBase ?? target.id;
+        await downloadZip(`${base}.zip`, files);
+      }
+      return;
+    }
     const result = target.export(pipeline.channels, targetSettings as never);
     download(result.filename, result.content);
   };
@@ -234,9 +260,9 @@ function Index() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border">
         <div className="mx-auto max-w-[1600px] px-6 py-5">
-          <h1 className="font-mono text-xl font-semibold tracking-tight">sk6ba → chirp.csv</h1>
+          <h1 className="font-mono text-xl font-semibold tracking-tight">sk6ba → codeplug</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Två oberoende källor — repeatrar från SK6BA/Marks och valfria kanalpaket — kombineras till en CHIRP-importerbar CSV. Allt sker lokalt i din webbläsare.
+            Två oberoende källor — repeatrar från SK6BA/Marks och valfria kanalpaket — kombineras till en CSV för CHIRP eller direkt till radions egen app. Allt sker lokalt i din webbläsare.
           </p>
         </div>
       </header>
@@ -244,6 +270,15 @@ function Index() {
       <main className="mx-auto max-w-[1600px] px-6 py-6">
         <div className={pipeline ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : ""}>
           <div className="space-y-6 min-w-0">
+
+            {/* ───────────── EXPORTFORMAT (väljs först) ───────────── */}
+            <Section
+              title="Exportformat"
+              subtitle="Välj först — formatet styr namnlängd, varningar och vilka splittnings­alternativ som är meningsfulla."
+            >
+              <TargetPickerPanel settings={settings} setSettings={setSettings} />
+            </Section>
+
 
             {/* ───────────── REPEATERSEKTION ───────────── */}
             <Section
@@ -340,7 +375,7 @@ function Index() {
                     <button onClick={doExport}
                       disabled={pipeline.duplicateStop}
                       className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-                      Exportera {target.label} ({pipeline.channels.length})
+                      Exportera {target.label} ({pipeline.channels.length}){willSplit ? " [ZIP]" : ""}
                     </button>
                   </div>
                 }>
@@ -375,7 +410,7 @@ function Index() {
 
       <footer className="border-t border-border mt-12">
         <div className="mx-auto max-w-[1600px] px-6 py-4 text-xs text-muted-foreground">
-          Verktyget skapar CHIRP-CSV — öppna den i CHIRP och importera till din radioimage. Digitala moder stöds inte i v1.
+          Verktyget skapar codeplug-CSV för CHIRP eller direktimport i radions egen app (t.ex. VGC N76). Digitala moder stöds inte i v1.
         </div>
       </footer>
     </div>
@@ -891,20 +926,8 @@ function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, targetSet
   const updChirp = (patch: Partial<ChirpSettings>) => setTargetSettings(patch as Record<string, unknown>);
   const updSort = (patch: Partial<Settings["sort"]>) => setSettings({ ...settings, sort: { ...settings.sort, ...patch } });
 
-  const targets = listTargets();
-  const setTargetId = (id: string) => {
-    const t = requireTarget(id);
-    setSettings({
-      ...settings,
-      export: {
-        targetId: id,
-        perTarget: {
-          ...settings.export.perTarget,
-          [id]: settings.export.perTarget[id] ?? { ...(t.defaultSettings as object) },
-        },
-      },
-    });
-  };
+
+
 
 
   return (
@@ -980,25 +1003,7 @@ function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, targetSet
       </div>
 
       <div className="border-t border-border pt-4">
-        <SectionLabel>Exportmål</SectionLabel>
-        <Hint>
-          Välj vilket app- eller radiospecifikt format CSV-filen ska skrivas i. Nya format läggs till i <code className="font-mono">src/lib/codeplug/targets/</code>.
-        </Hint>
-        <div className="mt-2">
-          <select value={settings.export.targetId}
-            onChange={(e) => setTargetId(e.target.value)}
-            className="rounded border border-input bg-background px-2 py-1 text-sm">
-            {Object.entries(
-              targets.reduce<Record<string, typeof targets>>((acc, t) => {
-                (acc[t.vendor] ||= []).push(t); return acc;
-              }, {}),
-            ).map(([vendor, group]) => (
-              <optgroup key={vendor} label={vendor}>
-                {group.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-              </optgroup>
-            ))}
-          </select>
-        </div>
+        <SplitPanel settings={settings} setSettings={setSettings} />
       </div>
 
       {settings.export.targetId === "chirp-generic" && (
@@ -1057,7 +1062,7 @@ function VgcN76Panel({ settings, update }: {
       <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5 mt-2">
         <NumberField label="Max längd title" value={settings.maxLength}
           onChange={(v) => update({ maxLength: v })}
-          hint="N76 visar 16 tecken. Längre namn trunkeras och flaggas som varning." />
+          hint="N76 visar 8 tecken i kanallistan. Längre namn trunkeras och flaggas som varning." />
         <Field label="Default sändareffekt" hint="H/M/L. Per-rad-override stöds inte i v1.">
           <select value={settings.defaultPower}
             onChange={(e) => update({ defaultPower: e.target.value as VgcN76Settings["defaultPower"] })}
@@ -1092,7 +1097,137 @@ function VgcN76Panel({ settings, update }: {
   );
 }
 
+/* ───────────── Target picker (top of page) ───────────── */
+
+function TargetPickerPanel({ settings, setSettings }: {
+  settings: Settings; setSettings: (s: Settings) => void;
+}) {
+  const targets = listTargets();
+  const setTargetId = (id: string) => {
+    const t = requireTarget(id);
+    setSettings({
+      ...settings,
+      export: {
+        ...settings.export,
+        targetId: id,
+        perTarget: {
+          ...settings.export.perTarget,
+          [id]: settings.export.perTarget[id] ?? { ...(t.defaultSettings as object) },
+        },
+      },
+    });
+  };
+  const active = requireTarget(settings.export.targetId);
+  const grouped = targets.reduce<Record<string, typeof targets>>((acc, t) => {
+    (acc[t.vendor] ||= []).push(t); return acc;
+  }, {});
+  return (
+    <div className="grid gap-4 md:grid-cols-[minmax(0,260px)_minmax(0,1fr)] items-start">
+      <div>
+        <select value={settings.export.targetId}
+          onChange={(e) => setTargetId(e.target.value)}
+          className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm font-mono">
+          {Object.entries(grouped).map(([vendor, group]) => (
+            <optgroup key={vendor} label={vendor}>
+              {group.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </optgroup>
+          ))}
+        </select>
+        <Hint>Nya format läggs till i <code className="font-mono">src/lib/codeplug/targets/</code>.</Hint>
+      </div>
+      <div className="text-xs space-y-2">
+        {active.description && (
+          <p className="text-sm text-muted-foreground">{active.description}</p>
+        )}
+        <div className="flex flex-wrap gap-1.5">
+          <LimitChip label="Max kanaler" value={active.limits.maxChannels ?? "∞"} />
+          {active.limits.maxChannelsPerGroup != null && (
+            <LimitChip label="Kanaler/grupp" value={active.limits.maxChannelsPerGroup} />
+          )}
+          <LimitChip label="Namnlängd" value={active.limits.maxNameLength} />
+          <LimitChip label="Moder" value={active.limits.supportedModes.join("/")} />
+          {!active.exportMany && (
+            <LimitChip label="Split" value="ej stött" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LimitChip({ label, value }: { label: string; value: string | number }) {
+  return (
+    <span className="rounded border border-border bg-muted/40 px-2 py-0.5 font-mono text-[11px]">
+      <span className="text-muted-foreground">{label}:</span> {value}
+    </span>
+  );
+}
+
+/* ───────────── Split panel ───────────── */
+
+function SplitPanel({ settings, setSettings }: {
+  settings: Settings; setSettings: (s: Settings) => void;
+}) {
+  const target = requireTarget(settings.export.targetId);
+  const split = settings.export.split;
+  const supportsSplit = !!target.exportMany;
+
+  const updSplit = (patch: Partial<SplitSettings>) =>
+    setSettings({
+      ...settings,
+      export: { ...settings.export, split: { ...split, ...patch } },
+    });
+
+  const groupCap = target.limits.maxChannelsPerGroup;
+
+  const modes: Array<[SplitMode, string, string]> = [
+    ["single", "En enda fil", "Alla kanaler i samma CSV (standard)."],
+    ["per_district", "En fil per distrikt", "Repeatrar grupperas på distriktssiffra. Paketkanaler i en egen fil."],
+    ["per_district_chunked", "Per distrikt + chunka", `Som ovan men varje fil delas vidare när den når kanaltaket${groupCap ? ` (default ${groupCap})` : ""}.`],
+  ];
+
+  return (
+    <div>
+      <SectionLabel>Uppdelning av exporten</SectionLabel>
+      <Hint>
+        {supportsSplit
+          ? "Flera filer levereras som en ZIP. En enda fil laddas ned direkt som CSV."
+          : `${target.label} stöder inte multifil-export — uppdelning ignoreras.`}
+      </Hint>
+      <div className="mt-2 flex flex-col gap-2">
+        {modes.map(([mode, label, desc]) => (
+          <label key={mode} className={`flex items-start gap-2 text-sm ${supportsSplit ? "" : "opacity-50"}`}>
+            <input
+              type="radio"
+              name="split-mode"
+              className="mt-1"
+              checked={split.mode === mode}
+              disabled={!supportsSplit}
+              onChange={() => updSplit({ mode })}
+            />
+            <span>
+              <span className="font-medium">{label}</span>
+              <span className="ml-2 text-xs text-muted-foreground">{desc}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {split.mode === "per_district_chunked" && (
+        <div className="mt-3 max-w-xs">
+          <NumberField
+            label="Kanaler per chunk"
+            value={split.chunkSize}
+            onChange={(v) => updSplit({ chunkSize: Math.max(1, v) })}
+            hint={groupCap ? `${target.label}: max ${groupCap} kanaler/grupp.` : "Anpassa till radions per-grupp-gräns."}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ───────────── QTH + home district ───────────── */
+
 
 function QthHomeDistrictPanel({ settings, updSort }: {
   settings: Settings; updSort: (patch: Partial<Settings["sort"]>) => void;

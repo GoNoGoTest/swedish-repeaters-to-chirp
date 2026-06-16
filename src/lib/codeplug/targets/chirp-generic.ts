@@ -1,6 +1,7 @@
-import type { ChirpSettings, NormalizedChannel } from "../models";
+import type { ChirpSettings, NormalizedChannel, SplitSettings } from "../models";
 import { exportChirpCsv } from "../exporters/chirp";
 import { registerTarget } from "./registry";
+import { buildSplitFiles } from "./split";
 import type { ExportTarget, HardwareLimits } from "./types";
 
 export const CHIRP_GENERIC_DEFAULTS: ChirpSettings = {
@@ -25,6 +26,8 @@ export const CHIRP_GENERIC_TARGET: ExportTarget<ChirpSettings> = {
   id: "chirp-generic",
   label: "CHIRP generic CSV",
   vendor: "CHIRP",
+  description: "Standard CHIRP-CSV — öppna i CHIRP och importera till valfri radioimage. Bredast hårdvarustöd.",
+  filenameBase: "chirp",
   fileExtension: "csv",
   limits: CHIRP_GENERIC_LIMITS,
   defaultSettings: CHIRP_GENERIC_DEFAULTS,
@@ -34,6 +37,13 @@ export const CHIRP_GENERIC_TARGET: ExportTarget<ChirpSettings> = {
     content: exportChirpCsv(channels, settings),
     warnings: [],
   }),
+  exportMany: (channels: NormalizedChannel[], settings: ChirpSettings, split: SplitSettings) =>
+    buildSplitFiles(channels, split, {
+      filenameBase: "chirp",
+      extension: "csv",
+      // Re-number Location per chunk so each file is internally consistent.
+      renderChunk: (chunk) => exportChirpCsv(chunk, settings),
+    }),
 };
 
 registerTarget(CHIRP_GENERIC_TARGET);

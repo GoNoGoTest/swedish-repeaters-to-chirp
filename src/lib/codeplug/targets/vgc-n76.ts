@@ -1,6 +1,7 @@
 import Papa from "papaparse";
-import type { NormalizedChannel, Warning } from "../models";
+import type { NormalizedChannel, SplitSettings, Warning } from "../models";
 import { registerTarget } from "./registry";
+import { buildSplitFiles } from "./split";
 import type { ExportTarget, HardwareLimits } from "./types";
 
 /**
@@ -37,7 +38,7 @@ export interface VgcN76Settings {
 }
 
 export const VGC_N76_DEFAULTS: VgcN76Settings = {
-  maxLength: 16,
+  maxLength: 8,
   defaultPower: "H",
   defaultBandwidth: 12500,
   channelsPerGroup: 32,
@@ -48,7 +49,7 @@ export const VGC_N76_DEFAULTS: VgcN76Settings = {
 const VGC_N76_LIMITS: HardwareLimits = {
   maxChannels: 500,
   maxChannelsPerGroup: 32,
-  maxNameLength: 16,
+  maxNameLength: 8,
   supportedModes: ["NFM", "FM"],
   supportsSplit: true,
   supportsCtcss: true,
@@ -290,6 +291,8 @@ export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
   id: "vgc-n76",
   label: "VGC N76 (app-CSV)",
   vendor: "VGC",
+  description: "CSV importerbar direkt i VGC:s iOS/Android-app. 8-tecken kanalnamn, 32 kanaler/grupp, integer-Hz frekvenser.",
+  filenameBase: "vgc-n76",
   fileExtension: "csv",
   limits: VGC_N76_LIMITS,
   defaultSettings: VGC_N76_DEFAULTS,
@@ -299,6 +302,12 @@ export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
     const { csv, warnings } = exportVgcN76Csv(channels, s);
     return { filename: "vgc-n76.csv", content: csv, warnings };
   },
+  exportMany: (channels: NormalizedChannel[], s: VgcN76Settings, split: SplitSettings) =>
+    buildSplitFiles(channels, split, {
+      filenameBase: "vgc-n76",
+      extension: "csv",
+      renderChunk: (chunk) => exportVgcN76Csv(chunk, s).csv,
+    }),
 };
 
 registerTarget(VGC_N76_TARGET);
