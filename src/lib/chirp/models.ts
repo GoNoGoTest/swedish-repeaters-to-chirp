@@ -167,10 +167,21 @@ export interface ChannelPackSettings {
   rxOnlyPolicy: RxOnlyPolicy;
 }
 
+/**
+ * Per-target settings storage. `targetId` selects the active export target
+ * (see src/lib/chirp/targets/registry.ts). `perTarget` holds the user's
+ * settings for each target id; shape is target-defined (e.g. ChirpSettings
+ * for "chirp-generic").
+ */
+export interface ExportSettings {
+  targetId: string;
+  perTarget: Record<string, unknown>;
+}
+
 export interface Settings {
   filter: FilterSettings;
   naming: NamingSettings;
-  chirp: ChirpSettings;
   sort: SortSettings;
   packs: ChannelPackSettings;
+  export: ExportSettings;
 }
