@@ -202,8 +202,10 @@ function Index() {
 
   const doExport = () => {
     if (!pipeline || pipeline.duplicateStop) return;
-    download("chirp.csv", exportChirpCsv(pipeline.channels, settings.chirp));
+    const result = target.export(pipeline.channels, targetSettings as never);
+    download(result.filename, result.content);
   };
+
 
   const exportReport = () => {
     if (!pipeline) return;
@@ -288,7 +290,7 @@ function Index() {
                       tokens={REPEATER_TOKENS}
                       hint="Repeaterrader får sitt namn via dessa tokens. Tomma tokens droppas och dubbla separatorer undviks."
                       previewKind="repeater"
-                      maxLength={settings.chirp.maxLength}
+                      maxLength={maxNameLength}
                     />
                   </div>
                 </div>
@@ -312,12 +314,14 @@ function Index() {
             {/* ───────────── EXPORT / SORTERING / CHIRP ───────────── */}
             {rows && (
               <Section
-                title="Sortering & CHIRP-export"
-                subtitle="Hur de kombinerade kanalerna ordnas i radions minne och vilka CHIRP-fält som används."
+                title="Sortering & export"
+                subtitle="Hur de kombinerade kanalerna ordnas i radions minne och vilket exportformat som används."
               >
                 <ExportPanel
                   settings={settings} setSettings={setSettings}
                   hasPacks={enabledPackCount > 0}
+                  chirpSettings={chirpSettings}
+                  setTargetSettings={setTargetSettings}
                 />
               </Section>
             )}
@@ -334,7 +338,7 @@ function Index() {
                     <button onClick={doExport}
                       disabled={pipeline.duplicateStop}
                       className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-                      Exportera CSV ({pipeline.channels.length})
+                      Exportera {target.label} ({pipeline.channels.length})
                     </button>
                   </div>
                 }>
@@ -350,7 +354,7 @@ function Index() {
                     <Stat label="Filtrerade bort" value={pipeline.filteredOut} />
                     <Stat label="Varn/Koll/Dupes/RX" value={`${stats?.warned ?? 0}/${stats?.collided ?? 0}/${stats?.dupes ?? 0}/${stats?.rxOnly ?? 0}`} />
                   </div>
-                  <PreviewTable channels={pipeline.channels} chirpMode={settings.chirp.mode} startLoc={settings.chirp.startLocation} />
+                  <PreviewTable channels={pipeline.channels} chirpMode={chirpSettings.mode} startLoc={chirpSettings.startLocation} />
                 </Section>
               </div>
             </div>
