@@ -1,4 +1,4 @@
-import type { NormalizedChannel, Warning } from "../models";
+import type { NormalizedChannel, SplitSettings, Warning } from "../models";
 
 /**
  * Hardware/software limits for a concrete export target (radio or app).
@@ -31,6 +31,12 @@ export interface ExportResult {
   warnings: Warning[];
 }
 
+/** One file in a multi-file export (used by exportMany). */
+export interface ExportFile {
+  filename: string;
+  content: string;
+}
+
 export interface ExportTarget<TSettings = unknown> {
   /** Stable id, e.g. "chirp-generic". */
   id: string;
@@ -38,13 +44,27 @@ export interface ExportTarget<TSettings = unknown> {
   label: string;
   /** Vendor / family for UI grouping ("CHIRP", "VGC", "RT Systems", ...). */
   vendor: string;
+  /** Short one-liner shown in the format picker. */
+  description?: string;
+  /** Base filename without extension (e.g. "vgc-n76"). Defaults to id. */
+  filenameBase?: string;
   fileExtension: "csv" | "txt" | string;
   limits: HardwareLimits;
   defaultSettings: TSettings;
   /** Optional pre-export validation against limits. */
   validate?: (channels: NormalizedChannel[], settings: TSettings) => Warning[];
-  /** Produce the exportable file. */
+  /** Produce a single exportable file. */
   export: (channels: NormalizedChannel[], settings: TSettings) => ExportResult;
+  /**
+   * Produce multiple files according to `split`. Targets that don't
+   * implement this are exported as a single file regardless of split.
+   * The returned filenames must NOT include a directory component.
+   */
+  exportMany?: (
+    channels: NormalizedChannel[],
+    settings: TSettings,
+    split: SplitSettings,
+  ) => ExportFile[];
   /**
    * Derive the effective max-name-length the pipeline should clip to,
    * given user-tunable settings (may be lower than limits.maxNameLength).
