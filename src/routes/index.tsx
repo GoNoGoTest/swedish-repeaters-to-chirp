@@ -1034,10 +1034,60 @@ function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, targetSet
 
       {settings.export.targetId === "vgc-n76" && (
         <VgcN76Panel
-          settings={targetSettings as unknown as import("@/lib/codeplug/targets").VgcN76Settings}
+          settings={targetSettings as unknown as VgcN76Settings}
           update={setTargetSettings}
         />
       )}
+    </div>
+  );
+}
+
+/* ───────────── VGC N76 panel ───────────── */
+
+function VgcN76Panel({ settings, update }: {
+  settings: VgcN76Settings;
+  update: (patch: Record<string, unknown>) => void;
+}) {
+  return (
+    <div className="border-t border-border pt-4">
+      <SectionLabel>VGC N76-fält</SectionLabel>
+      <Hint>
+        VGC:s iOS/Android-app importerar denna CSV direkt — inga andra verktyg behövs. Frekvenser skrivs i Hz, CTCSS som Hz×100, DCS som decimal-form av oktal-koden. DCS-polaritet (N/I) går inte att uttrycka i filen och defaultas till N.
+      </Hint>
+      <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5 mt-2">
+        <NumberField label="Max längd title" value={settings.maxLength}
+          onChange={(v) => update({ maxLength: v })}
+          hint="N76 visar 16 tecken. Längre namn trunkeras och flaggas som varning." />
+        <Field label="Default sändareffekt" hint="H/M/L. Per-rad-override stöds inte i v1.">
+          <select value={settings.defaultPower}
+            onChange={(e) => update({ defaultPower: e.target.value as VgcN76Settings["defaultPower"] })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+            <option value="H">H (hög)</option>
+            <option value="M">M (medel)</option>
+            <option value="L">L (låg)</option>
+          </select>
+        </Field>
+        <Field label="Default bandbredd" hint="Används när kanalpaket inte anger NFM/FM. 12500 = smal, 25000 = bred.">
+          <select value={settings.defaultBandwidth}
+            onChange={(e) => update({ defaultBandwidth: Number(e.target.value) as VgcN76Settings["defaultBandwidth"] })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+            <option value={12500}>12500 (NFM)</option>
+            <option value={25000}>25000 (FM)</option>
+          </select>
+        </Field>
+        <NumberField label="Kanaler per grupp" value={settings.channelsPerGroup}
+          onChange={(v) => update({ channelsPerGroup: v })}
+          hint="N76 grupperar i klumpar om 32. Överskrids gränsen visas en varning — uppdelning sker manuellt i v1." />
+        <NumberField label="Padda till antal rader" value={settings.padToChannels ?? 0}
+          onChange={(v) => update({ padToChannels: v > 0 ? v : null })}
+          hint="0 = ingen padding. Sätt t.ex. 32 om appens template kräver fast längd." />
+      </div>
+      <label className="mt-3 flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={settings.skipLinks}
+          onChange={(e) => update({ skipLinks: e.target.checked })} />
+        Hoppa över länkar och hotspots vid skanning
+        <span className="text-xs text-muted-foreground">(sätter scan=0 på Link/Hotspot-rader)</span>
+      </label>
     </div>
   );
 }
