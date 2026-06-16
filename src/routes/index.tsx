@@ -1075,7 +1075,7 @@ function VgcN76Panel({ settings, update }: {
       <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5 mt-2">
         <NumberField label="Max längd title" value={settings.maxLength}
           onChange={(v) => update({ maxLength: v })}
-          hint="N76 visar 16 tecken. Längre namn trunkeras och flaggas som varning." />
+          hint="N76 visar 8 tecken i kanallistan. Längre namn trunkeras och flaggas som varning." />
         <Field label="Default sändareffekt" hint="H/M/L. Per-rad-override stöds inte i v1.">
           <select value={settings.defaultPower}
             onChange={(e) => update({ defaultPower: e.target.value as VgcN76Settings["defaultPower"] })}
