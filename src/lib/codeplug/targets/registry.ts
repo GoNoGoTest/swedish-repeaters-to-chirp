@@ -3,8 +3,10 @@ import type { ExportTarget } from "./types";
 const targets = new Map<string, ExportTarget<any>>();
 
 export function registerTarget<T>(target: ExportTarget<T>): void {
-  if (targets.has(target.id)) {
-    throw new Error(`ExportTarget already registered: ${target.id}`);
+  // Idempotent: re-register on HMR / double module evaluation (SSR + client) is fine.
+  const existing = targets.get(target.id);
+  if (existing && existing !== target) {
+    // Replace silently; throwing breaks SSR when the module graph evaluates twice.
   }
   targets.set(target.id, target as ExportTarget<any>);
 }
