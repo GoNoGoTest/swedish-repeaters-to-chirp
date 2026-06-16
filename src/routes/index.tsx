@@ -923,6 +923,7 @@ function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, targetSet
     setSettings({
       ...settings,
       export: {
+        ...settings.export,
         targetId: id,
         perTarget: {
           ...settings.export.perTarget,
