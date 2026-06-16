@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useCallback, useEffect } from "react";
 import Papa from "papaparse";
+import JSZip from "jszip";
 import { parseSk6baCsv, summarize, type Summary } from "@/lib/codeplug/importers/sk6ba";
 import { runPipeline } from "@/lib/codeplug/pipeline";
 import { listTargets, requireTarget } from "@/lib/codeplug/targets";
@@ -18,6 +19,7 @@ import {
 import type {
   RawRow, Settings, NormalizedChannel, NamingSettings,
   PackPlacement, FreqDupePolicy, RxOnlyPolicy, PackSelectionEntry, HomeDistrictSort,
+  SplitMode, SplitSettings,
 } from "@/lib/codeplug/models";
 import { isValidMaidenhead } from "@/lib/codeplug/maidenhead";
 
