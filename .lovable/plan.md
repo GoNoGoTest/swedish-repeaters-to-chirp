@@ -1,61 +1,127 @@
+
+# Refactor: pluggbart exportlager
+
 ## Mål
 
-Stötta DCS/DTCS som accessmetod för SK6BA-rader. När access innehåller `DCS 025` (eller varianter) ska CHIRP-exporten skriva `Tone=Cross`, `DtcsCode=025`, `DtcsPolarity=NN`, `CrossMode=DTCS->`, utan att röra `rToneFreq`/`cToneFreq`. Pack-grenens befintliga DTCS-hantering (`tone_raw=DTCS`) lämnas orörd.
+Förbereda appen för fler exportformat (näst på tur: VGC N76; senare RT Systems, DMR-varianter osv) utan att röra det som fungerar idag. Import, `NormalizedChannel`, pipeline (filter/sort/dedupe/naming) och UI för repeatrar+kanalpaket lämnas orörda. Inget nytt format implementeras nu — bara CHIRP flyttas in i den nya strukturen så att tillägg av N76 senare bara blir "lägg till en fil i `targets/`".
 
-## Ändringar
+Bakåtkompatibilitet för sparade `localStorage`-settings nedprioriteras (vi bumpar versionsnyckeln och resettar tyst).
 
-### 1. `src/lib/chirp/tones.ts`
+## Centralt koncept: "exportmål" (ExportTarget)
 
-Utöka `ToneParse`:
+Ett exportmål = en konkret kombination av appstöd och radiogränser som ger en importerbar fil. Exempel:
 
-```ts
-export interface ToneParse {
-  ctcss: number | null;
-  uses1750: boolean;
-  carrier: boolean;
-  dcs: string | null; // normaliserad 3-siffrig DCS-kod
+- `chirp-generic` — CHIRP generic CSV, gränser från en "generic CHIRP"-radio (det vi har idag).
+- `vgc-n76` (senare) — N76:s egna CSV, 32 kanaler/grupp, egen maxLength, egna tonkolumner.
+- `rt-systems-ftm500` (senare) — RT Systems CSV för en specifik Yaesu-radio.
+
+Vissa dialekter (t.ex. CHIRP) kan i framtiden återanvändas av flera mål med olika gränser; men det är en optimering — vi börjar med "ett mål = en exporter + en gränsuppsättning".
+
+## Ny struktur
+
+```text
+src/lib/chirp/                    (behålls; namnet "chirp" är historiskt)
+  exporters/
+    chirp.ts                      (oförändrad implementation, blir leverantör till chirp-generic-målet)
+  targets/                        (NY)
+    types.ts                      (ExportTarget, HardwareLimits, ExportContext, ExportResult)
+    registry.ts                   (registerTarget / listTargets / getTarget)
+    chirp-generic.ts              (registrerar CHIRP-målet, defaults, validering, anropar exporters/chirp.ts)
+    index.ts                      (importerar alla targets så registret fylls vid app-start)
+```
+
+### `types.ts` (skiss, inte slutgiltig kod)
+
+```text
+HardwareLimits {
+  maxChannels?: number
+  maxChannelsPerGroup?: number
+  maxNameLength: number
+  supportedModes: Array<"NFM"|"FM"|"AM"|"USB"|"LSB"|"CW"|"DMR"|"DSTAR"|"C4FM"|...>
+  supportsSplit: boolean
+  supportsCtcss: boolean
+  supportsDcs: boolean
+  toneStepHz?: number[]
+}
+
+ExportTarget<TSettings> {
+  id: string                      // "chirp-generic"
+  label: string                   // "CHIRP generic CSV"
+  vendor: string                  // "CHIRP"  — för gruppering i UI
+  fileExtension: "csv" | "txt" | ...
+  limits: HardwareLimits
+  defaultSettings: TSettings
+  validate?(channels, settings): Warning[]   // pre-export validering mot limits
+  export(channels: NormalizedChannel[], settings: TSettings): ExportResult
+}
+
+ExportResult { filename: string; content: string; warnings: Warning[] }
+```
+
+### `chirp-generic.ts`
+
+Wrappar nuvarande `exportChirpCsv` + `ChirpSettings`. Ingen logikändring; bara registrering.
+
+## Settings-modell
+
+`Settings.chirp` ersätts av ett generiskt schema. Versionsnyckeln i `localStorage` bumpas från `sk6ba-chirp-settings-v4` till `v5`, gammal nyckel ignoreras (ingen migrationskod).
+
+```text
+Settings {
+  filter, naming, sort, packs            // oförändrade
+  export: {
+    targetId: string                     // default "chirp-generic"
+    perTarget: Record<string, unknown>   // typad via target.defaultSettings vid läsning
+  }
 }
 ```
 
-Tokeniserings­logik:
+`ChirpSettings.maxLength` blir kvar i CHIRP-målets settings (där den hör hemma: hårdvarugräns för radions display). Inget flyttas till `NamingSettings`.
 
-- Splitta som idag på `[\s/|;]+`.
-- Före nuvarande number-loop: skanna tokens efter DCS-mönster:
-  - Token-par: `DCS`/`DTCS` följt av rent siffer­token (1–3 siffror) → fånga koden.
-  - Enkel token: `^(?:DCS|DTCS)0*(\d{1,3})$` (sammanskrivet, t.ex. `DCS025`).
-  - Enkel token: `^D0*(\d{1,3})$` endast om token är exakt 4 tecken och börjar med `D` följt av siffror, för att inte kollidera med t.ex. `D7` som distriktsnotation om sådan dyker upp i access. Säker eftersom access-fält.
-- Normalisera koden via `String(n).padStart(3, "0")`.
-- Konsumera de tokens som matchats så att `025` inte sen råkar gå in i CTCSS-loopen (i praktiken faller 25 utanför 40–300, men explicit konsumtion är säkrare).
-- Returnera `dcs: string | null`.
+Nya warning-koder reserveras: `exceeds_max_channels`, `exceeds_group_size`, `unsupported_mode_for_target`, `name_too_long_for_target`.
 
-Prioritet i parsern: ren parsning, ingen prioritet — den görs i exporten/normaliseraren.
+## UI-ändringar (minimala i denna runda)
 
-### 2. `src/lib/chirp/pipeline.ts` (normalize)
+I `Sortering & CHIRP-export`-sektionen i `src/routes/index.tsx`:
 
-- Plocka `access.dcs` och lagra på SK6BA-kanalen. Förslag: återanvänd `dtcs_code` (pack-fältet) — den är tomsträng för SK6BA idag och fyller exakt samma roll. Sätt även `dtcs_polarity = "NN"` när `dcs` finns. (Alternativt nytt fält `ctcss_tx_dcs`; återanvändning är minimalt invasivt.)
-- Lägg varning `unknown_access` redan idag-villkor utvidgas: `!ctcss && !uses1750 && !carrier && !dcs && r.access`.
-- Lägg varning `ctcss_and_dcs` när både `access.ctcss` och `access.dcs` finns (informativ).
+1. Lägg till en målväljare överst: `<select>` grupperad per `vendor`, listar `registry.listTargets()`. Default `chirp-generic`.
+2. Rendera målets settings-panel via en liten dispatcher. CHIRP-panelen flyttas ut från `ExportPanel` till `targets/chirp-generic.panel.tsx` (samma fält som idag: startLocation, mode, tStep, skipLinks, maxLength).
+3. Exportknappens text blir `Exportera {target.label} ({n})` och anropar `target.export(...)` istället för `exportChirpCsv` direkt.
+4. Visa eventuella `target.validate()`-varningar (t.ex. för många kanaler för radion) ovanför exportknappen — utan att blockera om man inte vill.
 
-### 3. `src/lib/chirp/exporters/chirp.ts` (`resolveToneFields`, SK6BA-grenen)
+Inga ändringar i repeater-, kanalpakets- eller preview-sektionerna.
 
-Ny prioritetsordning i SK6BA-grenen:
+Sektionsrubriken byts från `Sortering & CHIRP-export` till `Sortering & export`.
 
-1. `c.ctcss_tx != null` → `Tone=Tone`, `rToneFreq` (oförändrat).
-2. Annars `c.dtcs_code` (från access-DCS) → `Tone=Cross`, `DtcsCode=c.dtcs_code`, `DtcsPolarity="NN"`, `CrossMode="DTCS->"`, övriga tomma.
-3. Annars `EMPTY_TONE`.
+## Tester
 
-Pack-grenen (`source_type === "channel_pack"`) lämnas helt orörd — den styrs av `tone_raw`.
+- `targets/registry.test.ts`: register tar emot mål, hittar via id, kastar på dubblett-id.
+- `targets/chirp-generic.test.ts`: målet producerar identisk output med nuvarande `exportChirpCsv` för en uppsättning fixturer (regressionsskydd — vi får inte ändra CHIRP-output).
+- Behåll alla befintliga tester i `__tests__/exporters/chirp.test.ts` orörda. De fortsätter testa `chirp.ts` direkt.
+- Snapshot av CSV-headern via målet, så att framtida targets inte oavsiktligt kan ändra CHIRP-kolumnordningen.
 
-### 4. Tester
+## Vad som *inte* görs nu (medvetet uppskjutet)
 
-- `src/lib/chirp/__tests__/tones.test.ts`: parsa `DCS 025`, `DCS025`, `DTCS 025`, `DTCS025`, `D025` → `dcs === "025"`. Parsa `25` (utan DCS-prefix) → `dcs === null`. Parsa `1750/DCS 025` → `dcs === "025"`, `uses1750 === true`. Parsa `123.0/DCS 025` → båda satta.
-- `src/lib/chirp/__tests__/exporters/chirp.test.ts`: SK6BA-kanal med `dtcs_code="025"`, `dtcs_polarity="NN"` (utan `ctcss_tx`) → `Tone=Cross`, `DtcsCode=025`, `DtcsPolarity=NN`, `CrossMode=DTCS->`, `rToneFreq` och `cToneFreq` tomma. CTCSS+DCS samtidigt → CTCSS vinner.
-- `src/lib/chirp/__tests__/pipeline.test.ts`: regressionsfall — rad med `type=Link`, `mode=FM`, `network=AllStarLink`, `access="DCS 025"`, `output=145.2375`, `tx_shift=Simplex` → exporterad kanal med rätt fält och `Frequency=145.237500`.
+- VGC N76-exporter, N76-UI för kanalgrupper, 32/grupp-uppdelning.
+- RT Systems-varianter.
+- DMR/digitala mode-fält i `NormalizedChannel` (kräver att import/Marks-CSV-mappningen utökas; egen plan).
+- Per-radio bandfilter, automatisk skip-out av kanaler som överskrider limits.
+- Tillämpning av `HardwareLimits` (utöver att lagra dem och köra `validate`). Faktisk trunkering/uppdelning per radio kommer när första radiospecifika målet implementeras.
 
-## Det jag avråder från i förslaget
+## Tekniska detaljer / risker
 
-- Att lägga in `D025` som obligatoriskt format om källdata aldrig använder det — risk för fel­matchning. Stöder det defensivt (endast `D` + siffror, exakt fyra tecken), men det är inte ett krav.
+- "chirp"-namnet i mappstrukturen (`src/lib/chirp/`) blir missvisande när andra format finns. Vi behåller det i denna refactor för att minimera diff; en eventuell omdöpning till `src/lib/radio/` kan göras som separat städ-PR.
+- `Pipeline.duplicateStop` och övrig pipeline-logik är format-agnostisk och rörs inte.
+- Filnamnsgenerering (idag hårdkodat `chirp.csv` i `download(...)`) byts till `${target.id}.${target.fileExtension}` eller liknande.
+- Sparade exporter i localStorage (SK6BA-CSV-cache) är input-relaterade och påverkas inte.
 
-## Risker
+## Leverans
 
-Låga. Pack-export­logiken är isolerad via `source_type`-check och rörs inte. `EMPTY_TONE`-fallback gäller fortfarande för rader utan CTCSS och utan DCS. Inga API-ändringar utåt; bara `ToneParse` får ett nytt fält och en SK6BA-kanal kan nu få `dtcs_code` ifyllt.
+En PR/iteration som:
+
+1. Skapar `targets/`-strukturen och flyttar in CHIRP som första mål.
+2. Bumpar settings-versionen och uppdaterar `loadStoredSettings`.
+3. Lägger till målväljare + dispatcher i export-sektionen.
+4. Lägger till registertester + CHIRP-regressionstest.
+
+Efter mergen kan VGC N76 läggas till i en separat, mycket mindre PR: en fil i `targets/`, en panel-komponent, och eventuellt nya fält i `NormalizedChannel` om N76 behöver något vi inte redan har.
