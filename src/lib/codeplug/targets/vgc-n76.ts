@@ -246,7 +246,7 @@ export function toVgcN76Rows(
   if (unsupported > 0) {
     warnings.push({
       code: "vgc_unsupported_mode",
-      message: `${unsupported} kanal(er) har mode som N76 inte stöder (USB/CW/AM/DV); exporterade som ${s.defaultBandwidth === 12500 ? "NFM" : "FM"}.`,
+      message: `${unsupported} kanal(er) har mode som N76 inte stöder (USB/CW/DV); exporterade som ${s.defaultBandwidth === 12500 ? "NFM" : "FM"}.`,
     });
   }
   if (channels.length > s.channelsPerGroup) {
