@@ -96,6 +96,13 @@ export function buildSplitFiles(
     filenameBase: string;
     extension: string;
     renderChunk: (chunk: NormalizedChannel[]) => string;
+    /**
+     * Hard cap on rows-per-file for the `packs` bucket, applied in any
+     * multi-file split mode (`per_district`, `per_district_chunked`).
+     * Used by hardware targets like VGC N76 where channel-packs would
+     * otherwise overflow the per-group limit. Districts ignore this.
+     */
+    packsChunkSize?: number;
   },
 ): { filename: string; content: string }[] {
   if (split.mode === "single") {
@@ -106,11 +113,16 @@ export function buildSplitFiles(
   }
 
   const buckets = groupChannelsForSplit(channels);
-  const chunkSize = split.mode === "per_district_chunked" ? Math.max(1, split.chunkSize) : Infinity;
+  const districtChunkSize = split.mode === "per_district_chunked" ? Math.max(1, split.chunkSize) : Infinity;
   const out: { filename: string; content: string }[] = [];
   for (const bucket of buckets) {
-    const chunks = Number.isFinite(chunkSize)
-      ? chunkChannels(bucket.channels, chunkSize)
+    const isPacks = bucket.key === "packs";
+    const packsCap = isPacks && opts.packsChunkSize && opts.packsChunkSize > 0
+      ? opts.packsChunkSize
+      : Infinity;
+    const effective = Math.min(districtChunkSize, packsCap);
+    const chunks = Number.isFinite(effective)
+      ? chunkChannels(bucket.channels, effective)
       : [bucket.channels];
     chunks.forEach((chunk, idx) => {
       out.push({
