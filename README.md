@@ -2,7 +2,7 @@
 
 Webbverktyg som bygger en importerbar codeplug-CSV från Marks Amatörradioklubbs / SK6BA:s repeaterexport och valfria färdiga kanalpaket. **All bearbetning sker lokalt i webbläsaren — inga filer laddas upp.**
 
-Live: <https://swe-repeater-to-chirp-buddy.lovable.app>
+Live: <https://swe-repeater-to-codeplug.lovable.app>
 
 ## Funktioner
 
