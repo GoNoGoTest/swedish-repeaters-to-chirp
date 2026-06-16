@@ -3,7 +3,8 @@ import { useMemo, useState, useCallback, useEffect } from "react";
 import Papa from "papaparse";
 import { parseSk6baCsv, summarize, type Summary } from "@/lib/chirp/importers/sk6ba";
 import { runPipeline } from "@/lib/chirp/pipeline";
-import { exportChirpCsv } from "@/lib/chirp/exporters/chirp";
+import { listTargets, requireTarget } from "@/lib/chirp/targets";
+import type { ChirpSettings } from "@/lib/chirp/models";
 import { DEFAULT_SETTINGS, DEFAULT_PACK_NAMING } from "@/lib/chirp/defaults";
 import { loadMergedPacks, type MergedPack } from "@/lib/chirp/channel_packs/registry";
 import { selectPackChannels, type ParsedPackChannel } from "@/lib/chirp/importers/channel_pack";
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const STORAGE_KEY = "sk6ba-chirp-settings-v4";
+const STORAGE_KEY = "sk6ba-chirp-settings-v5";
 
 const REPEATER_TOKENS = ["{type}", "{network}", "{band}", "{district}", "{city}", "{channel}", "{call}"];
 const PACK_TOKENS = ["{service}", "{category}", "{label}", "{name_hint}", "{channel}", "{band}"];
@@ -49,22 +50,18 @@ function loadStoredSettings(): Settings {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw);
-    // Migration: maxLength flyttades från NamingSettings till ChirpSettings;
-    // cToneFreq togs bort helt.
-    const legacyMax = parsed?.naming?.maxLength;
-    const { cToneFreq: _dropCTone, ...chirpClean } = parsed?.chirp ?? {};
-    const { maxLength: _dropLegacyMax, ...namingClean } = parsed?.naming ?? {};
-    const chirpMerged = { ...DEFAULT_SETTINGS.chirp, ...chirpClean };
-    if (chirpMerged.maxLength == null && typeof legacyMax === "number") {
-      chirpMerged.maxLength = legacyMax;
-    }
+    // v5: export targets are pluggable. Older keys (v4 and below) live under
+    // a different STORAGE_KEY and are ignored on purpose — see plan.md.
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
-      naming: { ...DEFAULT_SETTINGS.naming, ...namingClean },
-      chirp: chirpMerged,
+      naming: { ...DEFAULT_SETTINGS.naming, ...(parsed.naming ?? {}) },
       packs: { ...DEFAULT_SETTINGS.packs, ...(parsed.packs ?? {}) },
       sort: { ...DEFAULT_SETTINGS.sort, ...(parsed.sort ?? {}) },
+      export: {
+        targetId: parsed?.export?.targetId ?? DEFAULT_SETTINGS.export.targetId,
+        perTarget: { ...DEFAULT_SETTINGS.export.perTarget, ...(parsed?.export?.perTarget ?? {}) },
+      },
     };
   } catch { return DEFAULT_SETTINGS; }
 }
@@ -94,6 +91,33 @@ function Index() {
   }, [settings, settingsHydrated]);
 
   const packs = useMemo(() => loadMergedPacks(), []);
+
+  // Active export target + its current settings. Targets are pluggable
+  // (see src/lib/chirp/targets/registry.ts). For now only "chirp-generic"
+  // exists; new formats (e.g. VGC N76) plug in here without UI rewrites.
+  const target = useMemo(() => requireTarget(settings.export.targetId), [settings.export.targetId]);
+  const targetSettings = (settings.export.perTarget[settings.export.targetId] ?? target.defaultSettings) as Record<string, unknown>;
+  // CHIRP-typed view of the active settings. Safe today because the only
+  // shipped target is chirp-generic; when more targets land, each panel
+  // will cast to its own settings type.
+  const chirpSettings = targetSettings as unknown as ChirpSettings;
+  const maxNameLength = target.resolveMaxNameLength
+    ? target.resolveMaxNameLength(targetSettings as never)
+    : target.limits.maxNameLength;
+
+  const setTargetSettings = useCallback((patch: Record<string, unknown>) => {
+    setSettings((prev) => ({
+      ...prev,
+      export: {
+        ...prev.export,
+        perTarget: {
+          ...prev.export.perTarget,
+          [prev.export.targetId]: { ...(prev.export.perTarget[prev.export.targetId] ?? {}) as object, ...patch },
+        },
+      },
+    }));
+  }, []);
+
 
   // Derive pack channels actually selected (only enabled packs contribute)
   const selectedPackChannels = useMemo<NormalizedChannel[]>(() => {
@@ -150,7 +174,7 @@ function Index() {
 
   const pipeline = useMemo(() => {
     if (!rows) return null;
-    return runPipeline({ sk6baRows: rows, packChannels: selectedPackChannels, settings });
+    return runPipeline({ sk6baRows: rows, packChannels: selectedPackChannels, settings, maxNameLength });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     rows,
@@ -159,8 +183,10 @@ function Index() {
     settings.naming,
     settings.packs,
     settings.sort,
-    settings.chirp,
+    settings.export,
+    maxNameLength,
   ]);
+
 
   const stats = useMemo(() => {
     if (!pipeline) return null;
@@ -176,8 +202,10 @@ function Index() {
 
   const doExport = () => {
     if (!pipeline || pipeline.duplicateStop) return;
-    download("chirp.csv", exportChirpCsv(pipeline.channels, settings.chirp));
+    const result = target.export(pipeline.channels, targetSettings as never);
+    download(result.filename, result.content);
   };
+
 
   const exportReport = () => {
     if (!pipeline) return;
@@ -262,7 +290,7 @@ function Index() {
                       tokens={REPEATER_TOKENS}
                       hint="Repeaterrader får sitt namn via dessa tokens. Tomma tokens droppas och dubbla separatorer undviks."
                       previewKind="repeater"
-                      maxLength={settings.chirp.maxLength}
+                      maxLength={maxNameLength}
                     />
                   </div>
                 </div>
@@ -280,18 +308,21 @@ function Index() {
                 setSettings={setSettings}
                 selectedPackCount={enabledPackCount}
                 selectedChannelCount={selectedPackChannels.length}
+                maxNameLength={maxNameLength}
               />
             </Section>
 
             {/* ───────────── EXPORT / SORTERING / CHIRP ───────────── */}
             {rows && (
               <Section
-                title="Sortering & CHIRP-export"
-                subtitle="Hur de kombinerade kanalerna ordnas i radions minne och vilka CHIRP-fält som används."
+                title="Sortering & export"
+                subtitle="Hur de kombinerade kanalerna ordnas i radions minne och vilket exportformat som används."
               >
                 <ExportPanel
                   settings={settings} setSettings={setSettings}
                   hasPacks={enabledPackCount > 0}
+                  chirpSettings={chirpSettings}
+                  setTargetSettings={setTargetSettings}
                 />
               </Section>
             )}
@@ -308,7 +339,7 @@ function Index() {
                     <button onClick={doExport}
                       disabled={pipeline.duplicateStop}
                       className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-                      Exportera CSV ({pipeline.channels.length})
+                      Exportera {target.label} ({pipeline.channels.length})
                     </button>
                   </div>
                 }>
@@ -324,7 +355,7 @@ function Index() {
                     <Stat label="Filtrerade bort" value={pipeline.filteredOut} />
                     <Stat label="Varn/Koll/Dupes/RX" value={`${stats?.warned ?? 0}/${stats?.collided ?? 0}/${stats?.dupes ?? 0}/${stats?.rxOnly ?? 0}`} />
                   </div>
-                  <PreviewTable channels={pipeline.channels} chirpMode={settings.chirp.mode} startLoc={settings.chirp.startLocation} />
+                  <PreviewTable channels={pipeline.channels} chirpMode={chirpSettings.mode} startLoc={chirpSettings.startLocation} />
                 </Section>
               </div>
             </div>
@@ -724,13 +755,14 @@ function NamingEditor({ value, onChange, tokens, hint, previewKind, maxLength, s
 /* ───────────── Channel packs panel ───────────── */
 
 function ChannelPacksPanel({
-  packs, settings, setSettings, selectedPackCount, selectedChannelCount,
+  packs, settings, setSettings, selectedPackCount, selectedChannelCount, maxNameLength,
 }: {
   packs: MergedPack[];
   settings: Settings;
   setSettings: (s: Settings) => void;
   selectedPackCount: number;
   selectedChannelCount: number;
+  maxNameLength: number;
 }) {
   const updPack = (packId: string, patch: Partial<PackSelectionEntry>) => {
     const cur = settings.packs.selection[packId] ?? defaultPackEntry();
@@ -749,7 +781,7 @@ function ChannelPacksPanel({
       {packs.map((pack) => (
         <PackRow key={pack.packId} pack={pack}
           entry={settings.packs.selection[pack.packId]}
-          maxLength={settings.chirp.maxLength}
+          maxLength={maxNameLength}
           onChange={(patch) => updPack(pack.packId, patch)} />
       ))}
     </div>
@@ -837,12 +869,32 @@ function PackRow({ pack, entry, maxLength, onChange }: {
 
 /* ───────────── Export / CHIRP / sortering ───────────── */
 
-function ExportPanel({ settings, setSettings, hasPacks }: {
-  settings: Settings; setSettings: (s: Settings) => void; hasPacks: boolean;
+function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, setTargetSettings }: {
+  settings: Settings;
+  setSettings: (s: Settings) => void;
+  hasPacks: boolean;
+  chirpSettings: ChirpSettings;
+  setTargetSettings: (patch: Record<string, unknown>) => void;
 }) {
   const updPacks = (patch: Partial<Settings["packs"]>) => setSettings({ ...settings, packs: { ...settings.packs, ...patch } });
-  const updChirp = (patch: Partial<Settings["chirp"]>) => setSettings({ ...settings, chirp: { ...settings.chirp, ...patch } });
+  const updChirp = (patch: Partial<ChirpSettings>) => setTargetSettings(patch as Record<string, unknown>);
   const updSort = (patch: Partial<Settings["sort"]>) => setSettings({ ...settings, sort: { ...settings.sort, ...patch } });
+
+  const targets = listTargets();
+  const setTargetId = (id: string) => {
+    const t = requireTarget(id);
+    setSettings({
+      ...settings,
+      export: {
+        targetId: id,
+        perTarget: {
+          ...settings.export.perTarget,
+          [id]: settings.export.perTarget[id] ?? { ...(t.defaultSettings as object) },
+        },
+      },
+    });
+  };
+
 
   return (
     <div className="space-y-5">
@@ -917,28 +969,50 @@ function ExportPanel({ settings, setSettings, hasPacks }: {
       </div>
 
       <div className="border-t border-border pt-4">
+        <SectionLabel>Exportmål</SectionLabel>
+        <Hint>
+          Välj vilket app- eller radiospecifikt format CSV-filen ska skrivas i. Nya format läggs till i <code className="font-mono">src/lib/chirp/targets/</code>.
+        </Hint>
+        <div className="mt-2">
+          <select value={settings.export.targetId}
+            onChange={(e) => setTargetId(e.target.value)}
+            className="rounded border border-input bg-background px-2 py-1 text-sm">
+            {Object.entries(
+              targets.reduce<Record<string, typeof targets>>((acc, t) => {
+                (acc[t.vendor] ||= []).push(t); return acc;
+              }, {}),
+            ).map(([vendor, group]) => (
+              <optgroup key={vendor} label={vendor}>
+                {group.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="border-t border-border pt-4">
         <SectionLabel>CHIRP-fält & radio</SectionLabel>
         <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
-          <NumberField label="Startnummer (Location)" value={settings.chirp.startLocation}
+          <NumberField label="Startnummer (Location)" value={chirpSettings.startLocation}
             onChange={(v) => updChirp({ startLocation: v })}
             hint="Första minnesposition i radion. T.ex. 1 om du vill skriva från början, 100 om du vill lägga repeatrarna efter befintliga kanaler." />
-          <NumberField label="Max längd kanalnamn" value={settings.chirp.maxLength}
+          <NumberField label="Max längd kanalnamn" value={chirpSettings.maxLength}
             onChange={(v) => updChirp({ maxLength: v })}
             hint="Hårdvarubegränsning — många radior trunkerar vid 6–7 tecken. Gäller alla kanaler (både repeatrar och paket)." />
           <Field label="Mode" hint="NFM = smal FM (12,5 kHz) — standard för amatörradio idag. FM = bred (25 kHz), äldre repeatrar.">
-            <select value={settings.chirp.mode}
-              onChange={(e) => updChirp({ mode: e.target.value as Settings["chirp"]["mode"] })}
+            <select value={chirpSettings.mode}
+              onChange={(e) => updChirp({ mode: e.target.value as ChirpSettings["mode"] })}
               className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
               <option value="NFM">NFM (smal FM)</option>
               <option value="FM">FM (bred)</option>
             </select>
           </Field>
-          <NumberField label="TStep (kHz)" step={0.5} value={settings.chirp.tStep}
+          <NumberField label="TStep (kHz)" step={0.5} value={chirpSettings.tStep}
             onChange={(v) => updChirp({ tStep: v })}
             hint="Frekvensraster vid manuell rattning på radion. 5 kHz funkar för 2m/70cm i Sverige. PMR/marin sätter eget per kanal." />
         </div>
         <label className="mt-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={settings.chirp.skipLinks}
+          <input type="checkbox" checked={chirpSettings.skipLinks}
             onChange={(e) => updChirp({ skipLinks: e.target.checked })} />
           Hoppa över länkar och hotspots vid skanning i radion
           <span className="text-xs text-muted-foreground">(sätter Skip=S på Link/Hotspot — kanalen finns kvar men skannas inte)</span>

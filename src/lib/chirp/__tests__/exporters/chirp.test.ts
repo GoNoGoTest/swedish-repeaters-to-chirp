@@ -3,7 +3,8 @@ import { exportChirpCsv, toChirpRows, CHIRP_COLUMNS } from "../../exporters/chir
 import { DEFAULT_SETTINGS } from "../../defaults";
 import { makeChannel } from "../helpers";
 
-const chirp = DEFAULT_SETTINGS.chirp;
+import { CHIRP_GENERIC_DEFAULTS } from "@/lib/chirp/targets";
+const chirp = CHIRP_GENERIC_DEFAULTS;
 
 const EXPECTED_HEADER =
   "Location,Name,Frequency,Duplex,Offset,Tone,rToneFreq,cToneFreq,DtcsCode,DtcsPolarity,RxDtcsCode,CrossMode,Mode,TStep,Skip,Power,Comment,URCALL,RPT1CALL,RPT2CALL";

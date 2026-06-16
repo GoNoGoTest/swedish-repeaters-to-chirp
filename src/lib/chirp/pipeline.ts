@@ -115,6 +115,12 @@ export interface PipelineInput {
   sk6baRows: RawRow[];
   packChannels?: NormalizedChannel[]; // already-selected channel pack rows
   settings: Settings;
+  /**
+   * Effective max channel-name length. Comes from the active export target
+   * (e.g. ChirpSettings.maxLength for chirp-generic). Defaults to 6 so
+   * legacy callers and tests work without wiring a target.
+   */
+  maxNameLength?: number;
 }
 
 export interface PipelineResult {
@@ -155,7 +161,7 @@ function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): N
 }
 
 export function runPipeline(input: PipelineInput): PipelineResult {
-  const { sk6baRows, packChannels = [], settings } = input;
+  const { sk6baRows, packChannels = [], settings, maxNameLength = 6 } = input;
   const totalInput = sk6baRows.length + packChannels.length;
   const normalized = normalize(sk6baRows);
   const exportable = normalized.filter((c) => c.rx_frequency != null);
@@ -206,15 +212,15 @@ export function runPipeline(input: PipelineInput): PipelineResult {
 
   for (const ch of combined) {
     const n = namingFor(ch);
-    const { full, clipped } = buildName(ch, n, settings.chirp.maxLength);
+    const { full, clipped } = buildName(ch, n, maxNameLength);
     ch.generated_name_full = full;
     ch.generated_name_final = clipped || "NONAME";
     if (!clipped) ch.warnings.push({ code: "empty_name", message: "Tomt kanalnamn" });
   }
 
   // Collisions are resolved globally with the repeater naming policy
-  // (we just need a deterministic suffix scheme — maxLength comes from chirp settings).
-  const { unresolved } = resolveCollisions(combined, settings.naming, settings.chirp.maxLength);
+  // (we just need a deterministic suffix scheme — maxLength comes from the active export target).
+  const { unresolved } = resolveCollisions(combined, settings.naming, maxNameLength);
   for (const ch of combined) {
     if (ch.collided) {
       const already = ch.warnings.some((w) => w.code === "name_collision");
