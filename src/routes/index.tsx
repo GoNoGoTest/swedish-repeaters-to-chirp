@@ -74,6 +74,7 @@ function loadStoredSettings(): Settings {
       export: {
         targetId: parsed?.export?.targetId ?? DEFAULT_SETTINGS.export.targetId,
         perTarget: { ...DEFAULT_SETTINGS.export.perTarget, ...(parsed?.export?.perTarget ?? {}) },
+        split: { ...DEFAULT_SETTINGS.export.split, ...(parsed?.export?.split ?? {}) },
       },
     };
   } catch { return DEFAULT_SETTINGS; }
