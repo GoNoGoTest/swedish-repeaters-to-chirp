@@ -213,8 +213,21 @@ function Index() {
     return { warned, collided, rxOnly, dupes };
   }, [pipeline]);
 
-  const doExport = () => {
+  const split = settings.export.split;
+  const willSplit = split.mode !== "single" && !!target.exportMany;
+
+  const doExport = async () => {
     if (!pipeline || pipeline.duplicateStop) return;
+    if (willSplit && target.exportMany) {
+      const files = target.exportMany(pipeline.channels, targetSettings as never, split);
+      if (files.length === 1) {
+        download(files[0].filename, files[0].content);
+      } else {
+        const base = target.filenameBase ?? target.id;
+        await downloadZip(`${base}.zip`, files);
+      }
+      return;
+    }
     const result = target.export(pipeline.channels, targetSettings as never);
     download(result.filename, result.content);
   };
