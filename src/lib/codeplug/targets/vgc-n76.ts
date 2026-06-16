@@ -307,6 +307,10 @@ export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
       filenameBase: "vgc-n76",
       extension: "csv",
       renderChunk: (chunk) => exportVgcN76Csv(chunk, s).csv,
+      // Channel-packs have no district and must always respect the
+      // N76 per-group hardware limit, even when the user picks
+      // per_district (un-chunked) for repeaters.
+      packsChunkSize: VGC_N76_LIMITS.maxChannelsPerGroup,
     }),
 };
 

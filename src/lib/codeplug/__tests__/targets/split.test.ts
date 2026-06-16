@@ -86,6 +86,94 @@ describe("vgc-n76 exportMany", () => {
     expect(files).toHaveLength(1);
     expect(files[0].filename).toBe("vgc-n76.csv");
   });
+
+  it("per_district chunks packs at VGC group limit (32) even if districts unchunked", () => {
+    const repeaters = [
+      makeChannel({ district: "6", generated_name_final: "R", rx_frequency: 145.6 }),
+    ];
+    const packs = Array.from({ length: 50 }, (_, i) =>
+      makeChannel({
+        source_type: "channel_pack",
+        generated_name_final: `P${i}`,
+        rx_frequency: 446.0,
+        tx_frequency: 446.0,
+      }),
+    );
+    const files = VGC_N76_TARGET.exportMany!(
+      [...repeaters, ...packs],
+      VGC_N76_DEFAULTS,
+      { mode: "per_district", chunkSize: 32 },
+    );
+    expect(files.map((f) => f.filename)).toEqual([
+      "vgc-n76_distrikt_6.csv",
+      "vgc-n76_packs_part1.csv",
+      "vgc-n76_packs_part2.csv",
+    ]);
+    const rows = (csv: string) => csv.trim().split(/\r?\n/).length - 1;
+    expect(rows(files[1].content)).toBe(32);
+    expect(rows(files[2].content)).toBe(18);
+  });
+
+  it("per_district_chunked uses min(user chunkSize, packs cap)", () => {
+    const packs = Array.from({ length: 80 }, (_, i) =>
+      makeChannel({
+        source_type: "channel_pack",
+        generated_name_final: `P${i}`,
+        rx_frequency: 446.0,
+        tx_frequency: 446.0,
+      }),
+    );
+    const files = VGC_N76_TARGET.exportMany!(
+      packs,
+      VGC_N76_DEFAULTS,
+      { mode: "per_district_chunked", chunkSize: 50 },
+    );
+    expect(files.map((f) => f.filename)).toEqual([
+      "vgc-n76_packs_part1.csv",
+      "vgc-n76_packs_part2.csv",
+      "vgc-n76_packs_part3.csv",
+    ]);
+    const rows = (csv: string) => csv.trim().split(/\r?\n/).length - 1;
+    expect([rows(files[0].content), rows(files[1].content), rows(files[2].content)]).toEqual([32, 32, 16]);
+  });
+
+  it("per_district_chunked with user chunkSize < cap keeps user value", () => {
+    const packs = Array.from({ length: 25 }, (_, i) =>
+      makeChannel({
+        source_type: "channel_pack",
+        generated_name_final: `P${i}`,
+        rx_frequency: 446.0,
+        tx_frequency: 446.0,
+      }),
+    );
+    const files = VGC_N76_TARGET.exportMany!(
+      packs,
+      VGC_N76_DEFAULTS,
+      { mode: "per_district_chunked", chunkSize: 10 },
+    );
+    const rows = (csv: string) => csv.trim().split(/\r?\n/).length - 1;
+    expect(files).toHaveLength(3);
+    expect([rows(files[0].content), rows(files[1].content), rows(files[2].content)]).toEqual([10, 10, 5]);
+  });
+});
+
+describe("chirp-generic packs not capped", () => {
+  it("per_district keeps all 100 packs in a single packs file", () => {
+    const packs = Array.from({ length: 100 }, (_, i) =>
+      makeChannel({
+        source_type: "channel_pack",
+        generated_name_final: `P${i}`,
+        rx_frequency: 446.0,
+        tx_frequency: 446.0,
+      }),
+    );
+    const files = CHIRP_GENERIC_TARGET.exportMany!(
+      packs,
+      CHIRP_GENERIC_DEFAULTS,
+      { mode: "per_district", chunkSize: 32 },
+    );
+    expect(files.map((f) => f.filename)).toEqual(["chirp_packs.csv"]);
+  });
 });
 
 describe("chirp-generic exportMany", () => {
