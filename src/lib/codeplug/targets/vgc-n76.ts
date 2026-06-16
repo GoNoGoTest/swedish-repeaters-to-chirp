@@ -205,10 +205,11 @@ export function toVgcN76Rows(
     if (c.dtcs_code && c.dtcs_polarity && c.dtcs_polarity !== "NN") polLost++;
 
     const m = (c.mode_chirp || "").toUpperCase();
-    if (m && m !== "NFM" && m !== "FM") unsupported++;
+    if (m && m !== "NFM" && m !== "FM" && m !== "AM") unsupported++;
 
     const txMhz = mobileTxMhz(c);
     const rxMhz = c.rx_frequency;
+    const am = isAm(c);
 
     return {
       title,
@@ -225,8 +226,8 @@ export function toVgcN76Rows(
       tx_dis: c.rx_only || !c.tx_allowed ? "1" : "0",
       bclo: "0",
       mute: "0",
-      rx_mod: "0",
-      tx_mod: "0",
+      rx_mod: am ? "1" : "0",
+      tx_mod: am ? "1" : "0",
     };
   });
 
