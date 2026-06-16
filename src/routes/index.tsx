@@ -22,6 +22,11 @@ import type {
   SplitMode, SplitSettings,
 } from "@/lib/codeplug/models";
 import { isValidMaidenhead } from "@/lib/codeplug/maidenhead";
+import { Switch } from "@/components/ui/switch";
+
+function channelKey(c: NormalizedChannel): string {
+  return `${c.source_type}:${c.pack_id ?? ""}:${c.source_id}:${c.source_row}`;
+}
 
 
 export const Route = createFileRoute("/")({
@@ -92,6 +97,15 @@ function Index() {
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [savedExports, setSavedExports] = useState<SavedExport[]>([]);
+  const [excludedKeys, setExcludedKeys] = useState<Set<string>>(new Set());
+  const toggleExclude = useCallback((key: string) => {
+    setExcludedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+  const resetExcluded = useCallback(() => setExcludedKeys(new Set()), []);
   // Hydratera först efter mount för att undvika SSR/CSR-mismatch.
   useEffect(() => { setSavedExports(listSavedExports()); }, []);
   useEffect(() => {
@@ -201,17 +215,23 @@ function Index() {
   ]);
 
 
+  const exportChannels = useMemo(() => {
+    if (!pipeline) return [] as NormalizedChannel[];
+    if (excludedKeys.size === 0) return pipeline.channels;
+    return pipeline.channels.filter((c) => !excludedKeys.has(channelKey(c)));
+  }, [pipeline, excludedKeys]);
+
   const stats = useMemo(() => {
     if (!pipeline) return null;
     let warned = 0, collided = 0, rxOnly = 0, dupes = 0;
-    for (const c of pipeline.channels) {
+    for (const c of exportChannels) {
       if (c.warnings.length) warned++;
       if (c.collided) collided++;
       if (c.rx_only) rxOnly++;
       if (c.warnings.some((w) => w.code === "freq_duplicate")) dupes++;
     }
     return { warned, collided, rxOnly, dupes };
-  }, [pipeline]);
+  }, [pipeline, exportChannels]);
 
   const split = settings.export.split;
   const willSplit = split.mode !== "single" && !!target.exportMany;
@@ -219,7 +239,7 @@ function Index() {
   const doExport = async () => {
     if (!pipeline || pipeline.duplicateStop) return;
     if (willSplit && target.exportMany) {
-      const files = target.exportMany(pipeline.channels, targetSettings as never, split);
+      const files = target.exportMany(exportChannels, targetSettings as never, split);
       if (files.length === 1) {
         download(files[0].filename, files[0].content);
       } else {
@@ -228,14 +248,14 @@ function Index() {
       }
       return;
     }
-    const result = target.export(pipeline.channels, targetSettings as never);
+    const result = target.export(exportChannels, targetSettings as never);
     download(result.filename, result.content);
   };
 
 
   const exportReport = () => {
     if (!pipeline) return;
-    const reportRows = pipeline.channels
+    const reportRows = exportChannels
       .filter((c) => c.warnings.length)
       .map((c) => ({
         source_type: c.source_type,
@@ -375,7 +395,7 @@ function Index() {
                     <button onClick={doExport}
                       disabled={pipeline.duplicateStop}
                       className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-                      Exportera {target.label} ({pipeline.channels.length}){willSplit ? " [ZIP]" : ""}
+                      Exportera {target.label} ({exportChannels.length}){willSplit ? " [ZIP]" : ""}
                     </button>
                   </div>
                 }>
@@ -391,8 +411,14 @@ function Index() {
                     <Stat label="Filtrerade bort" value={pipeline.filteredOut} />
                     <Stat label="Varn/Koll/Dupes/RX" value={`${stats?.warned ?? 0}/${stats?.collided ?? 0}/${stats?.dupes ?? 0}/${stats?.rxOnly ?? 0}`} />
                   </div>
+                  {excludedKeys.size > 0 && (
+                    <div className="mb-3 flex items-center justify-between rounded border border-border bg-muted/40 px-3 py-2 text-xs">
+                      <span>Exkluderade rader: <strong>{excludedKeys.size}</strong> (visas i previewen men tas inte med i exporten)</span>
+                      <button onClick={resetExcluded} className="rounded border border-border px-2 py-1">Återställ</button>
+                    </div>
+                  )}
                   {pipeline && target.validate && (() => {
-                    const tw = target.validate!(pipeline.channels, targetSettings as never);
+                    const tw = target.validate!(exportChannels, targetSettings as never);
                     if (tw.length === 0) return null;
                     return (
                       <ul className="mb-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200 space-y-1">
@@ -400,7 +426,13 @@ function Index() {
                       </ul>
                     );
                   })()}
-                  <PreviewTable channels={pipeline.channels} chirpMode={target.id === "chirp-generic" ? chirpSettings.mode : "NFM"} startLoc={target.id === "chirp-generic" ? chirpSettings.startLocation : 1} />
+                  <PreviewTable
+                    channels={pipeline.channels}
+                    excludedKeys={excludedKeys}
+                    onToggleExclude={toggleExclude}
+                    chirpMode={target.id === "chirp-generic" ? chirpSettings.mode : "NFM"}
+                    startLoc={target.id === "chirp-generic" ? chirpSettings.startLocation : 1}
+                  />
                 </Section>
               </div>
             </div>
@@ -1309,27 +1341,44 @@ function QthHomeDistrictPanel({ settings, updSort }: {
   );
 }
 
-function PreviewTable({ channels, chirpMode, startLoc }: { channels: NormalizedChannel[]; chirpMode: string; startLoc: number }) {
-  const shown = channels.slice(0, 300);
+function PreviewTable({ channels, excludedKeys, onToggleExclude, chirpMode, startLoc }: {
+  channels: NormalizedChannel[];
+  excludedKeys: Set<string>;
+  onToggleExclude: (key: string) => void;
+  chirpMode: string;
+  startLoc: number;
+}) {
+  let locCounter = startLoc;
   return (
-    <div className="overflow-x-auto rounded border border-border">
+    <div className="overflow-auto rounded border border-border max-h-[70vh]">
       <table className="min-w-full text-xs font-mono">
-        <thead className="bg-muted text-muted-foreground">
+        <thead className="bg-muted text-muted-foreground sticky top-0 z-10">
           <tr>
-            {["#","Loc","Källa","Namn (full → final)","Freq","Dpx","Off","Tone","Mode","Type/Net/Kat","Plats / Label","Tags","Comment","⚠"].map((h) => (
+            {["Exkl.","#","Loc","Källa","Namn (full → final)","Freq","Dpx","Off","Tone","Mode","Type/Net/Kat","Plats / Label","Tags","Comment","⚠"].map((h) => (
               <th key={h} className="px-2 py-1 text-left whitespace-nowrap">{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {shown.map((c, i) => {
+          {channels.map((c, i) => {
             const isPack = c.source_type === "channel_pack";
-            const rowClass = c.warnings.length ? "bg-destructive/5" : isPack ? "bg-primary/5" : "";
+            const key = channelKey(c);
+            const excluded = excludedKeys.has(key);
+            const baseRowClass = c.warnings.length ? "bg-destructive/5" : isPack ? "bg-primary/5" : "";
+            const rowClass = excluded ? "opacity-40 line-through decoration-muted-foreground/50" : baseRowClass;
             const mode = isPack && c.mode_chirp ? c.mode_chirp : chirpMode;
+            const loc = excluded ? "—" : String(locCounter++);
             return (
               <tr key={`${c.source_type}-${c.source_row}-${c.source_id}-${i}`} className={`border-t border-border ${rowClass}`}>
+                <td className="px-2 py-1 no-underline">
+                  <Switch
+                    checked={excluded}
+                    onCheckedChange={() => onToggleExclude(key)}
+                    aria-label={`Exkludera rad ${c.source_row} från export`}
+                  />
+                </td>
                 <td className="px-2 py-1 text-muted-foreground">{c.source_row}</td>
-                <td className="px-2 py-1">{startLoc + i}</td>
+                <td className="px-2 py-1">{loc}</td>
                 <td className="px-2 py-1">
                   <span className={`rounded px-1.5 py-0.5 text-[10px] ${isPack ? "bg-primary/20 text-primary" : "bg-muted text-foreground"}`}>
                     {isPack ? `PACK · ${c.pack_id}` : "SK6BA"}
@@ -1360,12 +1409,11 @@ function PreviewTable({ channels, chirpMode, startLoc }: { channels: NormalizedC
           })}
         </tbody>
       </table>
-      {channels.length > shown.length && (
-        <div className="px-3 py-2 text-xs text-muted-foreground border-t border-border">
-          Visar {shown.length} av {channels.length} rader. Exporten innehåller alla.
-        </div>
-      )}
+      <div className="px-3 py-2 text-xs text-muted-foreground border-t border-border sticky bottom-0 bg-card">
+        Totalt {channels.length} rader · {channels.length - excludedKeys.size} exporteras
+      </div>
     </div>
   );
 }
+
 
