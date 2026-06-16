@@ -410,7 +410,7 @@ function Index() {
 
       <footer className="border-t border-border mt-12">
         <div className="mx-auto max-w-[1600px] px-6 py-4 text-xs text-muted-foreground">
-          Verktyget skapar CHIRP-CSV — öppna den i CHIRP och importera till din radioimage. Digitala moder stöds inte i v1.
+          Verktyget skapar codeplug-CSV för CHIRP eller direktimport i radions egen app (t.ex. VGC N76). Digitala moder stöds inte i v1.
         </div>
       </footer>
     </div>
