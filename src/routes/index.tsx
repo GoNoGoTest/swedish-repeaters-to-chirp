@@ -92,6 +92,33 @@ function Index() {
 
   const packs = useMemo(() => loadMergedPacks(), []);
 
+  // Active export target + its current settings. Targets are pluggable
+  // (see src/lib/chirp/targets/registry.ts). For now only "chirp-generic"
+  // exists; new formats (e.g. VGC N76) plug in here without UI rewrites.
+  const target = useMemo(() => requireTarget(settings.export.targetId), [settings.export.targetId]);
+  const targetSettings = (settings.export.perTarget[settings.export.targetId] ?? target.defaultSettings) as Record<string, unknown>;
+  // CHIRP-typed view of the active settings. Safe today because the only
+  // shipped target is chirp-generic; when more targets land, each panel
+  // will cast to its own settings type.
+  const chirpSettings = targetSettings as unknown as ChirpSettings;
+  const maxNameLength = target.resolveMaxNameLength
+    ? target.resolveMaxNameLength(targetSettings as never)
+    : target.limits.maxNameLength;
+
+  const setTargetSettings = useCallback((patch: Record<string, unknown>) => {
+    setSettings((prev) => ({
+      ...prev,
+      export: {
+        ...prev.export,
+        perTarget: {
+          ...prev.export.perTarget,
+          [prev.export.targetId]: { ...(prev.export.perTarget[prev.export.targetId] ?? {}) as object, ...patch },
+        },
+      },
+    }));
+  }, []);
+
+
   // Derive pack channels actually selected (only enabled packs contribute)
   const selectedPackChannels = useMemo<NormalizedChannel[]>(() => {
     if (settings.packs.placement === "off") return [];
@@ -147,7 +174,7 @@ function Index() {
 
   const pipeline = useMemo(() => {
     if (!rows) return null;
-    return runPipeline({ sk6baRows: rows, packChannels: selectedPackChannels, settings });
+    return runPipeline({ sk6baRows: rows, packChannels: selectedPackChannels, settings, maxNameLength });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     rows,
@@ -156,8 +183,10 @@ function Index() {
     settings.naming,
     settings.packs,
     settings.sort,
-    settings.chirp,
+    settings.export,
+    maxNameLength,
   ]);
+
 
   const stats = useMemo(() => {
     if (!pipeline) return null;
