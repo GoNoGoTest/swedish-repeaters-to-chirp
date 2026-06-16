@@ -62,6 +62,7 @@ export const DEFAULT_SETTINGS: Settings = {
       [CHIRP_GENERIC_TARGET.id]: { ...CHIRP_GENERIC_DEFAULTS },
       [VGC_N76_TARGET.id]: { ...VGC_N76_DEFAULTS },
     },
+    split: { mode: "single", chunkSize: 32 },
   },
   sort: {
     keys: ["district", "geohash", "city"],
