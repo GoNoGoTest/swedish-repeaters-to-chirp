@@ -375,7 +375,7 @@ function Index() {
                     <button onClick={doExport}
                       disabled={pipeline.duplicateStop}
                       className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-                      Exportera {target.label} ({pipeline.channels.length})
+                      Exportera {target.label} ({pipeline.channels.length}){willSplit ? " [ZIP]" : ""}
                     </button>
                   </div>
                 }>
