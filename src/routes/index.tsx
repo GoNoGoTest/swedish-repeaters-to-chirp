@@ -284,6 +284,34 @@ function Index() {
           <p className="mt-1 text-sm text-muted-foreground">
             Två oberoende källor — repeatrar från SK6BA/Marks och valfria kanalpaket — kombineras till en CSV för CHIRP eller direkt till radions egen app. Allt sker lokalt i din webbläsare.
           </p>
+          <nav className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <a
+              href="https://sk6ba.se/vhf/repeater/karta/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline-offset-2 hover:text-foreground hover:underline"
+            >
+              Hämta CSV från SK6BA:s repeaterkarta
+            </a>
+            <span aria-hidden="true">·</span>
+            <a
+              href="https://github.com/GoNoGoTest/swedish-repeaters-to-codeplug/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline-offset-2 hover:text-foreground hover:underline"
+            >
+              GitHub
+            </a>
+            <span aria-hidden="true">·</span>
+            <a
+              href="https://github.com/GoNoGoTest/swedish-repeaters-to-codeplug/blob/main/LICENSE"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline-offset-2 hover:text-foreground hover:underline"
+            >
+              MIT-licens
+            </a>
+          </nav>
         </div>
       </header>
 
