@@ -9,7 +9,7 @@ describe("targets/vgc-n76", () => {
     expect(VGC_N76_TARGET.vendor).toBe("VGC");
     expect(VGC_N76_TARGET.fileExtension).toBe("csv");
     expect(VGC_N76_TARGET.limits.maxChannelsPerGroup).toBe(32);
-    expect(VGC_N76_TARGET.limits.maxNameLength).toBe(16);
+    expect(VGC_N76_TARGET.limits.maxNameLength).toBe(8);
   });
 
   it("header row matches the exact VGC app spec", () => {
