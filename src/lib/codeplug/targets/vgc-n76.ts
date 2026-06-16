@@ -38,7 +38,7 @@ export interface VgcN76Settings {
 }
 
 export const VGC_N76_DEFAULTS: VgcN76Settings = {
-  maxLength: 16,
+  maxLength: 8,
   defaultPower: "H",
   defaultBandwidth: 12500,
   channelsPerGroup: 32,
@@ -49,7 +49,7 @@ export const VGC_N76_DEFAULTS: VgcN76Settings = {
 const VGC_N76_LIMITS: HardwareLimits = {
   maxChannels: 500,
   maxChannelsPerGroup: 32,
-  maxNameLength: 16,
+  maxNameLength: 8,
   supportedModes: ["NFM", "FM"],
   supportsSplit: true,
   supportsCtcss: true,
