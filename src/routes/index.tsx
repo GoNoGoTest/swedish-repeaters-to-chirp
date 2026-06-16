@@ -321,6 +321,7 @@ function Index() {
                   settings={settings} setSettings={setSettings}
                   hasPacks={enabledPackCount > 0}
                   chirpSettings={chirpSettings}
+                  targetSettings={targetSettings}
                   setTargetSettings={setTargetSettings}
                 />
               </Section>
@@ -877,11 +878,12 @@ function PackRow({ pack, entry, maxLength, onChange }: {
 
 /* ───────────── Export / CHIRP / sortering ───────────── */
 
-function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, setTargetSettings }: {
+function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, targetSettings, setTargetSettings }: {
   settings: Settings;
   setSettings: (s: Settings) => void;
   hasPacks: boolean;
   chirpSettings: ChirpSettings;
+  targetSettings: Record<string, unknown>;
   setTargetSettings: (patch: Record<string, unknown>) => void;
 }) {
   const updPacks = (patch: Partial<Settings["packs"]>) => setSettings({ ...settings, packs: { ...settings.packs, ...patch } });
