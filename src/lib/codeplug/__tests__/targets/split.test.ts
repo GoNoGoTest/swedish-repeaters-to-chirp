@@ -32,6 +32,36 @@ describe("targets/split groupChannelsForSplit", () => {
     expect(buckets).toHaveLength(1);
     expect(buckets[0].key).toBe("distrikt_0");
   });
+
+  it("one bucket per pack_id with short descriptive name", () => {
+    const buckets = groupChannelsForSplit([
+      makeChannel({ source_type: "channel_pack", pack_id: "se_marine_vhf_rx", band: "vhf", generated_name_final: "M1" }),
+      makeChannel({ source_type: "channel_pack", pack_id: "se_marine_vhf_rx", band: "vhf", generated_name_final: "M2" }),
+      makeChannel({ source_type: "channel_pack", pack_id: "se_pmr446_rx", band: "uhf", generated_name_final: "P1" }),
+    ]);
+    expect(buckets.map((b) => b.key)).toEqual(["marine_vhf", "pmr446"]);
+    expect(buckets[0].channels).toHaveLength(2);
+    expect(buckets.every((b) => b.isPack)).toBe(true);
+  });
+
+  it("splits amateur multi-band pack into one bucket per band", () => {
+    const buckets = groupChannelsForSplit([
+      makeChannel({ source_type: "channel_pack", pack_id: "se_amateur_2m_70cm", band: "2m", generated_name_final: "A1" }),
+      makeChannel({ source_type: "channel_pack", pack_id: "se_amateur_2m_70cm", band: "70cm", generated_name_final: "A2" }),
+      makeChannel({ source_type: "channel_pack", pack_id: "se_amateur_2m_70cm", band: "2m", generated_name_final: "A3" }),
+    ]);
+    expect(buckets.map((b) => b.key)).toEqual(["amateur_2m_70cm_2m", "amateur_2m_70cm_70cm"]);
+    expect(buckets[0].channels).toHaveLength(2);
+    expect(buckets[1].channels).toHaveLength(1);
+  });
+
+  it("empty pack_id falls back to 'packs' bucket", () => {
+    const buckets = groupChannelsForSplit([
+      makeChannel({ source_type: "channel_pack", generated_name_final: "X" }),
+    ]);
+    expect(buckets[0].key).toBe("packs");
+    expect(buckets[0].isPack).toBe(true);
+  });
 });
 
 describe("targets/split chunkChannels", () => {
