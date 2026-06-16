@@ -308,6 +308,7 @@ function Index() {
                 setSettings={setSettings}
                 selectedPackCount={enabledPackCount}
                 selectedChannelCount={selectedPackChannels.length}
+                maxNameLength={maxNameLength}
               />
             </Section>
 
