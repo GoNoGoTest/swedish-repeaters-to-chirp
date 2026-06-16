@@ -926,21 +926,8 @@ function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, targetSet
   const updChirp = (patch: Partial<ChirpSettings>) => setTargetSettings(patch as Record<string, unknown>);
   const updSort = (patch: Partial<Settings["sort"]>) => setSettings({ ...settings, sort: { ...settings.sort, ...patch } });
 
-  const targets = listTargets();
-  const setTargetId = (id: string) => {
-    const t = requireTarget(id);
-    setSettings({
-      ...settings,
-      export: {
-        ...settings.export,
-        targetId: id,
-        perTarget: {
-          ...settings.export.perTarget,
-          [id]: settings.export.perTarget[id] ?? { ...(t.defaultSettings as object) },
-        },
-      },
-    });
-  };
+
+
 
 
   return (
