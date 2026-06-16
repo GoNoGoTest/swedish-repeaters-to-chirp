@@ -20,15 +20,33 @@ export interface DistrictBucket {
   key: string;
   label: string;
   channels: NormalizedChannel[];
+  /** True for channel-pack buckets — opt-in to packsChunkSize / packsSplitByBand. */
+  isPack?: boolean;
+}
+
+/**
+ * Derive a short, human-readable name from a pack_id for use in filenames.
+ * Examples:
+ *   "se_marine_vhf_rx"   → "marine_vhf"
+ *   "se_amateur_2m_70cm" → "amateur_2m_70cm"
+ *   ""                   → "packs" (fallback for legacy/empty pack_id)
+ */
+function packShortName(packId: string): string {
+  const trimmed = packId.trim();
+  if (!trimmed) return "packs";
+  return trimmed.replace(/^se_/, "").replace(/_rx$/, "");
 }
 
 export function groupChannelsForSplit(channels: NormalizedChannel[]): DistrictBucket[] {
   const byDistrict = new Map<string, NormalizedChannel[]>();
-  const packs: NormalizedChannel[] = [];
+  const byPack = new Map<string, NormalizedChannel[]>();
 
   for (const c of channels) {
     if (c.source_type === "channel_pack") {
-      packs.push(c);
+      const pid = c.pack_id ?? "";
+      const arr = byPack.get(pid) ?? [];
+      arr.push(c);
+      byPack.set(pid, arr);
       continue;
     }
     // SK6BA / repeater row — bucket by district digit, "0" when missing.
@@ -48,11 +66,37 @@ export function groupChannelsForSplit(channels: NormalizedChannel[]): DistrictBu
   numeric.sort((a, b) => Number(a.label) - Number(b.label));
   nonNumeric.sort((a, b) => a.label.localeCompare(b.label));
 
-  const out = [...numeric, ...nonNumeric];
-  if (packs.length > 0) {
-    out.push({ key: "packs", label: "packs", channels: packs });
+  // One bucket per pack_id. If a pack spans multiple bands (e.g. amateur 2m+70cm),
+  // split it further into one bucket per band.
+  const packBuckets: DistrictBucket[] = [];
+  const packIds = Array.from(byPack.keys()).sort();
+  for (const pid of packIds) {
+    const list = byPack.get(pid)!;
+    const short = packShortName(pid);
+    const bands = new Set(list.map((c) => (c.band ?? "").trim()).filter(Boolean));
+    if (bands.size > 1) {
+      const byBand = new Map<string, NormalizedChannel[]>();
+      for (const c of list) {
+        const b = (c.band ?? "").trim() || "okant";
+        const arr = byBand.get(b) ?? [];
+        arr.push(c);
+        byBand.set(b, arr);
+      }
+      const sortedBands = Array.from(byBand.keys()).sort();
+      for (const b of sortedBands) {
+        packBuckets.push({
+          key: `${short}_${b}`,
+          label: `${short} ${b}`,
+          channels: byBand.get(b)!,
+          isPack: true,
+        });
+      }
+    } else {
+      packBuckets.push({ key: short, label: short, channels: list, isPack: true });
+    }
   }
-  return out;
+
+  return [...numeric, ...nonNumeric, ...packBuckets];
 }
 
 /**
