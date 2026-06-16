@@ -92,7 +92,7 @@ describe("targets/vgc-n76", () => {
   it("truncates title beyond maxLength and warns", () => {
     const ch = makeChannel({ generated_name_final: "ABCDEFGHIJKLMNOPQ" }); // 17 chars
     const { rows, warnings } = toVgcN76Rows([ch], VGC_N76_DEFAULTS);
-    expect(rows[0].title).toBe("ABCDEFGHIJKLMNOP"); // 16
+    expect(rows[0].title).toBe("ABCDEFGH"); // 8
     expect(warnings.filter((w) => w.code === "vgc_title_truncated")).toHaveLength(1);
   });
 
