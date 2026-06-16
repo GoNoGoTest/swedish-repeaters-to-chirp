@@ -135,4 +135,36 @@ describe("targets/vgc-n76", () => {
     const validateWarnings = VGC_N76_TARGET.validate!(channels, VGC_N76_DEFAULTS);
     expect(validateWarnings).toEqual(exportWarnings);
   });
+
+  it("AM channel: rx_mod=1, tx_mod=1, bandwidth=25000, no unsupported warning", () => {
+    const ch = makeChannel({
+      source_type: "channel_pack",
+      generated_name_final: "AIR",
+      mode_chirp: "AM",
+      rx_frequency: 121.5,
+      tx_frequency: 121.5,
+      rx_only: true,
+      tx_allowed: false,
+    });
+    const { rows, warnings } = toVgcN76Rows([ch], VGC_N76_DEFAULTS);
+    expect(rows[0].rx_mod).toBe("1");
+    expect(rows[0].tx_mod).toBe("1");
+    expect(rows[0].bandwidth).toBe("25000");
+    expect(rows[0].tx_dis).toBe("1");
+    expect(warnings.filter((w) => w.code === "vgc_unsupported_mode")).toHaveLength(0);
+  });
+
+  it("USB still triggers unsupported_mode warning (AM removed from list)", () => {
+    const ch = makeChannel({
+      source_type: "channel_pack",
+      generated_name_final: "SSB",
+      mode_chirp: "USB",
+      rx_frequency: 14.2,
+      tx_frequency: 14.2,
+    });
+    const { warnings } = toVgcN76Rows([ch], VGC_N76_DEFAULTS);
+    const w = warnings.find((w) => w.code === "vgc_unsupported_mode");
+    expect(w).toBeDefined();
+    expect(w!.message).not.toMatch(/AM/);
+  });
 });

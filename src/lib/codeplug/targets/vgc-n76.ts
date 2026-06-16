@@ -50,11 +50,15 @@ const VGC_N76_LIMITS: HardwareLimits = {
   maxChannels: 500,
   maxChannelsPerGroup: 32,
   maxNameLength: 8,
-  supportedModes: ["NFM", "FM"],
+  supportedModes: ["NFM", "FM", "AM"],
   supportsSplit: true,
   supportsCtcss: true,
   supportsDcs: true,
 };
+
+function isAm(c: NormalizedChannel): boolean {
+  return (c.mode_chirp || "").toUpperCase() === "AM";
+}
 
 // Exact header as emitted by the VGC app — every paren spec must match
 // byte-for-byte or the app rejects the file silently.
@@ -126,6 +130,7 @@ function encodeBandwidth(c: NormalizedChannel, s: VgcN76Settings): 12500 | 25000
   const m = (c.mode_chirp || "").toUpperCase();
   if (m === "NFM") return 12500;
   if (m === "FM") return 25000;
+  if (m === "AM") return 25000;
   if (m === "" && c.is_analog_fm) return s.defaultBandwidth;
   return s.defaultBandwidth;
 }
@@ -200,10 +205,11 @@ export function toVgcN76Rows(
     if (c.dtcs_code && c.dtcs_polarity && c.dtcs_polarity !== "NN") polLost++;
 
     const m = (c.mode_chirp || "").toUpperCase();
-    if (m && m !== "NFM" && m !== "FM") unsupported++;
+    if (m && m !== "NFM" && m !== "FM" && m !== "AM") unsupported++;
 
     const txMhz = mobileTxMhz(c);
     const rxMhz = c.rx_frequency;
+    const am = isAm(c);
 
     return {
       title,
@@ -220,8 +226,8 @@ export function toVgcN76Rows(
       tx_dis: c.rx_only || !c.tx_allowed ? "1" : "0",
       bclo: "0",
       mute: "0",
-      rx_mod: "0",
-      tx_mod: "0",
+      rx_mod: am ? "1" : "0",
+      tx_mod: am ? "1" : "0",
     };
   });
 
@@ -240,7 +246,7 @@ export function toVgcN76Rows(
   if (unsupported > 0) {
     warnings.push({
       code: "vgc_unsupported_mode",
-      message: `${unsupported} kanal(er) har mode som N76 inte stöder (USB/CW/AM/DV); exporterade som ${s.defaultBandwidth === 12500 ? "NFM" : "FM"}.`,
+      message: `${unsupported} kanal(er) har mode som N76 inte stöder (USB/CW/DV); exporterade som ${s.defaultBandwidth === 12500 ? "NFM" : "FM"}.`,
     });
   }
   if (channels.length > s.channelsPerGroup) {

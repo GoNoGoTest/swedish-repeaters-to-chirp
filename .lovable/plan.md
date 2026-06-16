@@ -1,46 +1,32 @@
-## Mål
+## Bakgrund
 
-I VGC-fallet ska channel-packs alltid delas upp i filer om ≤ `limits.maxChannelsPerGroup` (32) — oavsett vilket split-läge användaren valt (`single`, `per_district`, `per_district_chunked`). Districts/repeaters ska däremot fortsätta följa användarens val.
+VGC N76 stödjer AM på RX (rx_modulation=1) — exempel-CSV:n och airband-packet visar att kanalerna är AM (mode_chirp="AM"). Idag:
 
-## Varför
-
-Channel-packs har inget distrikt och bucketas till `packs`. Idag chunkas de bara om hela exporten är i `per_district_chunked`. Eftersom N76 hårdvarumässigt är begränsad till 32 kanaler per grupp blir en `_packs.csv` med 80 rader oanvändbar i appen.
+1. `encodeBandwidth()` / row-mapping i `src/lib/codeplug/targets/vgc-n76.ts` behandlar bara `NFM`/`FM`. Alla AM-rader räknas som "unsupported" → varningen "exporterade som NFM" och rx_mod/tx_mod sätts till `0` (FM).
+2. `tx_dis` sätts redan korrekt (`c.rx_only || !c.tx_allowed ? "1" : "0"`, rad 220), och importern markerar `rx_only=true` för airband-packet. Default `rxOnlyPolicy="mark"` bevarar flaggan, så detta bör redan fungera — vi verifierar med ett test.
 
 ## Ändringar
 
-### 1. `src/lib/codeplug/targets/split.ts`
+### `src/lib/codeplug/targets/vgc-n76.ts`
 
-Lägg till en valfri `packsChunkSize?: number` på `buildSplitFiles`-options. Regler vid bygg av filer från `packs`-bucketen:
+- Lägg till hjälpare `isAm(c)` → `mode_chirp.toUpperCase() === "AM"`.
+- `encodeBandwidth()`: AM → `25000` (VGC behandlar AM som wide; airbandskanalsteg 8.33 kHz har inget eget bandwidth-värde).
+- I `toVgcN76Rows()`:
+  - Sätt `rx_mod = "1"` när AM.
+  - Sätt `tx_mod = "1"` när AM (oavsett tx_dis — håller modulering konsekvent ifall användaren slår på TX).
+  - Räkna INTE AM som "unsupported" — uppdatera meddelandet till "(USB/CW/DV)".
+- `VGC_N76_LIMITS.supportedModes`: lägg till `"AM"`.
 
-- `single`-läge: oförändrat — packs läggs i en fil (om vi splittar packs här bryter vi förväntningen att `single` ger exakt en fil). Se sektion "Frågetecken" nedan.
-- `per_district`: om `packsChunkSize` är satt, chunka packs med det värdet. Districts chunkas inte.
-- `per_district_chunked`: chunka packs med `min(split.chunkSize, packsChunkSize ?? Infinity)`. Districts chunkas med `split.chunkSize` som idag.
+### `src/lib/codeplug/__tests__/targets/vgc-n76.test.ts`
 
-Implementation: behåll en `chunkSize`-beräkning per bucket istället för en gemensam.
+Nya tester:
+- AM-kanal (mode_chirp="AM", rx_only=true) → `rx_mod="1"`, `tx_mod="1"`, `bandwidth="25000"`, `tx_dis="1"`.
+- AM-kanal genererar INGEN `vgc_unsupported_mode`-varning.
+- USB-kanal triggar fortfarande varningen (meddelandetext uppdaterad).
+- Verifiera tx_dis=1 för en pack-rad med `rx_only=true` via hela pipelinen (default policy="mark") — säkerställer att användarens observation faktiskt är fixad.
 
-### 2. `src/lib/codeplug/targets/vgc-n76.ts`
+## Tekniska anteckningar
 
-I `exportMany`, skicka `packsChunkSize: VGC_N76_LIMITS.maxChannelsPerGroup` (= 32) till `buildSplitFiles`.
-
-### 3. `src/lib/codeplug/targets/chirp-generic.ts`
-
-Oförändrad — skickar ingen `packsChunkSize` (CHIRP har ingen gruppgräns).
-
-### 4. Tester — `src/lib/codeplug/__tests__/targets/split.test.ts`
-
-Nya fall:
-
-- VGC `per_district` med 50 paketrader → en `_distrikt_X.csv` per distrikt + `_packs_part1.csv` (32 rader) + `_packs_part2.csv` (18 rader).
-- VGC `per_district_chunked` med `chunkSize: 50` och 80 paketrader → `_packs_part1..3.csv` med 32/32/16 (min-regeln slår in).
-- VGC `per_district_chunked` med `chunkSize: 10` och 25 paketrader → `_packs_part1..3.csv` med 10/10/5 (user-värdet vinner).
-- CHIRP `per_district` med 100 paketrader → fortfarande en enda `_packs.csv` (ingen `packsChunkSize`).
-
-## Filnamn
-
-Inga nya regler — befintlig `chunkFilename` ger `vgc-n76_packs_part1.csv` osv. när `totalChunks > 1`.
-
-## Frågetecken / icke-mål
-
-- **`single`-läget chunkar inte packs.** Det är det principielt minst förvånande: användaren har sagt "en fil". Vill du istället att VGC i `single`-läget alltid emittierar separata pack-filer (vilket gör att läget bryter sitt eget namn) — säg till så lägger jag in det.
-- UI-ändringar — ingen. Användaren ser bara fler filer i ZIP:en när det behövs.
-- Per-distrikt-gruppgränsen (max 32/distrikt på N76) hanteras separat i `per_district_chunked` om användaren sätter `chunkSize: 32`; ingen automatisk capping av distrikten i den här ändringen.
+- `tx_modulation=1` även för RX-only är medvetet: VGC-appen accepterar det, och om användaren senare slår av `tx_dis` får hen rätt modulering.
+- Inget UI-arbete krävs.
+- Inga ändringar i `chirp-generic` (CHIRP har redan eget AM-stöd via mode-kolumnen).
