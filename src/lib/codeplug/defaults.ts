@@ -1,5 +1,5 @@
 import type { NamingSettings, Settings } from "./models";
-import { CHIRP_GENERIC_TARGET, CHIRP_GENERIC_DEFAULTS } from "./targets";
+import { CHIRP_GENERIC_TARGET, CHIRP_GENERIC_DEFAULTS, VGC_N76_TARGET, VGC_N76_DEFAULTS } from "./targets";
 
 /**
  * Standardnamn för repeatrar/länkar/hotspots från SK6BA-importen.
@@ -60,6 +60,7 @@ export const DEFAULT_SETTINGS: Settings = {
     targetId: CHIRP_GENERIC_TARGET.id,
     perTarget: {
       [CHIRP_GENERIC_TARGET.id]: { ...CHIRP_GENERIC_DEFAULTS },
+      [VGC_N76_TARGET.id]: { ...VGC_N76_DEFAULTS },
     },
   },
   sort: {
