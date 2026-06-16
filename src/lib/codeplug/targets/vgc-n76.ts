@@ -130,6 +130,7 @@ function encodeBandwidth(c: NormalizedChannel, s: VgcN76Settings): 12500 | 25000
   const m = (c.mode_chirp || "").toUpperCase();
   if (m === "NFM") return 12500;
   if (m === "FM") return 25000;
+  if (m === "AM") return 25000;
   if (m === "" && c.is_analog_fm) return s.defaultBandwidth;
   return s.defaultBandwidth;
 }
