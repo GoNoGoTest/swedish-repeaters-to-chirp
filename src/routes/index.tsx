@@ -260,9 +260,9 @@ function Index() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border">
         <div className="mx-auto max-w-[1600px] px-6 py-5">
-          <h1 className="font-mono text-xl font-semibold tracking-tight">sk6ba → chirp.csv</h1>
+          <h1 className="font-mono text-xl font-semibold tracking-tight">sk6ba → codeplug</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Två oberoende källor — repeatrar från SK6BA/Marks och valfria kanalpaket — kombineras till en CHIRP-importerbar CSV. Allt sker lokalt i din webbläsare.
+            Två oberoende källor — repeatrar från SK6BA/Marks och valfria kanalpaket — kombineras till en CSV för CHIRP eller direkt till radions egen app. Allt sker lokalt i din webbläsare.
           </p>
         </div>
       </header>
@@ -270,6 +270,15 @@ function Index() {
       <main className="mx-auto max-w-[1600px] px-6 py-6">
         <div className={pipeline ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : ""}>
           <div className="space-y-6 min-w-0">
+
+            {/* ───────────── EXPORTFORMAT (väljs först) ───────────── */}
+            <Section
+              title="Exportformat"
+              subtitle="Välj först — formatet styr namnlängd, varningar och vilka splittnings­alternativ som är meningsfulla."
+            >
+              <TargetPickerPanel settings={settings} setSettings={setSettings} />
+            </Section>
+
 
             {/* ───────────── REPEATERSEKTION ───────────── */}
             <Section
