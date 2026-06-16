@@ -3,7 +3,8 @@ import { useMemo, useState, useCallback, useEffect } from "react";
 import Papa from "papaparse";
 import { parseSk6baCsv, summarize, type Summary } from "@/lib/chirp/importers/sk6ba";
 import { runPipeline } from "@/lib/chirp/pipeline";
-import { exportChirpCsv } from "@/lib/chirp/exporters/chirp";
+import { listTargets, requireTarget } from "@/lib/chirp/targets";
+import type { ChirpSettings } from "@/lib/chirp/models";
 import { DEFAULT_SETTINGS, DEFAULT_PACK_NAMING } from "@/lib/chirp/defaults";
 import { loadMergedPacks, type MergedPack } from "@/lib/chirp/channel_packs/registry";
 import { selectPackChannels, type ParsedPackChannel } from "@/lib/chirp/importers/channel_pack";
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const STORAGE_KEY = "sk6ba-chirp-settings-v4";
+const STORAGE_KEY = "sk6ba-chirp-settings-v5";
 
 const REPEATER_TOKENS = ["{type}", "{network}", "{band}", "{district}", "{city}", "{channel}", "{call}"];
 const PACK_TOKENS = ["{service}", "{category}", "{label}", "{name_hint}", "{channel}", "{band}"];
@@ -49,22 +50,18 @@ function loadStoredSettings(): Settings {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw);
-    // Migration: maxLength flyttades från NamingSettings till ChirpSettings;
-    // cToneFreq togs bort helt.
-    const legacyMax = parsed?.naming?.maxLength;
-    const { cToneFreq: _dropCTone, ...chirpClean } = parsed?.chirp ?? {};
-    const { maxLength: _dropLegacyMax, ...namingClean } = parsed?.naming ?? {};
-    const chirpMerged = { ...DEFAULT_SETTINGS.chirp, ...chirpClean };
-    if (chirpMerged.maxLength == null && typeof legacyMax === "number") {
-      chirpMerged.maxLength = legacyMax;
-    }
+    // v5: export targets are pluggable. Older keys (v4 and below) live under
+    // a different STORAGE_KEY and are ignored on purpose — see plan.md.
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
-      naming: { ...DEFAULT_SETTINGS.naming, ...namingClean },
-      chirp: chirpMerged,
+      naming: { ...DEFAULT_SETTINGS.naming, ...(parsed.naming ?? {}) },
       packs: { ...DEFAULT_SETTINGS.packs, ...(parsed.packs ?? {}) },
       sort: { ...DEFAULT_SETTINGS.sort, ...(parsed.sort ?? {}) },
+      export: {
+        targetId: parsed?.export?.targetId ?? DEFAULT_SETTINGS.export.targetId,
+        perTarget: { ...DEFAULT_SETTINGS.export.perTarget, ...(parsed?.export?.perTarget ?? {}) },
+      },
     };
   } catch { return DEFAULT_SETTINGS; }
 }
