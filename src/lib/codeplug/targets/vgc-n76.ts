@@ -1,6 +1,7 @@
 import Papa from "papaparse";
-import type { NormalizedChannel, Warning } from "../models";
+import type { NormalizedChannel, SplitSettings, Warning } from "../models";
 import { registerTarget } from "./registry";
+import { buildSplitFiles } from "./split";
 import type { ExportTarget, HardwareLimits } from "./types";
 
 /**
