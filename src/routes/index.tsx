@@ -354,7 +354,16 @@ function Index() {
                     <Stat label="Filtrerade bort" value={pipeline.filteredOut} />
                     <Stat label="Varn/Koll/Dupes/RX" value={`${stats?.warned ?? 0}/${stats?.collided ?? 0}/${stats?.dupes ?? 0}/${stats?.rxOnly ?? 0}`} />
                   </div>
-                  <PreviewTable channels={pipeline.channels} chirpMode={chirpSettings.mode} startLoc={chirpSettings.startLocation} />
+                  {pipeline && target.validate && (() => {
+                    const tw = target.validate!(pipeline.channels, targetSettings as never);
+                    if (tw.length === 0) return null;
+                    return (
+                      <ul className="mb-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+                        {tw.map((w, i) => <li key={i}>⚠ {w.message}</li>)}
+                      </ul>
+                    );
+                  })()}
+                  <PreviewTable channels={pipeline.channels} chirpMode={target.id === "chirp-generic" ? chirpSettings.mode : "NFM"} startLoc={target.id === "chirp-generic" ? chirpSettings.startLocation : 1} />
                 </Section>
               </div>
             </div>
@@ -989,34 +998,43 @@ function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, setTarget
         </div>
       </div>
 
-      <div className="border-t border-border pt-4">
-        <SectionLabel>CHIRP-fält & radio</SectionLabel>
-        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
-          <NumberField label="Startnummer (Location)" value={chirpSettings.startLocation}
-            onChange={(v) => updChirp({ startLocation: v })}
-            hint="Första minnesposition i radion. T.ex. 1 om du vill skriva från början, 100 om du vill lägga repeatrarna efter befintliga kanaler." />
-          <NumberField label="Max längd kanalnamn" value={chirpSettings.maxLength}
-            onChange={(v) => updChirp({ maxLength: v })}
-            hint="Hårdvarubegränsning — många radior trunkerar vid 6–7 tecken. Gäller alla kanaler (både repeatrar och paket)." />
-          <Field label="Mode" hint="NFM = smal FM (12,5 kHz) — standard för amatörradio idag. FM = bred (25 kHz), äldre repeatrar.">
-            <select value={chirpSettings.mode}
-              onChange={(e) => updChirp({ mode: e.target.value as ChirpSettings["mode"] })}
-              className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
-              <option value="NFM">NFM (smal FM)</option>
-              <option value="FM">FM (bred)</option>
-            </select>
-          </Field>
-          <NumberField label="TStep (kHz)" step={0.5} value={chirpSettings.tStep}
-            onChange={(v) => updChirp({ tStep: v })}
-            hint="Frekvensraster vid manuell rattning på radion. 5 kHz funkar för 2m/70cm i Sverige. PMR/marin sätter eget per kanal." />
+      {settings.export.targetId === "chirp-generic" && (
+        <div className="border-t border-border pt-4">
+          <SectionLabel>CHIRP-fält & radio</SectionLabel>
+          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
+            <NumberField label="Startnummer (Location)" value={chirpSettings.startLocation}
+              onChange={(v) => updChirp({ startLocation: v })}
+              hint="Första minnesposition i radion. T.ex. 1 om du vill skriva från början, 100 om du vill lägga repeatrarna efter befintliga kanaler." />
+            <NumberField label="Max längd kanalnamn" value={chirpSettings.maxLength}
+              onChange={(v) => updChirp({ maxLength: v })}
+              hint="Hårdvarubegränsning — många radior trunkerar vid 6–7 tecken. Gäller alla kanaler (både repeatrar och paket)." />
+            <Field label="Mode" hint="NFM = smal FM (12,5 kHz) — standard för amatörradio idag. FM = bred (25 kHz), äldre repeatrar.">
+              <select value={chirpSettings.mode}
+                onChange={(e) => updChirp({ mode: e.target.value as ChirpSettings["mode"] })}
+                className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+                <option value="NFM">NFM (smal FM)</option>
+                <option value="FM">FM (bred)</option>
+              </select>
+            </Field>
+            <NumberField label="TStep (kHz)" step={0.5} value={chirpSettings.tStep}
+              onChange={(v) => updChirp({ tStep: v })}
+              hint="Frekvensraster vid manuell rattning på radion. 5 kHz funkar för 2m/70cm i Sverige. PMR/marin sätter eget per kanal." />
+          </div>
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={chirpSettings.skipLinks}
+              onChange={(e) => updChirp({ skipLinks: e.target.checked })} />
+            Hoppa över länkar och hotspots vid skanning i radion
+            <span className="text-xs text-muted-foreground">(sätter Skip=S på Link/Hotspot — kanalen finns kvar men skannas inte)</span>
+          </label>
         </div>
-        <label className="mt-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={chirpSettings.skipLinks}
-            onChange={(e) => updChirp({ skipLinks: e.target.checked })} />
-          Hoppa över länkar och hotspots vid skanning i radion
-          <span className="text-xs text-muted-foreground">(sätter Skip=S på Link/Hotspot — kanalen finns kvar men skannas inte)</span>
-        </label>
-      </div>
+      )}
+
+      {settings.export.targetId === "vgc-n76" && (
+        <VgcN76Panel
+          settings={targetSettings as unknown as import("@/lib/codeplug/targets").VgcN76Settings}
+          update={setTargetSettings}
+        />
+      )}
     </div>
   );
 }
