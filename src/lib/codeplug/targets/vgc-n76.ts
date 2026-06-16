@@ -291,6 +291,8 @@ export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
   id: "vgc-n76",
   label: "VGC N76 (app-CSV)",
   vendor: "VGC",
+  description: "CSV importerbar direkt i VGC:s iOS/Android-app. 8-tecken kanalnamn, 32 kanaler/grupp, integer-Hz frekvenser.",
+  filenameBase: "vgc-n76",
   fileExtension: "csv",
   limits: VGC_N76_LIMITS,
   defaultSettings: VGC_N76_DEFAULTS,
@@ -300,6 +302,12 @@ export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
     const { csv, warnings } = exportVgcN76Csv(channels, s);
     return { filename: "vgc-n76.csv", content: csv, warnings };
   },
+  exportMany: (channels: NormalizedChannel[], s: VgcN76Settings, split: SplitSettings) =>
+    buildSplitFiles(channels, split, {
+      filenameBase: "vgc-n76",
+      extension: "csv",
+      renderChunk: (chunk) => exportVgcN76Csv(chunk, s).csv,
+    }),
 };
 
 registerTarget(VGC_N76_TARGET);
