@@ -23,22 +23,23 @@ async function downloadZip(filename: string, files: { filename: string; content:
 }
 
 /**
- * Resolve settings for a target and invoke its export/exportMany. The
- * generic `<T extends AnyExportTarget>` keeps `target` and `settings`
- * paired via TargetSettingsMap, so no per-call cast is needed.
+ * Distribute over AnyExportTarget so `target.export(channels, settings)`
+ * is callable: without distribution TS narrows method params to the
+ * intersection of every variant's settings type, which never matches.
  */
-function runExport<T extends AnyExportTarget>(
-  target: T,
-  stored: Record<string, unknown> | undefined,
-  channels: NormalizedChannel[],
-  split: Settings["export"]["split"],
-) {
-  const settings = resolveTargetSettings(target, stored);
-  const willSplit = split.mode !== "single" && !!target.exportMany;
-  if (willSplit && target.exportMany) {
-    return { kind: "many" as const, files: target.exportMany(channels, settings, split) };
-  }
-  return { kind: "one" as const, result: target.export(channels, settings) };
+type ExportInvocation<T extends AnyExportTarget> = T extends AnyExportTarget
+  ? { target: T; settings: T["defaultSettings"] }
+  : never;
+
+function buildInvocation(
+  target: AnyExportTarget,
+  stored: unknown,
+): ExportInvocation<AnyExportTarget> {
+  const settings = resolveTargetSettings(
+    target,
+    (stored as Record<string, unknown> | undefined) ?? undefined,
+  );
+  return { target, settings } as ExportInvocation<AnyExportTarget>;
 }
 
 export function useCodeplugDownload(input: {
@@ -49,19 +50,24 @@ export function useCodeplugDownload(input: {
 
   const exportFiles = useCallback(async () => {
     const target = requireTarget(settings.export.targetId);
-    const stored = settings.export.perTarget[settings.export.targetId];
-    const out = runExport(target, stored, exportChannels, settings.export.split);
-    if (out.kind === "many") {
-      if (out.files.length === 1) {
-        downloadBlob(out.files[0].filename, out.files[0].content);
+    const inv = buildInvocation(target, settings.export.perTarget[settings.export.targetId]);
+    const split = settings.export.split;
+    const willSplit = split.mode !== "single" && !!inv.target.exportMany;
+
+    if (willSplit && inv.target.exportMany) {
+      const files = inv.target.exportMany(exportChannels, inv.settings, split);
+      if (files.length === 1) {
+        downloadBlob(files[0].filename, files[0].content);
       } else {
-        const base = target.filenameBase ?? target.id;
-        await downloadZip(`${base}.zip`, out.files);
+        const base = inv.target.filenameBase ?? inv.target.id;
+        await downloadZip(`${base}.zip`, files);
       }
       return;
     }
-    downloadBlob(out.result.filename, out.result.content);
+    const result = inv.target.export(exportChannels, inv.settings);
+    downloadBlob(result.filename, result.content);
   }, [settings, exportChannels]);
+
 
   const exportWarnings = useCallback(() => {
     const reportRows = exportChannels
