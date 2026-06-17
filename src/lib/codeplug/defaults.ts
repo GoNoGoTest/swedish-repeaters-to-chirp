@@ -52,6 +52,10 @@ export const DEFAULT_SETTINGS: Settings = {
     modeStrategy: "contains_fm",
     customModes: [],
     bands: ["2", "70"],
+    countries: ["SE"],
+    regions: [],
+    includeUnknownRegions: false,
+    // Legacy fields preserved for migration of old persisted settings.
     districts: [],
     includeUnknownDistricts: false,
   },
