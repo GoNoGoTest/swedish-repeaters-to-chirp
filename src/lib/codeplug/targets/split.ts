@@ -1,20 +1,24 @@
 import type { NormalizedChannel, SplitSettings } from "../models";
 
 /**
- * Group channels by district for split-export.
+ * Group channels by region for split-export.
  *
- * Repeater rows (source_type === "sk6ba") are grouped by their `district`
- * digit. Channel-pack rows have no district — they all go into a single
- * "packs" bucket so the user can sideload them separately.
+ * Repeater rows (source_type === "sk6ba") are grouped by their `region`
+ * (country + districtLabel) so Nordic / foreign rows each get their own
+ * file (SE/SM6, NO/LA, DK/OZ, FI/OH6, AX/OH0, IS/TF, …) instead of being
+ * lumped under a raw district digit. Rows with country "unknown" fall
+ * back to an "unknown" bucket (optionally suffixed with the raw district
+ * code). Channel-pack rows have no region — they all go into separate
+ * "packs" buckets so the user can sideload them separately.
  *
  * Returns an array of { key, label, channels } in deterministic order:
- *   1. numeric districts ascending (0, 1, 2, …)
- *   2. non-numeric / empty districts alphabetically (rare; safety net)
- *   3. "packs" bucket last
+ *   1. region buckets sorted by region.sortKey (SE/SM* first, then other
+ *      Nordic countries, then "unknown")
+ *   2. pack buckets, one per pack_id (further split by band when a pack
+ *      spans multiple bands)
  *
- * `key` is a filesystem-safe slug used in filenames; `label` is the
- * display value (currently identical, but kept distinct so future
- * UI can localise).
+ * `key` is a filesystem-safe slug used in filenames (e.g. "se_sm6",
+ * "no_la", "dk_oz", "fi_oh6"); `label` is the display value.
  */
 export interface DistrictBucket {
   key: string;
@@ -124,8 +128,10 @@ export function chunkChannels<T>(list: T[], chunkSize: number): T[][] {
 
 /**
  * Build a filename for a split chunk. Examples:
- *   ("vgc-n76", "distrikt_6", 1, 1) → "vgc-n76_distrikt_6.csv"
- *   ("vgc-n76", "distrikt_6", 2, 1) → "vgc-n76_distrikt_6_part1.csv"
+ *   ("chirp",   "se_sm6", 1, 0) → "chirp_se_sm6.csv"
+ *   ("chirp",   "no_la",  1, 0) → "chirp_no_la.csv"
+ *   ("vgc-n76", "dk_oz",  2, 0) → "vgc-n76_dk_oz_part1.csv"
+ *   ("vgc-n76", "fi_oh6", 2, 1) → "vgc-n76_fi_oh6_part2.csv"
  */
 export function chunkFilename(
   base: string,
@@ -151,10 +157,10 @@ export function buildSplitFiles(
     extension: string;
     renderChunk: (chunk: NormalizedChannel[]) => string;
     /**
-     * Hard cap on rows-per-file for the `packs` bucket, applied in any
+     * Hard cap on rows-per-file for `packs` buckets, applied in any
      * multi-file split mode (`per_district`, `per_district_chunked`).
      * Used by hardware targets like VGC N76 where channel-packs would
-     * otherwise overflow the per-group limit. Districts ignore this.
+     * otherwise overflow the per-group limit. Region buckets ignore this.
      */
     packsChunkSize?: number;
   },

@@ -188,7 +188,11 @@ export interface ChannelPackSettings {
  * Splitting behaviour for export. Target-agnostic — targets that don't
  * implement `exportMany` ignore this and emit a single file.
  *  - "single"                 : one CSV (default, unchanged behaviour)
- *  - "per_district"           : one CSV per repeater district + one for packs
+ *  - "per_district"           : one CSV per repeater region (country +
+ *                               districtLabel, e.g. SE/SM6, NO/LA, DK/OZ,
+ *                               FI/OH6) + one CSV per channel-pack bucket.
+ *                               The mode name is kept for backwards
+ *                               compatibility with persisted settings.
  *  - "per_district_chunked"   : same as above, but each file is further
  *                               chunked at `chunkSize` rows (to fit
  *                               radio per-group limits like VGC's 32).
