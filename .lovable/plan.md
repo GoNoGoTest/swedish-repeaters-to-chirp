@@ -1,55 +1,88 @@
-
 ## Mål
 
-Skriv om `README.md` så den är koncis och speglar appens nuvarande funktionalitet. Den nuvarande versionen är från v1 och beskriver bara CHIRP-export och ett enda kanalpaket — verkligheten är nu:
+Två låg-risk-förbättringar utan beteendeförändring:
 
-- Pluggbara exportmål (CHIRP-generisk + VGC N76, lätt att lägga till fler)
-- 9 kanalpaket (amatör 2m/70cm + RX-only: marin VHF, PMR446, airband, jakt 155 MHz, SRBR 444, 69 MHz, CB27)
-- Splittning av export (single / chunked per pack / per band)
-- Per-rad-exkludering i preview
-- Sparade exporter (localStorage)
-- QTH (Maidenhead) + hemdistrikt för avståndssortering
-- Allt material i README:n om "v1 begränsningar", "framtida kanalpaket-feature" osv. är inaktuellt.
+1. Bryt isär `src/routes/index.tsx` (1447 rader) i komponenter och hooks.
+2. Gör SK6BA-importervalidering tydlig — stoppa pipelinen och visa vilka kolumner som saknas.
 
-## Ny struktur (koncis, ~150 rader istället för ~130 utspridda)
+Kärnlogik i `src/lib/codeplug` rörs inte. CHIRP/VGC/split-export rörs inte. Inga nya tester för redan täckta områden. DMR och metadata-städ skjuts till separata turer.
 
-1. **Rubrik + en mening** — vad det är, att det körs lokalt i webbläsaren.
-2. **Funktioner** — punktlista, en rad per feature, grupperad:
-   - Datakällor: SK6BA/Marks-CSV + kanalpaket
-   - Exportmål: CHIRP-generisk, VGC N76 (pluggbar arkitektur)
-   - Bearbetning: namngivning, sortering, kollisioner, dubbletter
-   - UX: preview med exkludering, sparade exporter, varningar
-3. **Kom igång** — 4 steg: hämta CSV (länk till SK6BA-kartan), öppna appen, välj paket, exportera.
-4. **Datakällor** — kort beskrivning av SK6BA-importen och kanalpakten med tabell över paketen.
-5. **Exportmål** — kort om CHIRP-generisk vs VGC N76, och splittning.
-6. **Namngivning, sortering, kollisioner, CTCSS/shift, dubbletter** — komprimerade regler, inte fullt så ordrika som idag. En kort sektion var.
-7. **Lägga till nytt kanalpaket** — kvar (relevant för bidrag).
-8. **Utveckling** — `bun install`, `bun run dev`, `bun test`. Tech stack på en rad.
-9. **Licens** — MIT + länk.
-10. **Felsökning** — kvar men minimal (3–4 punkter).
+## 1. Route-split
 
-## Det jag tar bort / städar
+### Nya hooks (`src/hooks/`)
 
-- "Vad det INTE gör (v1)" — inaktuell, ersätts med att VGC N76 nämns och att DMR/D-Star/digitala moder fortfarande inte konfigureras (en rad i functions-listan).
-- "Varför bara 2m/70cm amatör i v1?" — irrelevant nu.
-- Långa CSV-kolumnlistan för kanalpaket — flyttar till "Lägga till nytt kanalpaket"-sektionen, lite kortare.
-- Dubbletter mellan "Kanalpaket"-sektion och toppen.
-- Felaktig sökväg `src/lib/chirp/channel_packs/registry.ts` → uppdateras till `src/lib/codeplug/channel_packs/registry.ts`.
+- `useCodeplugSettings.ts` — håller hela `Settings`-objektet + persist till localStorage. Returnerar `{ settings, setSettings, patch(partial), reset }`.
+- `useSavedSk6baExports.ts` — wrappar `saved-exports.ts` (lista, spara, ladda, ta bort senaste SK6BA-CSV).
+- `useSelectedPackChannels.ts` — läser `channel_packs/registry`, plockar valda kanaler baserat på `settings.packs.selection`. Returnerar `{ availablePacks, selectedChannels }`.
+- `useCodeplugPipeline.ts` — `useMemo` runt `runPipeline(...)`, tar `rawRows`, `selectedPackChannels`, `settings`, `maxNameLength`. Returnerar `PipelineResult`.
+- `useCodeplugDownload.ts` — bygger filer via target-registry + `splitExport`, triggar nedladdning (Blob + `URL.createObjectURL`). Returnerar `{ download(), isReady, warnings }`.
 
-## Det jag behåller med samma sak men kortare
+### Nya komponenter (`src/components/codeplug/`)
 
-- CTCSS/1750-regler (en 4-radig blurb)
-- Frekvens/shift-regler (en 4-radig blurb)
-- Kollisionspolicy (en mening + exempel)
-- CHIRP-importflödet (numrerade steg)
+- `common.tsx` — `Section`, `Stat`, `Field`, `Hint`, `NumberField`, `MultiSelect`.
+- `RepeaterLoader.tsx` — filinput + drag/drop för SK6BA CSV, visar parse-status (se §2).
+- `TargetPickerPanel.tsx` — väljer export-target, läser `targets/registry`.
+- `RepeaterFilterPanel.tsx` — `FilterSettings`-UI (status/typ/mode/band/distrikt).
+- `ChannelPacksPanel.tsx` — väljer packs + per-pack-policies (`PackPlacement`, `RxOnlyPolicy`, `FreqDupePolicy`).
+- `NamingEditor.tsx` — `NamingSettings`-UI.
+- `ExportPanel.tsx` — split-inställningar + download-knapp, visar warning-count.
+- `PreviewTable.tsx` — tabell över `NormalizedChannel[]` (kolumner: name, rx, tx, tone, type, district).
 
-## Saknar jag något?
+### Index-routen efter refaktor
 
-Om du vill att jag inkluderar något av nedan, säg till — annars hoppar jag dem:
+`src/routes/index.tsx` ska:
+- läsa hooks (`useCodeplugSettings`, `useSavedSk6baExports`, `useSelectedPackChannels`, `useCodeplugPipeline`, `useCodeplugDownload`)
+- rendera huvudlayout (header med länkar bevaras) + de 8 panelerna
+- inte längre innehålla helper-komponenter, parse-logik, eller download-logik
 
-1. Screenshots / GIF
-2. Badges (build, license, deploy)
-3. Avsnitt om bidragsrutin (PR-process, code style)
-4. Roadmap / known limitations utöver felsökningsavsnittet
+Mål: under ~200 rader.
 
-Den uppdaterade README:n committas till repot och syncar via GitHub-integrationen.
+### Bevarad UX
+
+Visuell layout, ordning på paneler, knappar, text-strängar, localStorage-nycklar — allt oförändrat. Refaktorn är ren extrahering; ingen ny styling, inga nya kontroller.
+
+## 2. SK6BA-importervalidering
+
+### Ny typ (i `importers/sk6ba.ts` eller intill)
+
+```ts
+export type Sk6baLoadState =
+  | { status: "empty" }
+  | { status: "loaded"; rows: RawRow[]; columns: string[]; rowCount: number }
+  | { status: "error"; message: string; missingColumns?: string[] };
+```
+
+### Beteende
+
+- `parseSk6baCsv` returnerar fortfarande sin nuvarande form (oförändrat API för befintliga tester).
+- Ny wrapper `loadSk6baCsv(text): Sk6baLoadState` används av `RepeaterLoader.tsx`.
+- Om obligatoriska kolumner saknas → `{ status: "error", message: "Saknade kolumner: <lista>", missingColumns }`. Inga `rawRows` skickas till pipelinen.
+- `useCodeplugPipeline` får `rawRows: RawRow[] | null`; om `null` kör den inte pipelinen.
+- `RepeaterLoader` visar tydlig röd alert med listan av saknade kolumner.
+
+### Tester
+
+- Lägg till 2–3 fall i befintliga `__tests__/importers/sk6ba.test.ts`:
+  - saknade obligatoriska kolumner → `status: "error"` + `missingColumns` icke-tom
+  - korrekt fil → `status: "loaded"` med rätt `rowCount`
+- BOM/komma-decimal/semikolon: lägg till **endast om** befintliga tester inte redan täcker det. Snabb genomgång av filen först.
+
+## Det vi INTE gör nu
+
+- Ingen DMR-modellförberedelse (separat tur när första DMR-target är konkret).
+- Ingen metadata/dep-städ (separat tur).
+- Inga nya testfiler för områden som redan har 130 gröna tester (`naming`, `dedupe`, `frequency`, `tones`, alla targets, `channel_pack`).
+- Ingen visuell redesign.
+
+## Acceptanskriterier
+
+- `bun test` grönt (alla 130 + nya importer-tester).
+- Bygget grönt.
+- `src/routes/index.tsx` < ~200 rader.
+- Felaktig SK6BA-fil renderar tydlig felruta med saknade kolumner; ingen pipeline körs.
+- CHIRP, VGC N76 och split-export oförändrade (verifieras via befintliga golden tests).
+- localStorage-nycklar oförändrade så sparade inställningar överlever refaktorn.
+
+## Risker
+
+Stor extrahering av UI utan UI-tester → manuell rökverifiering av varje panel + download-flöde i preview efter implementation.
