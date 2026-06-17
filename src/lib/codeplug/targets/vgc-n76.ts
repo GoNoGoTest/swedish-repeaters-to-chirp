@@ -35,6 +35,13 @@ export interface VgcN76Settings {
   padToChannels: number | null;
   /** Mirror chirp-generic: omit links from scan (scan=0 for Link/Hotspot rows). */
   skipLinks: boolean;
+  /**
+   * Reserve channel slot 32 in every chunk for a fixed APRS channel
+   * (144.800 FM 25 kHz, scan=0, sign=0). User channels that would have
+   * landed on slot 32 spill over to the next chunk instead of being
+   * overwritten. Effective user-channel cap per chunk drops from 32 to 31.
+   */
+  reserveAprsSlot32: boolean;
 }
 
 export const VGC_N76_DEFAULTS: VgcN76Settings = {
@@ -44,7 +51,9 @@ export const VGC_N76_DEFAULTS: VgcN76Settings = {
   channelsPerGroup: 32,
   padToChannels: null,
   skipLinks: false,
+  reserveAprsSlot32: false,
 };
+
 
 const VGC_N76_LIMITS: HardwareLimits = {
   maxChannels: 500,
