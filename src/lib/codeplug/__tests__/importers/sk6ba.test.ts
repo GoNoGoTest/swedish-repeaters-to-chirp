@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { parseSk6baCsv, parseNumberLoose, summarize } from "../../importers/sk6ba";
+import { parseSk6baCsv, parseNumberLoose, summarize, loadSk6baCsv } from "../../importers/sk6ba";
 
 const csv = readFileSync(resolve(__dirname, "../fixtures/sk6ba-sample.csv"), "utf8");
 
