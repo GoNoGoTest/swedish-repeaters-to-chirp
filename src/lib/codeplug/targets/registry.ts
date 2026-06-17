@@ -67,5 +67,5 @@ export function resolveTargetSettings<T extends AnyExportTarget>(
   return {
     ...(target.defaultSettings as object),
     ...(stored ?? {}),
-  } as T["defaultSettings"];
+  } as unknown as T["defaultSettings"];
 }
