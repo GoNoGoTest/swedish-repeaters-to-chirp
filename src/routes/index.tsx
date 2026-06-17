@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import type { ChirpSettings, NormalizedChannel } from "@/lib/codeplug/models";
-import { requireTarget } from "@/lib/codeplug/targets";
+import { requireTarget, type ExportTarget } from "@/lib/codeplug/targets";
 import { loadSk6baCsv, type Sk6baLoadState } from "@/lib/codeplug/importers/sk6ba";
 import { useCodeplugSettings } from "@/hooks/useCodeplugSettings";
 import { useSavedSk6baExports } from "@/hooks/useSavedSk6baExports";
@@ -45,12 +45,23 @@ function Index() {
   }, []);
   const resetExcluded = useCallback(() => setExcludedKeys(new Set()), []);
 
-  // Active export target + settings
-  const target = useMemo(() => requireTarget(settings.export.targetId), [settings.export.targetId]);
-  const targetSettings = (settings.export.perTarget[settings.export.targetId] ?? target.defaultSettings) as Record<string, unknown>;
+  // Active export target + settings.
+  // Targets are registered with concrete settings types (e.g. ExportTarget<ChirpSettings>),
+  // but `requireTarget` returns ExportTarget<any>. We narrow once to a single
+  // `Record<string, unknown>`-shaped target so the rest of this component can
+  // call target.validate / target.resolveMaxNameLength / etc. without per-call
+  // `as never` casts. Each target performs its own internal narrowing.
+  // TODO: extend the registry with a typed lookup keyed by target id so
+  // target settings can be narrowed at the call site without this cast.
+  const target = useMemo(
+    () => requireTarget(settings.export.targetId) as ExportTarget<Record<string, unknown>>,
+    [settings.export.targetId],
+  );
+  const targetSettings = (settings.export.perTarget[settings.export.targetId]
+    ?? target.defaultSettings) as Record<string, unknown>;
   const chirpSettings = targetSettings as unknown as ChirpSettings;
   const maxNameLength = target.resolveMaxNameLength
-    ? target.resolveMaxNameLength(targetSettings as never)
+    ? target.resolveMaxNameLength(targetSettings)
     : target.limits.maxNameLength;
 
   const setTargetSettings = useCallback((patch: Record<string, unknown>) => {
@@ -265,7 +276,7 @@ function Index() {
                     </div>
                   )}
                   {target.validate && (() => {
-                    const tw = target.validate!(exportChannels, targetSettings as never);
+                    const tw = target.validate!(exportChannels, targetSettings);
                     if (tw.length === 0) return null;
                     return (
                       <ul className="mb-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200 space-y-1">
