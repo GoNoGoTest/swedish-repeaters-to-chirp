@@ -38,7 +38,13 @@ function packShortName(packId: string): string {
 }
 
 export function groupChannelsForSplit(channels: NormalizedChannel[]): DistrictBucket[] {
-  const byDistrict = new Map<string, NormalizedChannel[]>();
+  // Repeater rows are bucketed by region (country + districtLabel) so that
+  // LA, OZ, OH6 etc. each get their own file with a region-aware slug instead
+  // of being lumped under raw district strings.
+  const byRegion = new Map<
+    string,
+    { sortKey: string; key: string; label: string; channels: NormalizedChannel[] }
+  >();
   const byPack = new Map<string, NormalizedChannel[]>();
 
   for (const c of channels) {
@@ -49,22 +55,26 @@ export function groupChannelsForSplit(channels: NormalizedChannel[]): DistrictBu
       byPack.set(pid, arr);
       continue;
     }
-    // SK6BA / repeater row — bucket by district digit, "0" when missing.
-    const d = c.district && c.district.trim() !== "" ? c.district : "0";
-    const arr = byDistrict.get(d) ?? [];
-    arr.push(c);
-    byDistrict.set(d, arr);
+    const region = c.region;
+    let key: string;
+    let label: string;
+    if (region.countryCode === "unknown") {
+      key = region.districtCode
+        ? `unknown_${region.districtCode.toLowerCase()}`
+        : "unknown";
+      label = region.districtCode || "Okänt";
+    } else {
+      key = `${region.countryCode.toLowerCase()}_${region.districtLabel.toLowerCase()}`;
+      label = region.districtLabel;
+    }
+    const bucket = byRegion.get(key) ?? { sortKey: region.sortKey, key, label, channels: [] };
+    bucket.channels.push(c);
+    byRegion.set(key, bucket);
   }
 
-  const numeric: DistrictBucket[] = [];
-  const nonNumeric: DistrictBucket[] = [];
-  for (const [d, list] of byDistrict.entries()) {
-    const bucket: DistrictBucket = { key: `distrikt_${d}`, label: d, channels: list };
-    if (/^\d+$/.test(d)) numeric.push(bucket);
-    else nonNumeric.push(bucket);
-  }
-  numeric.sort((a, b) => Number(a.label) - Number(b.label));
-  nonNumeric.sort((a, b) => a.label.localeCompare(b.label));
+  const regionBuckets: DistrictBucket[] = Array.from(byRegion.values())
+    .sort((a, b) => (a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0))
+    .map(({ key, label, channels }) => ({ key, label, channels }));
 
   // One bucket per pack_id. If a pack spans multiple bands (e.g. amateur 2m+70cm),
   // split it further into one bucket per band.
@@ -96,7 +106,7 @@ export function groupChannelsForSplit(channels: NormalizedChannel[]): DistrictBu
     }
   }
 
-  return [...numeric, ...nonNumeric, ...packBuckets];
+  return [...regionBuckets, ...packBuckets];
 }
 
 /**
