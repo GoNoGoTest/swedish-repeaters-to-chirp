@@ -51,6 +51,17 @@ function VgcN76Panel({ settings, update }: {
         Hoppa över länkar och hotspots vid skanning
         <span className="text-xs text-muted-foreground">(sätter scan=0 på Link/Hotspot-rader)</span>
       </label>
+      <label className="mt-2 flex items-start gap-2 text-sm">
+        <input type="checkbox" className="mt-1" checked={settings.reserveAprsSlot32}
+          onChange={(e) => update({ reserveAprsSlot32: e.target.checked })} />
+        <span>
+          Lägg till APRS på kanalplats 32 i varje chunk
+          <span className="ml-2 block text-xs text-muted-foreground">
+            Reserverar plats 32 för APRS 144.800 FM 25 kHz. Kanaler som annars skulle hamnat på plats 32 flyttas till nästa chunk.
+          </span>
+        </span>
+      </label>
+
     </div>
   );
 }
