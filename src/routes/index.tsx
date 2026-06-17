@@ -55,15 +55,18 @@ function Index() {
   const storedPatch = settings.export.perTarget[settings.export.targetId] as
     | Record<string, unknown>
     | undefined;
-  // Resolve merged settings per target variant — type-safe via TargetSettingsMap.
+  // Per-target resolved settings (defaults merged with user patch). Each
+  // branch narrows `target` to its concrete variant so the settings type is
+  // exact — no `as unknown as XSettings` cast.
   const chirpSettings: ChirpSettings = target.id === "chirp-generic"
     ? resolveTargetSettings(target, storedPatch)
     : { startLocation: 1, mode: "NFM", tStep: 5.0, skipLinks: false, maxLength: 6 };
+  // Persisted patch is opaque outside this file; pass through to ExportPanel,
+  // which narrows again on `target.id` before handing to per-target sub-panels.
+  const targetSettings: Record<string, unknown> = (storedPatch ?? {}) as Record<string, unknown>;
   const maxNameLength = target.id === "chirp-generic"
     ? (target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength)
-    : target.id === "vgc-n76"
-      ? (target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength)
-      : target.limits.maxNameLength;
+    : (target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength);
 
   const setTargetSettings = useCallback((patch: Record<string, unknown>) => {
     setSettings((prev) => ({
