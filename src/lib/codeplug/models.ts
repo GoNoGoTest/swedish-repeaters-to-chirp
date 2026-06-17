@@ -35,6 +35,8 @@ export interface RawRow {
 
 export type SourceType = "sk6ba" | "channel_pack";
 
+import type { RegionInfo, RegionCountryCode } from "./region";
+
 export interface NormalizedChannel {
   source_type: SourceType;
   source_row: number;
@@ -45,7 +47,10 @@ export interface NormalizedChannel {
   mode_raw: string;
   is_analog_fm: boolean;
   band: string;
+  /** Raw district value from the CSV (preserved verbatim). */
   district: string;
+  /** Derived country/region metadata (see src/lib/codeplug/region.ts). */
+  region: RegionInfo;
   city: string;
   call: string;
   channel: string;
