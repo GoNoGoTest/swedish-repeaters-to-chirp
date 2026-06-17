@@ -22,11 +22,15 @@ export type AnyExportTarget = {
 // Internally we store with a widened settings type; `registerTarget` is the
 // only entry point and it's typed on the way in, so the read-side cast to
 // `AnyExportTarget` is safe.
+// Internally we store with a widened settings type. The read-side narrowing
+// (AnyExportTarget) is safe because TargetSettingsMap is the source of truth
+// for which id → settings shape, and only the two real target modules call
+// registerTarget at startup (tests register dummies with their own ids).
 const targets = new Map<string, ExportTarget<unknown>>();
 
-export function registerTarget<K extends TargetId>(
-  target: ExportTarget<TargetSettingsMap[K]> & { id: K },
-): void {
+// Loose write-side signature: keeps test helpers and future targets ergonomic.
+// Read-side APIs below carry the strict mapping.
+export function registerTarget<T>(target: ExportTarget<T>): void {
   // Idempotent: re-register on HMR / double module evaluation (SSR + client) is fine.
   targets.set(target.id, target as ExportTarget<unknown>);
 }
