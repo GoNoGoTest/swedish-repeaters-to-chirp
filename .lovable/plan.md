@@ -1,95 +1,43 @@
-# Typad targets-registry — nästa steg
+# APRS-reservation på plats 32 i VGC-chunks
 
-Mål: ta bort de kvarvarande typkompromisserna runt `ExportTarget` utan att ändra runtime-beteende eller datalagring. Konkret de tre platserna idag:
+## Mål
+Lägg till en toggle i VGC N76-panelen: **"Lägg till APRS på kanalplats 32 i varje chunk"**. När på reserveras rad 32 i varje chunk för en fast APRS-kanal, och de tänkta användarkanaler som annars hamnat på plats 32 skjuts över till nästa chunk istället för att skrivas över.
 
-1. `registry.ts` lagrar och returnerar `ExportTarget<any>`.
-2. `routes/index.tsx` + `useCodeplugDownload.ts` castar en gång till `ExportTarget<Record<string, unknown>>`.
-3. `ExportPanel.tsx` castar `targetSettings as unknown as VgcN76Settings` när VGC-panelen renderas.
+## APRS-kanalen (bekräftat)
+| Fält | Värde |
+|---|---|
+| title | `APRS` (inget krock-suffix) |
+| rx_freq / tx_freq | `144800000` |
+| rx_sub / tx_sub | `0` (ingen subton) |
+| bandwidth | `25000` (Wide 25 kHz) |
+| rx_mod / tx_mod | `0` (FM) |
+| scan | `0` (ej med i scan) |
+| sign | `0` (ROGER-beep AV — olämpligt för packet) |
+| power | `s.defaultPower` |
+| övriga fält | VGC-standardvärden (samma defaults som tomma rader / vanliga kanaler) |
 
-Tester och export ska vara oförändrade. Inga ändringar i `chirp-generic`/`vgc-n76`-exporters, `split.ts`, eller persisterad form av `Settings.export.perTarget` (fortsatt `Record<string, unknown>`).
+## Ändringar
 
-## Designidé
+### `src/lib/codeplug/targets/vgc-n76.ts`
+- `VgcN76Settings`: nytt fält `reserveAprsSlot32: boolean` (default `false` i `VGC_N76_DEFAULTS`).
+- Ny helper `aprsVgcRow(s: VgcN76Settings)` → fast rad enligt tabellen ovan.
+- Ny helper `renderVgcChunk(chunk, s)`:
+  - serialiserar upp till 31 användarkanaler,
+  - lägger till `aprsVgcRow(s)` som rad 32,
+  - padar resterande rader upp till `maxChannelsPerGroup` med tomma rader (oförändrat).
+- `exportMany`:
+  - om `reserveAprsSlot32`: använd `packsChunkSize = maxChannelsPerGroup - 1` (= 31) och `split.chunkSize = 31` för `per_district_chunked` så att 32:a inmatade kanalen i en chunk flyter över till nästa fil istället för att skrivas över.
+  - använd `renderVgcChunk` istället för nuvarande chunk-rendering.
+- `export` (single file): använd också `renderVgcChunk` så APRS finns med på plats 32 även i enkelfilsexport (om toggle på).
+- Validering: `vgc_over_group_limit` räknar fortsatt totalt 32 rader inkl. APRS (dvs. effektivt 31 användarkanaler per chunk när toggle är på).
 
-Inför en sluten id → settings-typ-map och låt `requireTarget` returnera en **diskriminerad union** av konkreta `ExportTarget<T>`. Då kan TypeScript narrowa via `target.id === "vgc-n76"` istället för att castas.
+### `src/components/codeplug/ExportPanel.tsx`
+- I `VgcN76Panel`: ny checkbox bunden till `settings.reserveAprsSlot32`, placerad i chunking-sektionen, med kort hjälptext: *"Reserverar plats 32 för APRS 144.800 FM 25 kHz. Kanaler som annars skulle hamnat på plats 32 flyttas till nästa chunk."*
 
-### Ny typdeklaration (i `src/lib/codeplug/targets/index.ts`)
+### `src/lib/codeplug/__tests__/targets/vgc-n76.test.ts`
+- Toggle av (default) → oförändrat beteende.
+- Toggle på + `per_district_chunked` med 64 inkanaler → 3 filer; den 32:a inmatade kanalen hamnar i `part2`, APRS finns som rad 32 i varje fil med korrekta värden (scan=0, sign=0, bandwidth=25000, freq=144800000).
+- Toggle på + `single` → APRS finns som rad 32 i den enda filen.
 
-```ts
-import type { ChirpSettings } from "../models";
-import type { VgcN76Settings } from "./vgc-n76";
-
-export interface TargetSettingsMap {
-  "chirp-generic": ChirpSettings;
-  "vgc-n76": VgcN76Settings;
-}
-
-export type TargetId = keyof TargetSettingsMap;
-
-export type AnyExportTarget = {
-  [K in TargetId]: ExportTarget<TargetSettingsMap[K]> & { id: K };
-}[TargetId];
-```
-
-### Registry-ändringar (`registry.ts`)
-
-- Internt får mappen behålla en bredare typ (`ExportTarget<unknown>`), men de publika signaturerna blir:
-  - `registerTarget<K extends TargetId>(t: ExportTarget<TargetSettingsMap[K]> & { id: K }): void`
-  - `getTarget(id: string): AnyExportTarget | undefined`
-  - `requireTarget(id: string): AnyExportTarget`
-  - `listTargets(): AnyExportTarget[]`
-- En enda välkommenterad intern cast vid `Map.get → AnyExportTarget` ersätter alla nuvarande call-site-castar. Den motiveras med att `registerTarget` är den enda vägen in och att registreringsraderna i `chirp-generic.ts`/`vgc-n76.ts` är typade.
-
-### Call sites
-
-- `routes/index.tsx`:
-  - `requireTarget(...)` returnerar nu `AnyExportTarget` direkt. Ta bort `as ExportTarget<Record<string, unknown>>` och TODO-kommentaren.
-  - `chirpSettings`-användningen i preview/table avgörs redan av `target.id === "chirp-generic"`-checken — narrowa via en `if (target.id === "chirp-generic") { … target.defaultSettings as ChirpSettings-form … }` lokalt vid behov, eller plocka chirp-settings via en liten helper `getTargetSettings(target, perTarget)` (se nedan).
-  - `target.validate`/`resolveMaxNameLength`/`exportMany`-anropen får korrekt `TSettings` via narrowing och behöver inga castar.
-
-- `useCodeplugDownload.ts`:
-  - Använder `AnyExportTarget` och narrowa med `switch (target.id)` eller en liten generisk hjälpare:
-    ```ts
-    function callTarget<T extends AnyExportTarget>(target: T, stored: Record<string, unknown>) {
-      const settings = { ...(target.defaultSettings as object), ...stored } as Parameters<T["export"]>[1];
-      return settings;
-    }
-    ```
-    Ett enda lokalt cast (`as Parameters<T["export"]>[1]`) ersätter dagens `as Record<string, unknown>`-narrowing över hela hooken.
-
-- `ExportPanel.tsx`:
-  - Tar emot `target: AnyExportTarget` (eller importerar och kallar `requireTarget` lokalt med samma `targetId`).
-  - I VGC-grenen: `if (target.id === "vgc-n76") { const s = { ...target.defaultSettings, ...(targetSettings as Partial<VgcN76Settings>) }; … }` — den enda kvarvarande casten är ett tydligt avgränsat `Partial<VgcN76Settings>` på den persisterade patch-strukturen, inte längre `as unknown as VgcN76Settings`.
-  - Samma mönster för CHIRP-grenen.
-
-### Hjälpare (valfritt, om det blir tydligare)
-
-En liten funktion i `targets/index.ts`:
-
-```ts
-export function resolveTargetSettings<T extends AnyExportTarget>(
-  target: T,
-  stored: Record<string, unknown> | undefined,
-): T["defaultSettings"] {
-  return { ...(target.defaultSettings as object), ...(stored ?? {}) } as T["defaultSettings"];
-}
-```
-
-Då kan både `useCodeplugDownload`, `routes/index.tsx` och `ExportPanel` använda samma helper och slippa upprepa cast-formen.
-
-## Vad förändras inte
-
-- `Settings.export.targetId` förblir `string` i `models.ts` (lagrad form). Ingen migrering.
-- `Settings.export.perTarget` förblir `Record<string, Record<string, unknown>>`-aktig — typningen sker först när vi parar ihop id med target.
-- Inga ändringar i exporters, split-logik, eller exporterad CSV.
-- Tester rör vi inte (de använder redan konkreta targets).
-
-## Verifiering
-
-- `bun run test` — alla 175 vitest-tester ska passera.
-- `bun run build` — TypeScript-strict ska gå igenom utan nya fel.
-- Manuell rök-test i preview: byt mellan CHIRP- och VGC-target i UI, ändra inställningar, exportera. Förväntad output identisk med innan.
-
-## Risker / öppna frågor
-
-- `AnyExportTarget` är en sluten union — att lägga till en ny target kräver att man uppdaterar `TargetSettingsMap`. Det är poängen (kompilatorn fångar glömda inställningstyper), men värt att nämna i en kort kommentar ovanför mappen.
-- Om det dyker upp någon annan plats som idag förlitar sig på `ExportTarget<any>` (t.ex. test-helpers) kan en liten justering behövas — i så fall lägger jag den i samma PR.
+## Oförändrat
+`chirp-generic`, `split.ts`, filnamn, övriga targets och UI.

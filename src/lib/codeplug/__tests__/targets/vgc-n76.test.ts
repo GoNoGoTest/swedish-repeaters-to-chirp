@@ -168,3 +168,75 @@ describe("targets/vgc-n76", () => {
     expect(w!.message).not.toMatch(/AM/);
   });
 });
+
+describe("targets/vgc-n76 — APRS slot 32 reservation", () => {
+  function parseRows(csv: string): string[][] {
+    const parsed = Papa.parse<string[]>(csv, { skipEmptyLines: true });
+    return parsed.data.slice(1); // drop header
+  }
+
+  it("toggle off (default): no APRS row appears", () => {
+    const channels = Array.from({ length: 5 }, (_, i) =>
+      makeChannel({ generated_name_final: `CH${i + 1}`, rx_frequency: 145.6 + i * 0.025, is_analog_fm: true }),
+    );
+    const out = VGC_N76_TARGET.export(channels, VGC_N76_DEFAULTS);
+    expect(out.content).not.toMatch(/^APRS,/m);
+  });
+
+  it("single mode + APRS on with 40 channels: APRS spliced at row 32, channel 32 shifts to row 33", () => {
+    const channels = Array.from({ length: 40 }, (_, i) =>
+      makeChannel({ generated_name_final: `CH${i + 1}`, rx_frequency: 145.0 + i * 0.0125, is_analog_fm: true }),
+    );
+    const out = VGC_N76_TARGET.export(channels, { ...VGC_N76_DEFAULTS, reserveAprsSlot32: true });
+    const rows = parseRows(out.content);
+    expect(rows.length).toBe(41); // 40 user + 1 APRS
+    expect(rows[30][0]).toBe("CH31");
+    expect(rows[31][0]).toBe("APRS");
+    expect(rows[31][1]).toBe("144800000");
+    expect(rows[31][2]).toBe("144800000");
+    expect(rows[31][3]).toBe("0");
+    expect(rows[31][4]).toBe("0");
+    expect(rows[31][6]).toBe("25000");
+    expect(rows[31][7]).toBe("0"); // scan off
+    expect(rows[31][10]).toBe("0"); // sign off
+    expect(rows[31][14]).toBe("0"); // rx FM
+    expect(rows[31][15]).toBe("0"); // tx FM
+    expect(rows[32][0]).toBe("CH32"); // overflowed user channel
+  });
+
+  it("per_district_chunked + APRS on with 64 channels: 3 files, channel 32 falls over to part2, APRS row 32 in each", () => {
+    const channels = Array.from({ length: 64 }, (_, i) =>
+      makeChannel({
+        generated_name_final: `CH${i + 1}`,
+        rx_frequency: 145.0 + i * 0.0125,
+        is_analog_fm: true,
+        district: "6",
+      }),
+    );
+    const files = VGC_N76_TARGET.exportMany!(
+      channels,
+      { ...VGC_N76_DEFAULTS, reserveAprsSlot32: true },
+      { mode: "per_district_chunked", chunkSize: 32 },
+    );
+    expect(files.length).toBe(3);
+    expect(files[0].filename).toMatch(/_part1\.csv$/);
+    expect(files[1].filename).toMatch(/_part2\.csv$/);
+    expect(files[2].filename).toMatch(/_part3\.csv$/);
+
+    const r0 = parseRows(files[0].content);
+    expect(r0.length).toBe(32);
+    expect(r0[30][0]).toBe("CH31");
+    expect(r0[31][0]).toBe("APRS");
+
+    const r1 = parseRows(files[1].content);
+    expect(r1[0][0]).toBe("CH32"); // spilled over
+    expect(r1[30][0]).toBe("CH62");
+    expect(r1[31][0]).toBe("APRS");
+
+    const r2 = parseRows(files[2].content);
+    expect(r2[0][0]).toBe("CH63");
+    expect(r2[1][0]).toBe("CH64");
+    expect(r2[2][0]).toBe("APRS");
+  });
+});
+
