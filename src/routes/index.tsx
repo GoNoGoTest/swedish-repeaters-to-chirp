@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import type { ChirpSettings, NormalizedChannel } from "@/lib/codeplug/models";
-import { requireTarget, type ExportTarget } from "@/lib/codeplug/targets";
+import { requireTarget, resolveTargetSettings } from "@/lib/codeplug/targets";
 import { loadSk6baCsv, type Sk6baLoadState } from "@/lib/codeplug/importers/sk6ba";
 import { useCodeplugSettings } from "@/hooks/useCodeplugSettings";
 import { useSavedSk6baExports } from "@/hooks/useSavedSk6baExports";
@@ -45,24 +45,28 @@ function Index() {
   }, []);
   const resetExcluded = useCallback(() => setExcludedKeys(new Set()), []);
 
-  // Active export target + settings.
-  // Targets are registered with concrete settings types (e.g. ExportTarget<ChirpSettings>),
-  // but `requireTarget` returns ExportTarget<any>. We narrow once to a single
-  // `Record<string, unknown>`-shaped target so the rest of this component can
-  // call target.validate / target.resolveMaxNameLength / etc. without per-call
-  // `as never` casts. Each target performs its own internal narrowing.
-  // TODO: extend the registry with a typed lookup keyed by target id so
-  // target settings can be narrowed at the call site without this cast.
+  // Active export target — discriminated union (AnyExportTarget) keyed on `id`.
+  // Narrow with `target.id === "chirp-generic" | "vgc-n76"` to access settings
+  // safely; no `as` casts needed at call sites.
   const target = useMemo(
-    () => requireTarget(settings.export.targetId) as ExportTarget<Record<string, unknown>>,
+    () => requireTarget(settings.export.targetId),
     [settings.export.targetId],
   );
-  const targetSettings = (settings.export.perTarget[settings.export.targetId]
-    ?? target.defaultSettings) as Record<string, unknown>;
-  const chirpSettings = targetSettings as unknown as ChirpSettings;
-  const maxNameLength = target.resolveMaxNameLength
-    ? target.resolveMaxNameLength(targetSettings)
-    : target.limits.maxNameLength;
+  const storedPatch = settings.export.perTarget[settings.export.targetId] as
+    | Record<string, unknown>
+    | undefined;
+  // Per-target resolved settings (defaults merged with user patch). Each
+  // branch narrows `target` to its concrete variant so the settings type is
+  // exact — no `as unknown as XSettings` cast.
+  const chirpSettings: ChirpSettings = target.id === "chirp-generic"
+    ? resolveTargetSettings(target, storedPatch)
+    : { startLocation: 1, mode: "NFM", tStep: 5.0, skipLinks: false, maxLength: 6 };
+  // Persisted patch is opaque outside this file; pass through to ExportPanel,
+  // which narrows again on `target.id` before handing to per-target sub-panels.
+  const targetSettings: Record<string, unknown> = (storedPatch ?? {}) as Record<string, unknown>;
+  const maxNameLength = target.id === "chirp-generic"
+    ? (target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength)
+    : (target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength);
 
   const setTargetSettings = useCallback((patch: Record<string, unknown>) => {
     setSettings((prev) => ({
@@ -275,9 +279,12 @@ function Index() {
                       <button onClick={resetExcluded} className="rounded border border-border px-2 py-1">Återställ</button>
                     </div>
                   )}
-                  {target.validate && (() => {
-                    const tw = target.validate!(exportChannels, targetSettings);
-                    if (tw.length === 0) return null;
+                  {(() => {
+                    // Narrow on `target.id` so validate() gets its exact settings type.
+                    const tw = target.id === "chirp-generic"
+                      ? target.validate?.(exportChannels, resolveTargetSettings(target, storedPatch))
+                      : target.validate?.(exportChannels, resolveTargetSettings(target, storedPatch));
+                    if (!tw || tw.length === 0) return null;
                     return (
                       <ul className="mb-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200 space-y-1">
                         {tw.map((w, i) => <li key={i}>⚠ {w.message}</li>)}
