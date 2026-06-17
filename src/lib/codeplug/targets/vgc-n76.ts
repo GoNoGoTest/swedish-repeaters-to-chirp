@@ -297,9 +297,62 @@ function rowsToCsv(rows: VgcRow[]): string {
   return Papa.unparse({ fields: [...VGC_N76_COLUMNS], data });
 }
 
+/**
+ * Fixed APRS row inserted at chunk slot 32 when `reserveAprsSlot32` is on.
+ * 144.800 MHz simplex, FM wide (25 kHz), no subtones, NOT in scan list,
+ * ROGER beep off (data/packet mode — beeps would be disruptive).
+ */
+function aprsVgcRow(s: VgcN76Settings): VgcRow {
+  return {
+    title: "APRS",
+    tx_freq: "144800000",
+    rx_freq: "144800000",
+    tx_sub: "0",
+    rx_sub: "0",
+    power: s.defaultPower,
+    bandwidth: "25000",
+    scan: "0",
+    talk_around: "0",
+    pre_de_emph: "0",
+    sign: "0",
+    tx_dis: "0",
+    bclo: "0",
+    mute: "0",
+    rx_mod: "0",
+    tx_mod: "0",
+  };
+}
+
+/**
+ * Insert APRS row at slot 32 (0-indexed 31). For chunks with <31 user
+ * rows the APRS row is appended at the end; for chunks with ≥31 user
+ * rows it is spliced in at position 31 so any overflow user rows
+ * shift down rather than being overwritten.
+ */
+function insertAprsRow(rows: VgcRow[], aprs: VgcRow): VgcRow[] {
+  const SLOT_INDEX = VGC_N76_LIMITS.maxChannelsPerGroup - 1; // 31
+  if (rows.length >= SLOT_INDEX) {
+    return [...rows.slice(0, SLOT_INDEX), aprs, ...rows.slice(SLOT_INDEX)];
+  }
+  return [...rows, aprs];
+}
+
 export function exportVgcN76Csv(channels: NormalizedChannel[], s: VgcN76Settings): { csv: string; warnings: Warning[] } {
-  const { rows, warnings } = toVgcN76Rows(channels, s);
-  return { csv: rowsToCsv(rows), warnings };
+  if (!s.reserveAprsSlot32) {
+    const { rows, warnings } = toVgcN76Rows(channels, s);
+    return { csv: rowsToCsv(rows), warnings };
+  }
+  // With APRS-slot reservation we need to insert the APRS row before any
+  // padding is applied, so pad inside this function instead of in
+  // toVgcN76Rows.
+  const innerSettings: VgcN76Settings = { ...s, padToChannels: null };
+  const { rows, warnings } = toVgcN76Rows(channels, innerSettings);
+  const withAprs = insertAprsRow(rows, aprsVgcRow(s));
+  if (s.padToChannels != null && withAprs.length < s.padToChannels) {
+    const pad = s.padToChannels - withAprs.length;
+    for (let i = 0; i < pad; i++) withAprs.push({ ...EMPTY_ROW });
+  }
+  return { csv: rowsToCsv(withAprs), warnings };
 }
 
 export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
@@ -317,16 +370,30 @@ export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
     const { csv, warnings } = exportVgcN76Csv(channels, s);
     return { filename: "vgc-n76.csv", content: csv, warnings };
   },
-  exportMany: (channels: NormalizedChannel[], s: VgcN76Settings, split: SplitSettings) =>
-    buildSplitFiles(channels, split, {
+  exportMany: (channels: NormalizedChannel[], s: VgcN76Settings, split: SplitSettings) => {
+    // When APRS slot 32 is reserved, each chunk holds at most 31 user
+    // channels (slot 32 = APRS). Cap both the per-district chunkSize and
+    // the packs hard cap so the 32nd user channel spills into the next
+    // file instead of being overwritten by APRS.
+    const userCap = s.reserveAprsSlot32
+      ? Math.max(1, VGC_N76_LIMITS.maxChannelsPerGroup - 1)
+      : VGC_N76_LIMITS.maxChannelsPerGroup;
+    const effectiveSplit: SplitSettings =
+      s.reserveAprsSlot32 && split.mode === "per_district_chunked"
+        ? { ...split, chunkSize: Math.min(Math.max(1, split.chunkSize), userCap) }
+        : split;
+    return buildSplitFiles(channels, effectiveSplit, {
       filenameBase: "vgc-n76",
       extension: "csv",
       renderChunk: (chunk) => exportVgcN76Csv(chunk, s).csv,
       // Channel-packs have no district and must always respect the
-      // N76 per-group hardware limit, even when the user picks
-      // per_district (un-chunked) for repeaters.
-      packsChunkSize: VGC_N76_LIMITS.maxChannelsPerGroup,
-    }),
+      // N76 per-group hardware limit (reduced by 1 when APRS slot is
+      // reserved), even when the user picks per_district (un-chunked)
+      // for repeaters.
+      packsChunkSize: userCap,
+    });
+  },
 };
+
 
 registerTarget(VGC_N76_TARGET);
