@@ -1,6 +1,9 @@
 import type { NormalizedChannel } from "../models";
+import { deriveRegion } from "../region";
 
 export function makeChannel(over: Partial<NormalizedChannel> = {}): NormalizedChannel {
+  const district = over.district ?? "6";
+  const region = over.region ?? deriveRegion(district, over.call);
   return {
     source_type: "sk6ba",
     source_row: 2,
@@ -55,5 +58,7 @@ export function makeChannel(over: Partial<NormalizedChannel> = {}): NormalizedCh
     collided: false,
     warnings: [],
     ...over,
+    district,
+    region,
   };
 }

@@ -7,6 +7,7 @@ import { buildName, resolveCollisions } from "./naming";
 import { sortChannels } from "./sorting";
 import { applyFreqDedupe } from "./dedupe";
 import { DEFAULT_PACK_NAMING } from "./defaults";
+import { deriveRegion, UNKNOWN_REGION } from "./region";
 
 function emptyPackFields() {
   return {
@@ -85,7 +86,8 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
       type, status: (r.status ?? "").toString().trim(),
       mode_raw: modeRaw,
       is_analog_fm: /\bFM\b/i.test(modeRaw),
-      band, district, city, call, channel, network,
+      band, district, region: deriveRegion(district, call),
+      city, call, channel, network,
       network_id: (r.network_id ?? "").toString(),
       access_raw: (r.access ?? "").toString(),
       rx_frequency: output,

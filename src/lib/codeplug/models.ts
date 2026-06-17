@@ -104,8 +104,16 @@ export interface FilterSettings {
   modeStrategy: "contains_fm" | "exact_fm" | "all" | "custom";
   customModes: string[];
   bands: string[];
-  districts: string[];
-  includeUnknownDistricts: boolean;
+  /** Country codes to keep (empty = all). */
+  countries: RegionCountryCode[];
+  /** District labels (e.g. "SM6", "LA", "OH0") to keep (empty = all within the chosen countries). */
+  regions: string[];
+  /** Include rows whose region is "unknown". Replaces legacy `includeUnknownDistricts`. */
+  includeUnknownRegions: boolean;
+  /** @deprecated kept for backward compatibility with persisted settings. */
+  districts?: string[];
+  /** @deprecated alias for `includeUnknownRegions` in legacy persisted settings. */
+  includeUnknownDistricts?: boolean;
 }
 
 export interface NamingSettings {

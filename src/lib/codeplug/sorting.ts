@@ -17,11 +17,10 @@ function sortByKeys(channels: NormalizedChannel[], s: SortSettings): NormalizedC
       let bv: string | number = "";
       switch (key) {
         case "district":
-          av = a.c.district || "~";
-          bv = b.c.district || "~";
-          if (/^\d+$/.test(String(av)) && /^\d+$/.test(String(bv))) {
-            av = Number(av); bv = Number(bv);
-          }
+          // Region-aware: SE numerically (via SM0..SM7 label sort),
+          // other countries grouped per COUNTRY_SORT_ORDER.
+          av = a.c.region.sortKey || "~";
+          bv = b.c.region.sortKey || "~";
           break;
         case "geohash": av = a.geohash; bv = b.geohash; break;
         case "type": av = a.c.type; bv = b.c.type; break;
@@ -80,21 +79,16 @@ function sortOtherDistricts(
   channels: NormalizedChannel[],
   s: SortSettings,
 ): NormalizedChannel[] {
-  // Group by district, sort districts numerically/alphabetically, geohash within.
+  // Group by region sortKey so countries cluster in COUNTRY_SORT_ORDER,
+  // and SE districts stay numerically ordered (SM0..SM7).
   const groups = new Map<string, NormalizedChannel[]>();
   for (const c of channels) {
-    const d = districtOf(c) || "~";
-    const arr = groups.get(d) ?? [];
+    const key = c.region.sortKey || "~";
+    const arr = groups.get(key) ?? [];
     arr.push(c);
-    groups.set(d, arr);
+    groups.set(key, arr);
   }
-  const keys = Array.from(groups.keys()).sort((a, b) => {
-    const an = /^\d+$/.test(a), bn = /^\d+$/.test(b);
-    if (an && bn) return Number(a) - Number(b);
-    if (an) return -1;
-    if (bn) return 1;
-    return a < b ? -1 : a > b ? 1 : 0;
-  });
+  const keys = Array.from(groups.keys()).sort();
   const out: NormalizedChannel[] = [];
   for (const k of keys) {
     out.push(...sortByKeys(groups.get(k)!, { ...s, keys: ["geohash", "city"] }));
