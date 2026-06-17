@@ -22,9 +22,21 @@ describe("targets/registry", () => {
     expect(listTargets()).toHaveLength(1);
   });
 
-  it("throws on duplicate id", () => {
+  it("is idempotent when the same target is registered twice", () => {
+    // Module graphs evaluate twice under SSR + client hydration / HMR, so
+    // re-registering the exact same target object must be a silent no-op.
     registerTarget(dummy);
-    expect(() => registerTarget(dummy)).toThrow(/already registered/);
+    expect(() => registerTarget(dummy)).not.toThrow();
+    expect(listTargets()).toHaveLength(1);
+    expect(getTarget("dummy-target")).toBe(dummy);
+  });
+
+  it("replaces a target when a different object is registered under the same id", () => {
+    registerTarget(dummy);
+    const replacement: ExportTarget<{ x: number }> = { ...dummy, label: "Dummy v2" };
+    registerTarget(replacement);
+    expect(getTarget("dummy-target")).toBe(replacement);
+    expect(listTargets()).toHaveLength(1);
   });
 
   it("requireTarget throws on unknown id", () => {
