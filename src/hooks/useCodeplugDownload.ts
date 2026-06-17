@@ -1,8 +1,11 @@
 import { useCallback } from "react";
 import Papa from "papaparse";
 import JSZip from "jszip";
-import type { NormalizedChannel, Settings } from "@/lib/codeplug/models";
-import { requireTarget, resolveTargetSettings, type AnyExportTarget } from "@/lib/codeplug/targets";
+import type { NormalizedChannel, Settings, SplitSettings } from "@/lib/codeplug/models";
+import {
+  requireTarget, resolveTargetSettings,
+  type AnyExportTarget, type ExportFile, type ExportResult,
+} from "@/lib/codeplug/targets";
 
 function downloadBlob(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
@@ -23,23 +26,31 @@ async function downloadZip(filename: string, files: { filename: string; content:
 }
 
 /**
- * Distribute over AnyExportTarget so `target.export(channels, settings)`
- * is callable: without distribution TS narrows method params to the
- * intersection of every variant's settings type, which never matches.
+ * Switch on the discriminated `id` so TypeScript narrows `target` to a
+ * concrete `ExportTarget<TSettings>`; from there `resolveTargetSettings`
+ * yields the right settings shape and `target.export`/`exportMany` are
+ * called with no `as never` / cast at the call site.
  */
-type ExportInvocation<T extends AnyExportTarget> = T extends AnyExportTarget
-  ? { target: T; settings: T["defaultSettings"] }
-  : never;
-
-function buildInvocation(
+function invokeTarget(
   target: AnyExportTarget,
   stored: unknown,
-): ExportInvocation<AnyExportTarget> {
-  const settings = resolveTargetSettings(
-    target,
-    (stored as Record<string, unknown> | undefined) ?? undefined,
-  );
-  return { target, settings } as ExportInvocation<AnyExportTarget>;
+  channels: NormalizedChannel[],
+  split: SplitSettings,
+): { one: ExportResult } | { many: ExportFile[] } {
+  const willSplit = split.mode !== "single" && !!target.exportMany;
+  const storedPatch = stored as Record<string, unknown> | undefined;
+  switch (target.id) {
+    case "chirp-generic": {
+      const s = resolveTargetSettings(target, storedPatch);
+      if (willSplit && target.exportMany) return { many: target.exportMany(channels, s, split) };
+      return { one: target.export(channels, s) };
+    }
+    case "vgc-n76": {
+      const s = resolveTargetSettings(target, storedPatch);
+      if (willSplit && target.exportMany) return { many: target.exportMany(channels, s, split) };
+      return { one: target.export(channels, s) };
+    }
+  }
 }
 
 export function useCodeplugDownload(input: {
@@ -50,23 +61,24 @@ export function useCodeplugDownload(input: {
 
   const exportFiles = useCallback(async () => {
     const target = requireTarget(settings.export.targetId);
-    const inv = buildInvocation(target, settings.export.perTarget[settings.export.targetId]);
-    const split = settings.export.split;
-    const willSplit = split.mode !== "single" && !!inv.target.exportMany;
-
-    if (willSplit && inv.target.exportMany) {
-      const files = inv.target.exportMany(exportChannels, inv.settings, split);
-      if (files.length === 1) {
-        downloadBlob(files[0].filename, files[0].content);
+    const out = invokeTarget(
+      target,
+      settings.export.perTarget[settings.export.targetId],
+      exportChannels,
+      settings.export.split,
+    );
+    if ("many" in out) {
+      if (out.many.length === 1) {
+        downloadBlob(out.many[0].filename, out.many[0].content);
       } else {
-        const base = inv.target.filenameBase ?? inv.target.id;
-        await downloadZip(`${base}.zip`, files);
+        const base = target.filenameBase ?? target.id;
+        await downloadZip(`${base}.zip`, out.many);
       }
       return;
     }
-    const result = inv.target.export(exportChannels, inv.settings);
-    downloadBlob(result.filename, result.content);
+    downloadBlob(out.one.filename, out.one.content);
   }, [settings, exportChannels]);
+
 
 
   const exportWarnings = useCallback(() => {
