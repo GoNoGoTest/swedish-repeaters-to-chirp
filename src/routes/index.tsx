@@ -279,9 +279,12 @@ function Index() {
                       <button onClick={resetExcluded} className="rounded border border-border px-2 py-1">Återställ</button>
                     </div>
                   )}
-                  {target.validate && (() => {
-                    const tw = target.validate!(exportChannels, targetSettings);
-                    if (tw.length === 0) return null;
+                  {(() => {
+                    // Narrow on `target.id` so validate() gets its exact settings type.
+                    const tw = target.id === "chirp-generic"
+                      ? target.validate?.(exportChannels, resolveTargetSettings(target, storedPatch))
+                      : target.validate?.(exportChannels, resolveTargetSettings(target, storedPatch));
+                    if (!tw || tw.length === 0) return null;
                     return (
                       <ul className="mb-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200 space-y-1">
                         {tw.map((w, i) => <li key={i}>⚠ {w.message}</li>)}
