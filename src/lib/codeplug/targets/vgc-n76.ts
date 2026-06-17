@@ -333,7 +333,7 @@ function aprsVgcRow(s: VgcN76Settings): VgcRow {
  * shift down rather than being overwritten.
  */
 function insertAprsRow(rows: VgcRow[], aprs: VgcRow): VgcRow[] {
-  const SLOT_INDEX = VGC_N76_LIMITS.maxChannelsPerGroup - 1; // 31
+  const SLOT_INDEX = VGC_N76_CHANNELS_PER_GROUP - 1; // 31
   if (rows.length >= SLOT_INDEX) {
     return [...rows.slice(0, SLOT_INDEX), aprs, ...rows.slice(SLOT_INDEX)];
   }
@@ -379,8 +379,8 @@ export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
     // the packs hard cap so the 32nd user channel spills into the next
     // file instead of being overwritten by APRS.
     const userCap = s.reserveAprsSlot32
-      ? Math.max(1, VGC_N76_LIMITS.maxChannelsPerGroup - 1)
-      : VGC_N76_LIMITS.maxChannelsPerGroup;
+      ? Math.max(1, VGC_N76_CHANNELS_PER_GROUP - 1)
+      : VGC_N76_CHANNELS_PER_GROUP;
     const effectiveSplit: SplitSettings =
       s.reserveAprsSlot32 && split.mode === "per_district_chunked"
         ? { ...split, chunkSize: Math.min(Math.max(1, split.chunkSize), userCap) }
