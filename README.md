@@ -97,8 +97,15 @@ Registret ligger i `src/lib/codeplug/channel_packs/registry.ts` och använder `i
 ```bash
 bun install
 bun run dev    # http://localhost:5173
-bun test       # vitest
+bun run test   # vitest (kör package-scriptet, inte Buns inbyggda test-runner)
 ```
+
+## Verifiering
+
+- `bun run test` — kör hela Vitest-sviten.
+- `bun run verify` — kör tester och därefter en produktionsbuild (`vite build`). Motsvarar det CI gör vid varje push och PR.
+
+CI-workflow finns i `.github/workflows/ci.yml` och kör `bun install --frozen-lockfile`, `bun run test` och `bun run build` på push till `main` och alla PR.
 
 Stack: TanStack Start (Vite + React 19) · Tailwind v4 · shadcn/ui · TypeScript strict.
 

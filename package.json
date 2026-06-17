@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify": "bun run test && bun run build"
   },
   "dependencies": {
     "@radix-ui/react-switch": "^1.2.6",
