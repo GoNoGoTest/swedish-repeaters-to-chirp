@@ -1,88 +1,69 @@
-## Mål
+# Metadatarensning — måttlig
 
-Två låg-risk-förbättringar utan beteendeförändring:
+Mål: ta bort dött från template-arvet utan att röra app-beteende eller core-logik i `src/lib/codeplug/`.
 
-1. Bryt isär `src/routes/index.tsx` (1447 rader) i komponenter och hooks.
-2. Gör SK6BA-importervalidering tydlig — stoppa pipelinen och visa vilka kolumner som saknas.
+## 1. package.json
 
-Kärnlogik i `src/lib/codeplug` rörs inte. CHIRP/VGC/split-export rörs inte. Inga nya tester för redan täckta områden. DMR och metadata-städ skjuts till separata turer.
+- `name`: `"tanstack_start_ts"` → `"swedish-repeaters-to-codeplug"`.
+- Ta bort dependencies (ingen import någonstans i `src/`):
+  - `date-fns`
+  - `@hookform/resolvers`
+  - `@radix-ui/react-accordion`
+  - `@radix-ui/react-alert-dialog`
+  - `@radix-ui/react-aspect-ratio`
+  - `@radix-ui/react-avatar`
+  - `@radix-ui/react-checkbox`
+  - `@radix-ui/react-collapsible`
+  - `@radix-ui/react-context-menu`
+  - `@radix-ui/react-dialog`
+  - `@radix-ui/react-dropdown-menu`
+  - `@radix-ui/react-hover-card`
+  - `@radix-ui/react-label`
+  - `@radix-ui/react-menubar`
+  - `@radix-ui/react-navigation-menu`
+  - `@radix-ui/react-popover`
+  - `@radix-ui/react-progress`
+  - `@radix-ui/react-radio-group`
+  - `@radix-ui/react-scroll-area`
+  - `@radix-ui/react-select`
+  - `@radix-ui/react-separator`
+  - `@radix-ui/react-slider`
+  - `@radix-ui/react-slot`
+  - `@radix-ui/react-tabs`
+  - `@radix-ui/react-toggle`
+  - `@radix-ui/react-toggle-group`
+  - `@radix-ui/react-tooltip`
+  - `cmdk`
+  - `embla-carousel-react`
+  - `input-otp`
+  - `react-day-picker`
+  - `react-hook-form`
+  - `react-resizable-panels`
+  - `recharts`
+  - `sonner`
+  - `vaul`
+- Behåll: `@radix-ui/react-switch` (används av `src/components/ui/switch.tsx`), plus alla aktiva deps (TanStack, React, Tailwind, Vite, `jszip`, `papaparse`, `zod`, `lucide-react`, `clsx`, `tailwind-merge`, `class-variance-authority`, `tw-animate-css`).
 
-## 1. Route-split
+## 2. Radera oanvända shadcn-filer
 
-### Nya hooks (`src/hooks/`)
+Allt i `src/components/ui/` förutom `switch.tsx` raderas (45 filer): accordion, alert, alert-dialog, aspect-ratio, avatar, badge, breadcrumb, button, calendar, card, carousel, chart, checkbox, collapsible, command, context-menu, dialog, drawer, dropdown-menu, form, hover-card, input, input-otp, label, menubar, navigation-menu, pagination, popover, progress, radio-group, resizable, scroll-area, select, separator, sheet, sidebar, skeleton, slider, sonner, table, tabs, textarea, toggle, toggle-group, tooltip.
 
-- `useCodeplugSettings.ts` — håller hela `Settings`-objektet + persist till localStorage. Returnerar `{ settings, setSettings, patch(partial), reset }`.
-- `useSavedSk6baExports.ts` — wrappar `saved-exports.ts` (lista, spara, ladda, ta bort senaste SK6BA-CSV).
-- `useSelectedPackChannels.ts` — läser `channel_packs/registry`, plockar valda kanaler baserat på `settings.packs.selection`. Returnerar `{ availablePacks, selectedChannels }`.
-- `useCodeplugPipeline.ts` — `useMemo` runt `runPipeline(...)`, tar `rawRows`, `selectedPackChannels`, `settings`, `maxNameLength`. Returnerar `PipelineResult`.
-- `useCodeplugDownload.ts` — bygger filer via target-registry + `splitExport`, triggar nedladdning (Blob + `URL.createObjectURL`). Returnerar `{ download(), isReady, warnings }`.
+Verifierat: endast `PreviewTable.tsx` importerar från `@/components/ui` (`Switch`). Inga andra referenser finns.
 
-### Nya komponenter (`src/components/codeplug/`)
+## 3. Verifiering
 
-- `common.tsx` — `Section`, `Stat`, `Field`, `Hint`, `NumberField`, `MultiSelect`.
-- `RepeaterLoader.tsx` — filinput + drag/drop för SK6BA CSV, visar parse-status (se §2).
-- `TargetPickerPanel.tsx` — väljer export-target, läser `targets/registry`.
-- `RepeaterFilterPanel.tsx` — `FilterSettings`-UI (status/typ/mode/band/distrikt).
-- `ChannelPacksPanel.tsx` — väljer packs + per-pack-policies (`PackPlacement`, `RxOnlyPolicy`, `FreqDupePolicy`).
-- `NamingEditor.tsx` — `NamingSettings`-UI.
-- `ExportPanel.tsx` — split-inställningar + download-knapp, visar warning-count.
-- `PreviewTable.tsx` — tabell över `NormalizedChannel[]` (kolumner: name, rx, tx, tone, type, district).
+1. `bun install` så `bun.lock` speglar nya `package.json`.
+2. `bun test` → ska vara 142/143 (samma som idag).
+3. Build körs av harness — ska gå igenom utan TS- eller resolve-fel.
+4. Manuell smoke i preview: ladda SK6BA-CSV, välj target (CHIRP + VGC), exportera, ladda kanalpack, split-export. Du verifierar.
 
-### Index-routen efter refaktor
+## Vad som inte ändras
 
-`src/routes/index.tsx` ska:
-- läsa hooks (`useCodeplugSettings`, `useSavedSk6baExports`, `useSelectedPackChannels`, `useCodeplugPipeline`, `useCodeplugDownload`)
-- rendera huvudlayout (header med länkar bevaras) + de 8 panelerna
-- inte längre innehålla helper-komponenter, parse-logik, eller download-logik
+- Ingen ändring i `src/lib/codeplug/`, `src/hooks/`, `src/components/codeplug/`, eller `src/routes/`.
+- Ingen DMR-modellförberedelse.
+- Ingen UI-redesign.
+- `tw-animate-css`, `tailwindcss`, `@tailwindcss/vite` behålls (används av `src/styles.css` / Tailwind v4 pipeline).
 
-Mål: under ~200 rader.
+## Risk
 
-### Bevarad UX
-
-Visuell layout, ordning på paneler, knappar, text-strängar, localStorage-nycklar — allt oförändrat. Refaktorn är ren extrahering; ingen ny styling, inga nya kontroller.
-
-## 2. SK6BA-importervalidering
-
-### Ny typ (i `importers/sk6ba.ts` eller intill)
-
-```ts
-export type Sk6baLoadState =
-  | { status: "empty" }
-  | { status: "loaded"; rows: RawRow[]; columns: string[]; rowCount: number }
-  | { status: "error"; message: string; missingColumns?: string[] };
-```
-
-### Beteende
-
-- `parseSk6baCsv` returnerar fortfarande sin nuvarande form (oförändrat API för befintliga tester).
-- Ny wrapper `loadSk6baCsv(text): Sk6baLoadState` används av `RepeaterLoader.tsx`.
-- Om obligatoriska kolumner saknas → `{ status: "error", message: "Saknade kolumner: <lista>", missingColumns }`. Inga `rawRows` skickas till pipelinen.
-- `useCodeplugPipeline` får `rawRows: RawRow[] | null`; om `null` kör den inte pipelinen.
-- `RepeaterLoader` visar tydlig röd alert med listan av saknade kolumner.
-
-### Tester
-
-- Lägg till 2–3 fall i befintliga `__tests__/importers/sk6ba.test.ts`:
-  - saknade obligatoriska kolumner → `status: "error"` + `missingColumns` icke-tom
-  - korrekt fil → `status: "loaded"` med rätt `rowCount`
-- BOM/komma-decimal/semikolon: lägg till **endast om** befintliga tester inte redan täcker det. Snabb genomgång av filen först.
-
-## Det vi INTE gör nu
-
-- Ingen DMR-modellförberedelse (separat tur när första DMR-target är konkret).
-- Ingen metadata/dep-städ (separat tur).
-- Inga nya testfiler för områden som redan har 130 gröna tester (`naming`, `dedupe`, `frequency`, `tones`, alla targets, `channel_pack`).
-- Ingen visuell redesign.
-
-## Acceptanskriterier
-
-- `bun test` grönt (alla 130 + nya importer-tester).
-- Bygget grönt.
-- `src/routes/index.tsx` < ~200 rader.
-- Felaktig SK6BA-fil renderar tydlig felruta med saknade kolumner; ingen pipeline körs.
-- CHIRP, VGC N76 och split-export oförändrade (verifieras via befintliga golden tests).
-- localStorage-nycklar oförändrade så sparade inställningar överlever refaktorn.
-
-## Risker
-
-Stor extrahering av UI utan UI-tester → manuell rökverifiering av varje panel + download-flöde i preview efter implementation.
+Låg. Filerna som raderas har noll inkommande imports. Enda nyans: om någon CSS-regel i `src/styles.css` refererar shadcn-specifika klasser kollar jag det innan radering och rapporterar tillbaka om något oväntat dyker upp.
