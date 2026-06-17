@@ -55,15 +55,18 @@ export const VGC_N76_DEFAULTS: VgcN76Settings = {
 };
 
 
+const VGC_N76_CHANNELS_PER_GROUP = 32;
+
 const VGC_N76_LIMITS: HardwareLimits = {
   maxChannels: 500,
-  maxChannelsPerGroup: 32,
+  maxChannelsPerGroup: VGC_N76_CHANNELS_PER_GROUP,
   maxNameLength: 8,
   supportedModes: ["NFM", "FM", "AM"],
   supportsSplit: true,
   supportsCtcss: true,
   supportsDcs: true,
 };
+
 
 function isAm(c: NormalizedChannel): boolean {
   return (c.mode_chirp || "").toUpperCase() === "AM";
