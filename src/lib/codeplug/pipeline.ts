@@ -7,7 +7,7 @@ import { buildName, resolveCollisions } from "./naming";
 import { sortChannels } from "./sorting";
 import { applyFreqDedupe } from "./dedupe";
 import { DEFAULT_PACK_NAMING } from "./defaults";
-import { deriveRegion, UNKNOWN_REGION } from "./region";
+import { deriveRegion } from "./region";
 
 function emptyPackFields() {
   return {
