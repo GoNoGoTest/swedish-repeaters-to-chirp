@@ -13,7 +13,6 @@ export function makeChannel(over: Partial<NormalizedChannel> = {}): NormalizedCh
     mode_raw: "FM",
     is_analog_fm: true,
     band: "2",
-    district: "6",
     city: "Borås",
     call: "SK6BA",
     channel: "RV48",
