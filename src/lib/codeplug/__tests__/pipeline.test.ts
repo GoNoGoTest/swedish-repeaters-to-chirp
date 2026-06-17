@@ -12,7 +12,7 @@ const pack2m = readFileSync(resolve(__dirname, "../../../../channelpacks/se_amat
 
 const baseSettings: Settings = {
   ...DEFAULT_SETTINGS,
-  filter: { ...DEFAULT_SETTINGS.filter, statuses: ["QRV"], includeUnknownDistricts: true },
+  filter: { ...DEFAULT_SETTINGS.filter, statuses: ["QRV"], includeUnknownRegions: true, countries: [] },
 };
 
 describe("runPipeline (sk6ba only)", () => {
