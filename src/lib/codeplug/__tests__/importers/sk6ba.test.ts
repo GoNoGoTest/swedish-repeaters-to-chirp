@@ -29,3 +29,30 @@ describe("parseSk6baCsv", () => {
     expect(s.unclearShift).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe("loadSk6baCsv", () => {
+  it("returns status='loaded' with rowCount and summary on a valid file", () => {
+    const s = loadSk6baCsv(csv);
+    expect(s.status).toBe("loaded");
+    if (s.status !== "loaded") return;
+    expect(s.rowCount).toBe(6);
+    expect(s.rows).toHaveLength(6);
+    expect(s.summary.totalRows).toBe(6);
+  });
+
+  it("returns status='error' with missingColumns when required columns are absent", () => {
+    const broken = "id,call,city\n1,SK6AA,Borås\n";
+    const s = loadSk6baCsv(broken);
+    expect(s.status).toBe("error");
+    if (s.status !== "error") return;
+    expect(s.missingColumns).toBeDefined();
+    expect(s.missingColumns!.length).toBeGreaterThan(0);
+    expect(s.missingColumns).toContain("output");
+    expect(s.message).toMatch(/Saknade obligatoriska kolumner/);
+  });
+
+  it("returns status='error' on empty input", () => {
+    const s = loadSk6baCsv("");
+    expect(s.status).toBe("error");
+  });
+});
