@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import type { ChirpSettings, NormalizedChannel } from "@/lib/codeplug/models";
-import { requireTarget, type ExportTarget } from "@/lib/codeplug/targets";
+import { requireTarget, resolveTargetSettings } from "@/lib/codeplug/targets";
 import { loadSk6baCsv, type Sk6baLoadState } from "@/lib/codeplug/importers/sk6ba";
 import { useCodeplugSettings } from "@/hooks/useCodeplugSettings";
 import { useSavedSk6baExports } from "@/hooks/useSavedSk6baExports";
@@ -45,24 +45,25 @@ function Index() {
   }, []);
   const resetExcluded = useCallback(() => setExcludedKeys(new Set()), []);
 
-  // Active export target + settings.
-  // Targets are registered with concrete settings types (e.g. ExportTarget<ChirpSettings>),
-  // but `requireTarget` returns ExportTarget<any>. We narrow once to a single
-  // `Record<string, unknown>`-shaped target so the rest of this component can
-  // call target.validate / target.resolveMaxNameLength / etc. without per-call
-  // `as never` casts. Each target performs its own internal narrowing.
-  // TODO: extend the registry with a typed lookup keyed by target id so
-  // target settings can be narrowed at the call site without this cast.
+  // Active export target — discriminated union (AnyExportTarget) keyed on `id`.
+  // Narrow with `target.id === "chirp-generic" | "vgc-n76"` to access settings
+  // safely; no `as` casts needed at call sites.
   const target = useMemo(
-    () => requireTarget(settings.export.targetId) as ExportTarget<Record<string, unknown>>,
+    () => requireTarget(settings.export.targetId),
     [settings.export.targetId],
   );
-  const targetSettings = (settings.export.perTarget[settings.export.targetId]
-    ?? target.defaultSettings) as Record<string, unknown>;
-  const chirpSettings = targetSettings as unknown as ChirpSettings;
-  const maxNameLength = target.resolveMaxNameLength
-    ? target.resolveMaxNameLength(targetSettings)
-    : target.limits.maxNameLength;
+  const storedPatch = settings.export.perTarget[settings.export.targetId] as
+    | Record<string, unknown>
+    | undefined;
+  // Resolve merged settings per target variant — type-safe via TargetSettingsMap.
+  const chirpSettings: ChirpSettings = target.id === "chirp-generic"
+    ? resolveTargetSettings(target, storedPatch)
+    : { startLocation: 1, mode: "NFM", tStep: 5.0, skipLinks: false, maxLength: 6 };
+  const maxNameLength = target.id === "chirp-generic"
+    ? (target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength)
+    : target.id === "vgc-n76"
+      ? (target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength)
+      : target.limits.maxNameLength;
 
   const setTargetSettings = useCallback((patch: Record<string, unknown>) => {
     setSettings((prev) => ({
