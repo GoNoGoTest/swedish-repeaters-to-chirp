@@ -315,12 +315,16 @@ export function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, ta
         </div>
       )}
 
-      {settings.export.targetId === "vgc-n76" && (
-        <VgcN76Panel
-          settings={targetSettings as unknown as VgcN76Settings}
-          update={setTargetSettings}
-        />
-      )}
+      {settings.export.targetId === "vgc-n76" && (() => {
+        // Narrow via the typed registry instead of `as unknown as VgcN76Settings`.
+        const vgcTarget = requireTarget("vgc-n76");
+        if (vgcTarget.id !== "vgc-n76") return null; // unreachable; satisfies TS narrowing
+        const vgcSettings: VgcN76Settings = {
+          ...vgcTarget.defaultSettings,
+          ...(targetSettings as Partial<VgcN76Settings>),
+        };
+        return <VgcN76Panel settings={vgcSettings} update={setTargetSettings} />;
+      })()}
     </div>
   );
 }
