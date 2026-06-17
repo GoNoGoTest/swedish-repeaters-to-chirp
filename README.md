@@ -23,12 +23,34 @@ Live: <https://swe-repeater-to-codeplug.lovable.app>
 
 **UX**
 - Datainspektion med räknare för saknad output, koordinater, oklar shift och otolkbar CTCSS.
-- Interaktiva filter på status, type, mode, band och distrikt.
+- Interaktiva filter på status, type, mode, band, **land och region** (Sverige + nordiska/utländska regioner).
 - Preview över hela exporten med per-rad-exkludering, kollisionsmarkering och varningar.
 - Splittning av export: en fil, eller chunkad per distrikt, per kanalpaket och per amatörband.
 - Sparade exporter (localStorage) med färskhetsindikator.
 
 **Inte med**: DMR/D-Star/C4FM/digital-konfiguration. Digitala moder konfigureras inte; en `FM/DMR`-rad tas med som analog FM om mode-strategin tillåter det.
+
+## Nordiskt stöd
+
+SK6BA/Marks-exporten innehåller också nordiska och utländska repeatrar. `district`-fältet tolkas så här:
+
+| Råvärde | Land | Region (`{region}`) | Land (`{country}`) |
+| --- | --- | --- | --- |
+| `0`–`7` | Sverige | `SM0`–`SM7` | `SE` |
+| `LA` | Norge | `LA` | `NO` |
+| `OZ` | Danmark | `OZ` | `DK` |
+| `OH0` | Åland | `OH0` | `AX` |
+| `OH1`–`OH9` | Finland | `OH1`–`OH9` | `FI` |
+| `TF` | Island | `TF` | `IS` |
+| `JW` | Svalbard | `JW` | `SJ` |
+| `JX` | Jan Mayen | `JX` | `SJ` |
+| `OY` | Färöarna | `OY` | `FO` |
+| `OX` | Grönland | `OX` | `GL` |
+
+- Filterpanelen har separata land- och regionväljare med snabbknapparna **Bara Sverige**, **Norden** och **Alla**.
+- Naming har två nya tokens: `{region}` (SM6, LA, OH0, …) och `{country}` (SE, NO, AX, …). Befintliga `{district}` ger fortsatt `D6` för svenska distrikt men är tom för utländska prefix så `DLA`/`DOZ` aldrig dyker upp.
+- Split-export döper filerna efter region: `chirp_se_sm6.csv`, `chirp_no_la.csv`, `chirp_dk_oz.csv`, `chirp_fi_oh6.csv`, `chirp_ax_oh0.csv`, `chirp_is_tf.csv`, osv. (Tidigare `distrikt_6.csv`.)
+- DMR-konfiguration är fortfarande inte med — den här ändringen rör enbart land/region för analoga repeatrar.
 
 ## Kom igång
 
@@ -60,7 +82,7 @@ För CHIRP: öppna CHIRP → öppna din radioimage → File → Import → välj
 
 ## Defaults
 
-Status `QRV` · type `Repeater/Link/Hotspot` · mode innehåller FM · band 2 m + 70 cm · alla svenska distrikt · namn `{district}-{band}-{network}-{city}-{call}` max 16 tecken · sortering distrikt → geohash → ort.
+Status `QRV` · type `Repeater/Link/Hotspot` · mode innehåller FM · band 2 m + 70 cm · land `SE` (snabbknappar för Norden/Alla) · namn `{district}-{band}-{network}-{city}-{call}` max 16 tecken · sortering distrikt → geohash → ort.
 
 ## Lägga till nytt kanalpaket
 

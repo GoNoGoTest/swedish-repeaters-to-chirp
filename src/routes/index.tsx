@@ -27,7 +27,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const REPEATER_TOKENS = ["{type}", "{network}", "{band}", "{district}", "{city}", "{channel}", "{call}"];
+const REPEATER_TOKENS = ["{type}", "{network}", "{band}", "{district}", "{region}", "{country}", "{city}", "{channel}", "{call}"];
 
 function Index() {
   const { settings, setSettings } = useCodeplugSettings();

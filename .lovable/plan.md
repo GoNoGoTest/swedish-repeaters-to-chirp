@@ -1,69 +1,142 @@
-# Metadatarensning — måttlig
+## Mål
 
-Mål: ta bort dött från template-arvet utan att röra app-beteende eller core-logik i `src/lib/codeplug/`.
+Lägg en `RegionInfo`-abstraktion ovanpå rådatans `district` så att LA, OZ, OH0–OH9, TF, JW, JX, OY, OX behandlas som kända regioner — inte "okänt distrikt". Sverige (0–7 → SM0–SM7) fortsätter fungera identiskt. Inget DMR-arbete.
 
-## 1. package.json
+## Beslut (säg till om något ska ändras)
 
-- `name`: `"tanstack_start_ts"` → `"swedish-repeaters-to-codeplug"`.
-- Ta bort dependencies (ingen import någonstans i `src/`):
-  - `date-fns`
-  - `@hookform/resolvers`
-  - `@radix-ui/react-accordion`
-  - `@radix-ui/react-alert-dialog`
-  - `@radix-ui/react-aspect-ratio`
-  - `@radix-ui/react-avatar`
-  - `@radix-ui/react-checkbox`
-  - `@radix-ui/react-collapsible`
-  - `@radix-ui/react-context-menu`
-  - `@radix-ui/react-dialog`
-  - `@radix-ui/react-dropdown-menu`
-  - `@radix-ui/react-hover-card`
-  - `@radix-ui/react-label`
-  - `@radix-ui/react-menubar`
-  - `@radix-ui/react-navigation-menu`
-  - `@radix-ui/react-popover`
-  - `@radix-ui/react-progress`
-  - `@radix-ui/react-radio-group`
-  - `@radix-ui/react-scroll-area`
-  - `@radix-ui/react-select`
-  - `@radix-ui/react-separator`
-  - `@radix-ui/react-slider`
-  - `@radix-ui/react-slot`
-  - `@radix-ui/react-tabs`
-  - `@radix-ui/react-toggle`
-  - `@radix-ui/react-toggle-group`
-  - `@radix-ui/react-tooltip`
-  - `cmdk`
-  - `embla-carousel-react`
-  - `input-otp`
-  - `react-day-picker`
-  - `react-hook-form`
-  - `react-resizable-panels`
-  - `recharts`
-  - `sonner`
-  - `vaul`
-- Behåll: `@radix-ui/react-switch` (används av `src/components/ui/switch.tsx`), plus alla aktiva deps (TanStack, React, Tailwind, Vite, `jszip`, `papaparse`, `zod`, `lucide-react`, `clsx`, `tailwind-merge`, `class-variance-authority`, `tw-animate-css`).
+1. **Default-filter**: Behåll `countries = ["SE"]` som default — minimal beteendeförändring för befintliga användare. UI gör det enkelt att slå på Norden via en "Norden"-snabbknapp (sätter SE/NO/DK/FI/AX/IS).
+2. **`{country}`-token**: ger landskod i versaler (`SE`, `NO`, `OH`/`AX` etc.) — kort och passar i kanalnamn. Landnamn vore ofta för långt för 6–8 teckens display.
+3. **`home_district`**: behålls oförändrad i denna PR (svenska digit). Ingen omdöpning till `home_region` nu — minskar risk.
+4. **Callsign-inferens**: ingen ny callsign-baserad gissning för LA/OZ. Endast `district`-fältet som källa, exakt som du skrev.
+5. **`includeUnknownDistricts`**: behålls som alias för `includeUnknownRegions` i migrationen (loadStoredSettings), tas inte bort.
 
-## 2. Radera oanvända shadcn-filer
+## Arbetsplan
 
-Allt i `src/components/ui/` förutom `switch.tsx` raderas (45 filer): accordion, alert, alert-dialog, aspect-ratio, avatar, badge, breadcrumb, button, calendar, card, carousel, chart, checkbox, collapsible, command, context-menu, dialog, drawer, dropdown-menu, form, hover-card, input, input-otp, label, menubar, navigation-menu, pagination, popover, progress, radio-group, resizable, scroll-area, select, separator, sheet, sidebar, skeleton, slider, sonner, table, tabs, textarea, toggle, toggle-group, tooltip.
+### 1. `src/lib/codeplug/region.ts` (ny fil)
 
-Verifierat: endast `PreviewTable.tsx` importerar från `@/components/ui` (`Switch`). Inga andra referenser finns.
+```text
+RegionCountryCode = "SE"|"NO"|"DK"|"FI"|"AX"|"IS"|"SJ"|"FO"|"GL"|"unknown"
+RegionInfo { countryCode, countryName, districtCode, districtLabel, sortKey, isSwedishDistrict, isNordic }
+DISTRICT_REGION_MAP   // exakt enligt din tabell
+COUNTRY_SORT_ORDER    // SE 10, NO 20, DK 30, FI 40, AX 45, IS 50, SJ 60, FO 70, GL 80, unknown 999
+deriveRegion(districtRaw, callRaw?) → RegionInfo
+```
 
-## 3. Verifiering
+- `districtCode` = uppercased trim av råvärdet ("6", "LA", "OH0").
+- `districtLabel` = visningsnamn ("SM6", "LA", "OH0").
+- `sortKey` = `${order}-${districtLabel}` zero-padded så strängsort fungerar.
+- `isSwedishDistrict` = numeriskt 0–7.
+- Okänt råvärde → `{ countryCode: "unknown", countryName: "Okänt", districtLabel: districtCode || "?", ... }`.
 
-1. `bun install` så `bun.lock` speglar nya `package.json`.
-2. `bun test` → ska vara 142/143 (samma som idag).
-3. Build körs av harness — ska gå igenom utan TS- eller resolve-fel.
-4. Manuell smoke i preview: ladda SK6BA-CSV, välj target (CHIRP + VGC), exportera, ladda kanalpack, split-export. Du verifierar.
+### 2. `models.ts`
 
-## Vad som inte ändras
+- Lägg `region: RegionInfo` på `NormalizedChannel`. `district: string` bevaras.
+- Utöka `FilterSettings`:
+  ```
+  countries: RegionCountryCode[];
+  regions: string[];                    // districtLabel-värden
+  includeUnknownRegions: boolean;
+  /** @deprecated kvar för migration */ includeUnknownDistricts?: boolean;
+  ```
+  `districts: string[]` bevaras för bakåtkompabilitet men används inte av nya filterlogiken.
 
-- Ingen ändring i `src/lib/codeplug/`, `src/hooks/`, `src/components/codeplug/`, eller `src/routes/`.
-- Ingen DMR-modellförberedelse.
-- Ingen UI-redesign.
-- `tw-animate-css`, `tailwindcss`, `@tailwindcss/vite` behålls (används av `src/styles.css` / Tailwind v4 pipeline).
+### 3. `pipeline.ts → normalize()`
 
-## Risk
+- Anropa `deriveRegion(district, call)` och sätt `region` på varje normaliserad rad. Kanalpaket får `region` = unknown-singleton.
 
-Låg. Filerna som raderas har noll inkommande imports. Enda nyans: om någon CSS-regel i `src/styles.css` refererar shadcn-specifika klasser kollar jag det innan radering och rapporterar tillbaka om något oväntat dyker upp.
+### 4. `filters.ts`
+
+Ny logik (ersätter `/^\d+$/`-greppet):
+```
+if (f.countries.length && !f.countries.includes(c.region.countryCode)) return false;
+if (c.region.countryCode === "unknown" && !f.includeUnknownRegions) return false;
+if (f.regions.length && !f.regions.includes(c.region.districtLabel)) return false;
+```
+
+### 5. `sorting.ts`
+
+- `districtOf()` ersätts internt av `regionSortKeyOf(c)` (= `c.region.sortKey`) för grupp-sortering i `sortOtherDistricts`.
+- Numerisk sortering inom SE bevaras (sortKey "10-SM0".."10-SM7" sorterar lexikalt rätt).
+- `home_district`-jämförelse fortsätter använda råvärdet `district` så svensk hemdistrikt fungerar oförändrat.
+
+### 6. `naming.ts`
+
+- Ny token `{region}` → `ch.region.districtLabel` (SM6, LA, OZ, OH0, OH6, TF, JW, JX, OY, OX). Tom om unknown.
+- Ny token `{country}` → `ch.region.countryCode` (SE/NO/DK/FI/AX/IS/SJ/FO/GL).
+- `{district}` lämnas oförändrad → fortsatt `D{rådata}` för bakåtkompabilitet.
+- UI: lägg till `{region}` och `{country}` som valbara komponenter i NamingEditor.
+
+### 7. `targets/split.ts → groupChannelsForSplit()`
+
+- Gruppera repeatrar efter `region.sortKey` istället för rå district.
+- Bucket-key/filename-slug = `${countryCode.toLowerCase()}_${districtLabel.toLowerCase()}` → `se_sm6`, `no_la`, `dk_oz`, `fi_oh6`, `ax_oh0`, `is_tf`, `sj_jw`, `sj_jx`, `fo_oy`, `gl_ox`.
+- Label = `districtLabel`.
+- Unknown-bucket: `key="unknown"`.
+- Pack-buckets oförändrade.
+- Befintlig deterministisk ordning bibehålls via sortKey.
+
+### 8. `importers/sk6ba.ts → summarize()`
+
+Lägg till i `Summary`:
+```
+countryCounts: Record<string, number>;     // countryCode → count
+regionCounts: Record<string, number>;      // districtLabel → count
+unknownRegionCount: number;
+```
+Existerande räknare (output/coords/shift/access) lämnas orörda.
+
+### 9. `useCodeplugSettings.ts` — migration
+
+I `loadStoredSettings`:
+- Om `parsed.filter.includeUnknownDistricts` finns men `includeUnknownRegions` saknas → kopiera över.
+- Om `countries`/`regions` saknas → använd DEFAULT (SE-only).
+- Wrap i try/catch så gamla settings inte kan krascha appen.
+
+### 10. `defaults.ts`
+
+```
+filter: {
+  ...
+  countries: ["SE"],
+  regions: [],
+  includeUnknownRegions: false,
+  // bevarade legacy-fält:
+  districts: [],
+  includeUnknownDistricts: false,
+}
+```
+
+### 11. `RepeaterFilterPanel.tsx`
+
+Minimal UI:
+- **Land** (MultiSelect): visar förekommande `region.countryName` ordnade enligt `COUNTRY_SORT_ORDER`. Snabbknapp **"Norden"** sätter SE/NO/DK/FI/AX/IS.
+- **Region/distrikt** (MultiSelect): visar förekommande `region.districtLabel`, grupperade visuellt per land i optgroup om det är enkelt, annars en platt sorterad lista.
+- Checkbox: **"Inkludera okända regioner"** (`includeUnknownRegions`).
+- Befintlig svensk distrikt-MultiSelect tas bort. Sverige styrs nu via region-listan (SM0–SM7).
+
+### 12. README
+
+Lägg till sektion "Nordiskt stöd": listar tolkningstabellen, nya tokens `{region}`/`{country}`, nya split-filnamn, DMR-status oförändrad.
+
+### 13. Tester
+
+- `__tests__/region.test.ts` — alla mappningar i din lista + tomt/okänt.
+- `__tests__/filters.test.ts` — utöka med nordiska rader.
+- `__tests__/sorting.test.ts` — blandad svensk+nordisk grupp-ordning.
+- `__tests__/naming.test.ts` — `{region}` och `{country}` för SE/NO/AX.
+- `__tests__/targets/split.test.ts` — filename-slugs för LA/OZ/OH6/OH0/TF/JW.
+- `__tests__/pipeline.test.ts` — `region` sätts på normaliserade rader.
+
+## Acceptanskriterier
+
+- `bun test` grön (befintliga tester anpassas där `filter.includeUnknownDistricts` testas).
+- Svenska SK6BA-CSV producerar identiska exporter (CHIRP + VGC N76) som idag, förutom split-filnamn (`distrikt_6` → `se_sm6`). Om det är ett brott du vill undvika säg till — alternativt behåller vi `distrikt_N` för SE och använder regionnamn endast för icke-SE.
+- LA/OZ/OH*/TF/JW/JX/OY/OX visas inte längre som "okänt".
+- Filterpanelen har land + region. `{region}` valbart i naming.
+- Gamla `sk6ba-chirp-settings-v6` i localStorage kraschar inte.
+
+## Risker / öppna frågor
+
+- **Split-filnamn för SE ändras** (`distrikt_6` → `se_sm6`). Vill du istället behålla `distrikt_N` för SE och bara använda nytt schema för utländska? Säg till.
+- **Default `countries: ["SE"]`** — vill du ha Norden som default istället? Säg till.
+- **Storage-nyckel**: Jag bumpar inte till `v7`; migrationen ovan räcker. Säg till om du hellre vill ha en ren cut.

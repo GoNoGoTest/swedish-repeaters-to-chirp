@@ -32,7 +32,18 @@ function resolveToken(token: string, ch: NormalizedChannel, n: NamingSettings): 
     case "{band}":
       return n.abbreviations.band[ch.band] ?? ch.band;
     case "{district}":
-      return ch.district ? `${n.abbreviations.districtPrefix}${ch.district}` : "";
+      // Legacy: raw district value prefixed (e.g. "D6"). Empty for non-SE rows
+      // where district is "LA"/"OZ"/"OH6"… so DLA/DOZ never appear. Use {region}
+      // instead for region-aware names.
+      return ch.district && /^\d+$/.test(ch.district)
+        ? `${n.abbreviations.districtPrefix}${ch.district}`
+        : "";
+    case "{region}":
+      // SM6, LA, OZ, OH0, OH6, TF, JW, JX, OY, OX. Empty when unknown.
+      return ch.region.countryCode === "unknown" ? "" : ch.region.districtLabel;
+    case "{country}":
+      // Short ISO-ish code: SE/NO/DK/FI/AX/IS/SJ/FO/GL. Empty when unknown.
+      return ch.region.countryCode === "unknown" ? "" : ch.region.countryCode;
     case "{city}": {
       const primary = (ch.city || "").split("/")[0].trim();
       if (!primary) return "";

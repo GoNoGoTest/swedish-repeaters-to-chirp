@@ -6,7 +6,7 @@ import type { SplitSettings } from "@/lib/codeplug/models";
 import { makeChannel } from "../helpers";
 
 describe("targets/split groupChannelsForSplit", () => {
-  it("groups by district, packs in own bucket, numeric district order", () => {
+  it("groups by region, packs in own bucket, COUNTRY_SORT_ORDER then label", () => {
     const channels = [
       makeChannel({ district: "6", generated_name_final: "A" }),
       makeChannel({ district: "3", generated_name_final: "B" }),
@@ -16,21 +16,47 @@ describe("targets/split groupChannelsForSplit", () => {
     ];
     const buckets = groupChannelsForSplit(channels);
     expect(buckets.map((b) => b.key)).toEqual([
-      "distrikt_0",
-      "distrikt_3",
-      "distrikt_6",
+      "se_sm0",
+      "se_sm3",
+      "se_sm6",
       "packs",
     ]);
-    expect(buckets.find((b) => b.key === "distrikt_6")!.channels).toHaveLength(2);
+    expect(buckets.find((b) => b.key === "se_sm6")!.channels).toHaveLength(2);
     expect(buckets.find((b) => b.key === "packs")!.channels).toHaveLength(1);
   });
 
-  it("missing district falls back to '0'", () => {
+  it("missing district falls back to 'unknown' bucket", () => {
     const buckets = groupChannelsForSplit([
       makeChannel({ district: "", generated_name_final: "X" }),
     ]);
     expect(buckets).toHaveLength(1);
-    expect(buckets[0].key).toBe("distrikt_0");
+    expect(buckets[0].key).toBe("unknown");
+  });
+
+  it("Nordic prefixes get own region-slugged buckets in country order", () => {
+    const channels = [
+      makeChannel({ district: "OX", generated_name_final: "GL1" }),
+      makeChannel({ district: "OH0", generated_name_final: "AX1" }),
+      makeChannel({ district: "LA", generated_name_final: "NO1" }),
+      makeChannel({ district: "6", generated_name_final: "SE1" }),
+      makeChannel({ district: "OZ", generated_name_final: "DK1" }),
+      makeChannel({ district: "OH6", generated_name_final: "FI1" }),
+      makeChannel({ district: "TF", generated_name_final: "IS1" }),
+      makeChannel({ district: "JW", generated_name_final: "SJ1" }),
+      makeChannel({ district: "OY", generated_name_final: "FO1" }),
+    ];
+    const buckets = groupChannelsForSplit(channels);
+    expect(buckets.map((b) => b.key)).toEqual([
+      "se_sm6",
+      "no_la",
+      "dk_oz",
+      "fi_oh6",
+      "ax_oh0",
+      "is_tf",
+      "sj_jw",
+      "fo_oy",
+      "gl_ox",
+    ]);
   });
 
   it("one bucket per pack_id with short descriptive name", () => {
@@ -84,8 +110,8 @@ describe("vgc-n76 exportMany", () => {
     ];
     const files = VGC_N76_TARGET.exportMany!(channels, VGC_N76_DEFAULTS, split);
     expect(files.map((f) => f.filename)).toEqual([
-      "vgc-n76_distrikt_3.csv",
-      "vgc-n76_distrikt_6.csv",
+      "vgc-n76_se_sm3.csv",
+      "vgc-n76_se_sm6.csv",
       "vgc-n76_packs.csv",
     ]);
     for (const f of files) expect(f.content.split(/\r?\n/)[0]).toMatch(/^title,tx_freq/);
@@ -101,9 +127,9 @@ describe("vgc-n76 exportMany", () => {
       { mode: "per_district_chunked", chunkSize: 2 },
     );
     expect(files.map((f) => f.filename)).toEqual([
-      "vgc-n76_distrikt_6_part1.csv",
-      "vgc-n76_distrikt_6_part2.csv",
-      "vgc-n76_distrikt_6_part3.csv",
+      "vgc-n76_se_sm6_part1.csv",
+      "vgc-n76_se_sm6_part2.csv",
+      "vgc-n76_se_sm6_part3.csv",
     ]);
   });
 
@@ -135,7 +161,7 @@ describe("vgc-n76 exportMany", () => {
       { mode: "per_district", chunkSize: 32 },
     );
     expect(files.map((f) => f.filename)).toEqual([
-      "vgc-n76_distrikt_6.csv",
+      "vgc-n76_se_sm6.csv",
       "vgc-n76_packs_part1.csv",
       "vgc-n76_packs_part2.csv",
     ]);
@@ -218,8 +244,8 @@ describe("chirp-generic exportMany", () => {
       { mode: "per_district", chunkSize: 32 },
     );
     expect(files.map((f) => f.filename)).toEqual([
-      "chirp_distrikt_3.csv",
-      "chirp_distrikt_6.csv",
+      "chirp_se_sm3.csv",
+      "chirp_se_sm6.csv",
     ]);
   });
 });

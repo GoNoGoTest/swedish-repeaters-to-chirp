@@ -1,6 +1,23 @@
 import type { FilterSettings, NormalizedChannel } from "./models";
 
+/**
+ * Filter normalised channels using country/region-aware rules.
+ *
+ * - `countries` (empty = all) gates on `c.region.countryCode`.
+ * - `regions` (empty = all within the gated countries) gates on
+ *   `c.region.districtLabel` ("SM6", "LA", "OH0", …).
+ * - `includeUnknownRegions` controls whether unknown-region rows pass.
+ *
+ * Legacy `includeUnknownDistricts` is honoured as an alias for
+ * `includeUnknownRegions` when the new field is undefined, so old
+ * persisted settings keep working without a forced reset.
+ */
 export function applyFilters(channels: NormalizedChannel[], f: FilterSettings): NormalizedChannel[] {
+  const includeUnknown =
+    f.includeUnknownRegions ?? f.includeUnknownDistricts ?? false;
+  const countries = f.countries ?? [];
+  const regions = f.regions ?? [];
+
   return channels.filter((c) => {
     if (f.statuses.length && !f.statuses.includes(c.status)) return false;
     if (f.types.length && !f.types.includes(c.type)) return false;
@@ -15,12 +32,10 @@ export function applyFilters(channels: NormalizedChannel[], f: FilterSettings): 
 
     if (f.bands.length && !f.bands.includes(c.band)) return false;
 
-    const district = (c.district || "").trim();
-    const swedishDistrict = /^\d+$/.test(district);
-    if (!swedishDistrict && !f.includeUnknownDistricts) return false;
-    if (f.districts.length && !f.districts.includes(district)) {
-      if (swedishDistrict || !f.includeUnknownDistricts) return false;
-    }
+    const isUnknown = c.region.countryCode === "unknown";
+    if (isUnknown && !includeUnknown) return false;
+    if (countries.length && !countries.includes(c.region.countryCode)) return false;
+    if (regions.length && !regions.includes(c.region.districtLabel)) return false;
 
     return true;
   });

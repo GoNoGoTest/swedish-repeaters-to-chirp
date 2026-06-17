@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { NamingSettings, NormalizedChannel } from "@/lib/codeplug/models";
 import { buildName } from "@/lib/codeplug/naming";
+import { deriveRegion } from "@/lib/codeplug/region";
 import { Field, Hint, NumberField } from "./common";
 
 const REPEATER_EXAMPLES: Partial<NormalizedChannel>[] = [
@@ -16,10 +17,12 @@ const PACK_EXAMPLES: Partial<NormalizedChannel>[] = [
 ];
 
 function makeExampleChannel(over: Partial<NormalizedChannel>): NormalizedChannel {
+  const district = over.district ?? "";
   return {
     source_type: "sk6ba", source_row: 0, source_id: "ex",
     type: "Repeater", status: "QRV", mode_raw: "FM", is_analog_fm: true,
-    band: "", district: "", city: "", call: "", channel: "",
+    band: "", district, region: over.region ?? deriveRegion(district, over.call),
+    city: "", call: "", channel: "",
     network: "", network_id: "", access_raw: "",
     rx_frequency: null, tx_shift_raw: "", tx_shift: null, shift_unclear: false,
     duplex: "", offset: 0, ctcss_tx: null, uses_1750: false,

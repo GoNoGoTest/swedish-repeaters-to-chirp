@@ -1,5 +1,6 @@
 import Papa from "papaparse";
 import type { RawRow } from "../models";
+import { deriveRegion, type RegionCountryCode } from "../region";
 
 const EXPECTED_COLS = [
   "id","updated","type","band","mode","network","network_id","district",
@@ -99,6 +100,12 @@ export interface Summary {
   missingCoords: number;
   unclearShift: number;
   missingTone: number;
+  /** Count of rows per countryCode (incl. "unknown"). */
+  countryCounts: Record<string, number>;
+  /** Count of rows per region.districtLabel (e.g. "SM6", "LA", "OH0"). */
+  regionCounts: Record<string, number>;
+  /** Rows that did not map to any known region. */
+  unknownRegionCount: number;
 }
 
 export function summarize(rows: RawRow[], columns: string[]): Summary {
@@ -110,6 +117,9 @@ export function summarize(rows: RawRow[], columns: string[]): Summary {
   let missingCoords = 0;
   let unclearShift = 0;
   let missingTone = 0;
+  const countryCounts: Record<string, number> = {};
+  const regionCounts: Record<string, number> = {};
+  let unknownRegionCount = 0;
 
   for (const r of rows) {
     for (const f of fields) {
@@ -124,8 +134,28 @@ export function summarize(rows: RawRow[], columns: string[]): Summary {
     }
     const access = (r.access ?? "").toString();
     if (!extractCtcssQuick(access)) missingTone++;
+
+    const region = deriveRegion((r.district ?? "").toString(), (r.call ?? "").toString());
+    const cc: RegionCountryCode = region.countryCode;
+    countryCounts[cc] = (countryCounts[cc] ?? 0) + 1;
+    if (cc === "unknown") {
+      unknownRegionCount++;
+    } else {
+      regionCounts[region.districtLabel] = (regionCounts[region.districtLabel] ?? 0) + 1;
+    }
   }
-  return { totalRows: rows.length, columns, uniqueCounts, missingOutput, missingCoords, unclearShift, missingTone };
+  return {
+    totalRows: rows.length,
+    columns,
+    uniqueCounts,
+    missingOutput,
+    missingCoords,
+    unclearShift,
+    missingTone,
+    countryCounts,
+    regionCounts,
+    unknownRegionCount,
+  };
 }
 
 function extractCtcssQuick(access: string): number | null {

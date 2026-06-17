@@ -35,6 +35,8 @@ export interface RawRow {
 
 export type SourceType = "sk6ba" | "channel_pack";
 
+import type { RegionInfo, RegionCountryCode } from "./region";
+
 export interface NormalizedChannel {
   source_type: SourceType;
   source_row: number;
@@ -45,7 +47,10 @@ export interface NormalizedChannel {
   mode_raw: string;
   is_analog_fm: boolean;
   band: string;
+  /** Raw district value from the CSV (preserved verbatim). */
   district: string;
+  /** Derived country/region metadata (see src/lib/codeplug/region.ts). */
+  region: RegionInfo;
   city: string;
   call: string;
   channel: string;
@@ -99,8 +104,16 @@ export interface FilterSettings {
   modeStrategy: "contains_fm" | "exact_fm" | "all" | "custom";
   customModes: string[];
   bands: string[];
-  districts: string[];
-  includeUnknownDistricts: boolean;
+  /** Country codes to keep (empty = all). */
+  countries: RegionCountryCode[];
+  /** District labels (e.g. "SM6", "LA", "OH0") to keep (empty = all within the chosen countries). */
+  regions: string[];
+  /** Include rows whose region is "unknown". Replaces legacy `includeUnknownDistricts`. */
+  includeUnknownRegions: boolean;
+  /** @deprecated kept for backward compatibility with persisted settings. */
+  districts?: string[];
+  /** @deprecated alias for `includeUnknownRegions` in legacy persisted settings. */
+  includeUnknownDistricts?: boolean;
 }
 
 export interface NamingSettings {

@@ -1,6 +1,7 @@
 import Papa from "papaparse";
 import type { NormalizedChannel, Warning } from "../models";
 import { parseNumberLoose } from "./sk6ba";
+import { UNKNOWN_REGION } from "../region";
 
 export const PACK_COLUMNS = [
   "pack_id","source_id","enabled_default","service","band","category","tags",
@@ -127,6 +128,7 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
       is_analog_fm: /^(N?FM)$/.test(mode),
       band,
       district: "",
+      region: UNKNOWN_REGION,
       city: "",
       call: "",
       channel: channelCode,

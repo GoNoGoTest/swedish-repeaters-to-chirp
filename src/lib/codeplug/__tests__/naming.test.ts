@@ -50,6 +50,30 @@ describe("buildName", () => {
     const r = buildName(ch, { ...naming, components: ["{district}", "{band}"], separator: "-" }, 20);
     expect(r.full).toBe("D6-2M");
   });
+
+  it("{region} yields SM6 for Swedish, LA for Norway, OH0 for Åland", () => {
+    const se = makeChannel({ district: "6" });
+    const no = makeChannel({ district: "LA" });
+    const ax = makeChannel({ district: "OH0" });
+    const fi = makeChannel({ district: "OH6" });
+    const opts = { ...naming, components: ["{region}"], separator: "-" };
+    expect(buildName(se, opts, 10).full).toBe("SM6");
+    expect(buildName(no, opts, 10).full).toBe("LA");
+    expect(buildName(ax, opts, 10).full).toBe("OH0");
+    expect(buildName(fi, opts, 10).full).toBe("OH6");
+  });
+
+  it("{country} yields country code", () => {
+    const ch = makeChannel({ district: "LA", city: "Oslo" });
+    const r = buildName(ch, { ...naming, components: ["{country}", "{city}"], separator: "-" }, 20);
+    expect(r.full).toBe("NO-OSLO");
+  });
+
+  it("{district} returns empty for non-Swedish raw values (no DLA/DOZ artefacts)", () => {
+    const la = makeChannel({ district: "LA", city: "Oslo" });
+    const r = buildName(la, { ...naming, components: ["{district}", "{city}"], separator: "-" }, 20);
+    expect(r.full).toBe("OSLO");
+  });
 });
 
 describe("resolveCollisions", () => {
