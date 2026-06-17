@@ -1,0 +1,326 @@
+import type {
+  ChirpSettings, FreqDupePolicy, PackPlacement, RxOnlyPolicy, Settings,
+  SplitMode, SplitSettings, HomeDistrictSort,
+} from "@/lib/codeplug/models";
+import type { VgcN76Settings } from "@/lib/codeplug/targets";
+import { requireTarget } from "@/lib/codeplug/targets";
+import { isValidMaidenhead } from "@/lib/codeplug/maidenhead";
+import { Field, Hint, NumberField, SectionLabel } from "./common";
+
+function VgcN76Panel({ settings, update }: {
+  settings: VgcN76Settings;
+  update: (patch: Record<string, unknown>) => void;
+}) {
+  return (
+    <div className="border-t border-border pt-4">
+      <SectionLabel>VGC N76-fält</SectionLabel>
+      <Hint>
+        VGC:s iOS/Android-app importerar denna CSV direkt — inga andra verktyg behövs. Frekvenser skrivs i Hz, CTCSS som Hz×100, DCS som decimal-form av oktal-koden. DCS-polaritet (N/I) går inte att uttrycka i filen och defaultas till N.
+      </Hint>
+      <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5 mt-2">
+        <NumberField label="Max längd title" value={settings.maxLength}
+          onChange={(v) => update({ maxLength: v })}
+          hint="N76 visar 8 tecken i kanallistan. Längre namn trunkeras och flaggas som varning." />
+        <Field label="Default sändareffekt" hint="H/M/L. Per-rad-override stöds inte i v1.">
+          <select value={settings.defaultPower}
+            onChange={(e) => update({ defaultPower: e.target.value as VgcN76Settings["defaultPower"] })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+            <option value="H">H (hög)</option>
+            <option value="M">M (medel)</option>
+            <option value="L">L (låg)</option>
+          </select>
+        </Field>
+        <Field label="Default bandbredd" hint="Används när kanalpaket inte anger NFM/FM. 12500 = smal, 25000 = bred.">
+          <select value={settings.defaultBandwidth}
+            onChange={(e) => update({ defaultBandwidth: Number(e.target.value) as VgcN76Settings["defaultBandwidth"] })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+            <option value={12500}>12500 (NFM)</option>
+            <option value={25000}>25000 (FM)</option>
+          </select>
+        </Field>
+        <NumberField label="Kanaler per grupp" value={settings.channelsPerGroup}
+          onChange={(v) => update({ channelsPerGroup: v })}
+          hint="N76 grupperar i klumpar om 32. Överskrids gränsen visas en varning — uppdelning sker manuellt i v1." />
+        <NumberField label="Padda till antal rader" value={settings.padToChannels ?? 0}
+          onChange={(v) => update({ padToChannels: v > 0 ? v : null })}
+          hint="0 = ingen padding. Sätt t.ex. 32 om appens template kräver fast längd." />
+      </div>
+      <label className="mt-3 flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={settings.skipLinks}
+          onChange={(e) => update({ skipLinks: e.target.checked })} />
+        Hoppa över länkar och hotspots vid skanning
+        <span className="text-xs text-muted-foreground">(sätter scan=0 på Link/Hotspot-rader)</span>
+      </label>
+    </div>
+  );
+}
+
+function SplitPanel({ settings, setSettings }: {
+  settings: Settings; setSettings: (s: Settings) => void;
+}) {
+  const target = requireTarget(settings.export.targetId);
+  const split = settings.export.split;
+  const supportsSplit = !!target.exportMany;
+
+  const updSplit = (patch: Partial<SplitSettings>) =>
+    setSettings({
+      ...settings,
+      export: { ...settings.export, split: { ...split, ...patch } },
+    });
+
+  const groupCap = target.limits.maxChannelsPerGroup;
+
+  const modes: Array<[SplitMode, string, string]> = [
+    ["single", "En enda fil", "Alla kanaler i samma CSV (standard)."],
+    ["per_district", "En fil per distrikt", "Repeatrar grupperas på distriktssiffra. Paketkanaler i en egen fil."],
+    ["per_district_chunked", "Per distrikt + chunka", `Som ovan men varje fil delas vidare när den når kanaltaket${groupCap ? ` (default ${groupCap})` : ""}.`],
+  ];
+
+  return (
+    <div>
+      <SectionLabel>Uppdelning av exporten</SectionLabel>
+      <Hint>
+        {supportsSplit
+          ? "Flera filer levereras som en ZIP. En enda fil laddas ned direkt som CSV."
+          : `${target.label} stöder inte multifil-export — uppdelning ignoreras.`}
+      </Hint>
+      <div className="mt-2 flex flex-col gap-2">
+        {modes.map(([mode, label, desc]) => (
+          <label key={mode} className={`flex items-start gap-2 text-sm ${supportsSplit ? "" : "opacity-50"}`}>
+            <input
+              type="radio"
+              name="split-mode"
+              className="mt-1"
+              checked={split.mode === mode}
+              disabled={!supportsSplit}
+              onChange={() => updSplit({ mode })}
+            />
+            <span>
+              <span className="font-medium">{label}</span>
+              <span className="ml-2 text-xs text-muted-foreground">{desc}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {split.mode === "per_district_chunked" && (
+        <div className="mt-3 max-w-xs">
+          <NumberField
+            label="Kanaler per chunk"
+            value={split.chunkSize}
+            onChange={(v) => updSplit({ chunkSize: Math.max(1, v) })}
+            hint={groupCap ? `${target.label}: max ${groupCap} kanaler/grupp.` : "Anpassa till radions per-grupp-gräns."}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QthHomeDistrictPanel({ settings, updSort }: {
+  settings: Settings; updSort: (patch: Partial<Settings["sort"]>) => void;
+}) {
+  const qth = settings.sort.qth_maidenhead ?? "";
+  const qthValid = qth === "" || isValidMaidenhead(qth);
+  const home = settings.sort.home_district ?? "";
+  const sortMode = settings.sort.home_district_sort;
+  const hasQth = qth !== "" && qthValid;
+
+  return (
+    <div>
+      <SectionLabel>QTH och hemdistrikt (för repeatersortering)</SectionLabel>
+      <Hint>
+        När hemdistrikt är valt sorteras dess repeatrar enligt valet nedan. Övriga distrikt grupperas geohash-mässigt
+        i nummerordning (SM1, SM2, … SM7). Påverkar inte kanalpaket.
+      </Hint>
+      <div className="grid gap-3 md:grid-cols-4 mt-3">
+        <Field label="QTH (Maidenhead-lokator)" hint="6 tecken rek., t.ex. JO67bp. Tomt = ingen distanssortering.">
+          <input
+            value={qth}
+            placeholder="JO67bp"
+            onChange={(e) => updSort({ qth_maidenhead: e.target.value })}
+            className={`w-full rounded border px-2 py-1 text-sm font-mono ${
+              qthValid ? "border-input bg-background" : "border-destructive bg-destructive/5"
+            }`}
+          />
+          {!qthValid && <Hint>Ogiltig lokator (förväntar t.ex. JO67 eller JO67bp).</Hint>}
+        </Field>
+        <Field label="Hemdistrikt" hint="Distrikt vars repeatrar sorteras separat.">
+          <select
+            value={home}
+            onChange={(e) => updSort({ home_district: e.target.value || null })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm font-mono"
+          >
+            <option value="">(inget — använd fallback nedan)</option>
+            {["0","1","2","3","4","5","6","7"].map((d) => (
+              <option key={d} value={d}>SM{d}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Sortering inom hemdistrikt">
+          <div className="flex flex-col gap-1">
+            {([
+              ["distance","Avstånd från QTH"],
+              ["geohash","Geohash (regional)"],
+              ["alphabetical","Alfabetiskt"],
+            ] as Array<[HomeDistrictSort,string]>).map(([k,label]) => {
+              const disabled = k === "distance" && !hasQth;
+              return (
+                <label key={k} className={`flex items-center gap-2 text-sm ${disabled ? "opacity-50" : ""}`}
+                  title={disabled ? "Kräver giltig QTH-lokator" : ""}>
+                  <input
+                    type="radio"
+                    name="home_district_sort"
+                    checked={sortMode === k}
+                    disabled={disabled}
+                    onChange={() => updSort({ home_district_sort: k })}
+                  />
+                  {label}
+                </label>
+              );
+            })}
+          </div>
+        </Field>
+        <Field label="Placering">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={settings.sort.home_district_first}
+              onChange={(e) => updSort({ home_district_first: e.target.checked })}
+            />
+            Visa hemdistrikt först
+          </label>
+          <Hint>Avmarkera för att lägga hemdistriktet sist istället.</Hint>
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+export function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, targetSettings, setTargetSettings }: {
+  settings: Settings;
+  setSettings: (s: Settings) => void;
+  hasPacks: boolean;
+  chirpSettings: ChirpSettings;
+  targetSettings: Record<string, unknown>;
+  setTargetSettings: (patch: Record<string, unknown>) => void;
+}) {
+  const updPacks = (patch: Partial<Settings["packs"]>) => setSettings({ ...settings, packs: { ...settings.packs, ...patch } });
+  const updChirp = (patch: Partial<ChirpSettings>) => setTargetSettings(patch as Record<string, unknown>);
+  const updSort = (patch: Partial<Settings["sort"]>) => setSettings({ ...settings, sort: { ...settings.sort, ...patch } });
+
+  return (
+    <div className="space-y-5">
+      {hasPacks && (
+        <div>
+          <SectionLabel>Var hamnar kanalpaketen?</SectionLabel>
+          <div className="grid gap-3 md:grid-cols-3">
+            <Field label="Placering i CHIRP-listan">
+              <div className="flex flex-wrap gap-1">
+                {([
+                  ["prepend","I början"],
+                  ["append","I slutet"],
+                  ["off","Inte med alls"],
+                ] as Array<[PackPlacement,string]>).map(([k,label]) => (
+                  <button key={k} type="button" onClick={() => updPacks({ placement: k })}
+                    className={`rounded border px-2 py-1 text-xs ${settings.packs.placement === k ? "bg-primary text-primary-foreground border-primary" : "border-border bg-background"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <Hint>Repeatrar sorteras alltid efter sorteringsordningen nedan. Kanalpaketen ligger i den ordning de står i CSV:n.</Hint>
+            </Field>
+            <Field label="Frekvensdubblett mellan paket och repeatrar" hint="Vad ska hända om en paketkanal har samma RX-frekvens som en repeater?">
+              <select value={settings.packs.freqDupePolicy}
+                onChange={(e) => updPacks({ freqDupePolicy: e.target.value as FreqDupePolicy })}
+                className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+                <option value="keep_both">Behåll båda</option>
+                <option value="drop_pack">Hoppa över paket-raden</option>
+                <option value="drop_sk6ba">Hoppa över repeater-raden</option>
+                <option value="stop">Stoppa export</option>
+              </select>
+            </Field>
+            <Field label="RX-only-kanaler (t.ex. marin VHF, airband)" hint="Hur ska kanaler markerade som mottagning-bara hanteras vid export?">
+              <select value={settings.packs.rxOnlyPolicy}
+                onChange={(e) => updPacks({ rxOnlyPolicy: e.target.value as RxOnlyPolicy })}
+                className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+                <option value="duplex_off">Exportera som Duplex=off (rekommenderas)</option>
+                <option value="mark">Exportera normalt + markera RX-ONLY i Comment</option>
+                <option value="skip">Hoppa över helt</option>
+                <option value="stop">Stoppa export</option>
+              </select>
+            </Field>
+          </div>
+        </div>
+      )}
+
+      <div className="border-t border-border pt-4">
+        <QthHomeDistrictPanel settings={settings} updSort={updSort} />
+      </div>
+
+      <div className="border-t border-border pt-4">
+        <SectionLabel>Sorteringsordning för repeatrar (fallback)</SectionLabel>
+        <Hint>
+          Används när inget hemdistrikt är valt ovan. Klicka för att lägga till/ta bort en sorteringsnyckel. Ordningen styr prioritet.
+        </Hint>
+        <div className="flex flex-wrap gap-1 mt-2">
+          {(["district","geohash","type","city","frequency"] as const).map((k) => {
+            const idx = settings.sort.keys.indexOf(k);
+            const on = idx !== -1;
+            return (
+              <button key={k} type="button"
+                onClick={() => {
+                  const keys = on ? settings.sort.keys.filter((x) => x !== k) : [...settings.sort.keys, k];
+                  updSort({ keys });
+                }}
+                className={`rounded border px-2 py-0.5 text-xs font-mono ${on ? "bg-primary text-primary-foreground border-primary" : "border-border"}`}>
+                {on ? `${idx + 1}. ${k}` : k}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="border-t border-border pt-4">
+        <SplitPanel settings={settings} setSettings={setSettings} />
+      </div>
+
+      {settings.export.targetId === "chirp-generic" && (
+        <div className="border-t border-border pt-4">
+          <SectionLabel>CHIRP-fält & radio</SectionLabel>
+          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
+            <NumberField label="Startnummer (Location)" value={chirpSettings.startLocation}
+              onChange={(v) => updChirp({ startLocation: v })}
+              hint="Första minnesposition i radion. T.ex. 1 om du vill skriva från början, 100 om du vill lägga repeatrarna efter befintliga kanaler." />
+            <NumberField label="Max längd kanalnamn" value={chirpSettings.maxLength}
+              onChange={(v) => updChirp({ maxLength: v })}
+              hint="Hårdvarubegränsning — många radior trunkerar vid 6–7 tecken. Gäller alla kanaler (både repeatrar och paket)." />
+            <Field label="Mode" hint="NFM = smal FM (12,5 kHz) — standard för amatörradio idag. FM = bred (25 kHz), äldre repeatrar.">
+              <select value={chirpSettings.mode}
+                onChange={(e) => updChirp({ mode: e.target.value as ChirpSettings["mode"] })}
+                className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+                <option value="NFM">NFM (smal FM)</option>
+                <option value="FM">FM (bred)</option>
+              </select>
+            </Field>
+            <NumberField label="TStep (kHz)" step={0.5} value={chirpSettings.tStep}
+              onChange={(v) => updChirp({ tStep: v })}
+              hint="Frekvensraster vid manuell rattning på radion. 5 kHz funkar för 2m/70cm i Sverige. PMR/marin sätter eget per kanal." />
+          </div>
+          <label className="mt-3 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={chirpSettings.skipLinks}
+              onChange={(e) => updChirp({ skipLinks: e.target.checked })} />
+            Hoppa över länkar och hotspots vid skanning i radion
+            <span className="text-xs text-muted-foreground">(sätter Skip=S på Link/Hotspot — kanalen finns kvar men skannas inte)</span>
+          </label>
+        </div>
+      )}
+
+      {settings.export.targetId === "vgc-n76" && (
+        <VgcN76Panel
+          settings={targetSettings as unknown as VgcN76Settings}
+          update={setTargetSettings}
+        />
+      )}
+    </div>
+  );
+}
