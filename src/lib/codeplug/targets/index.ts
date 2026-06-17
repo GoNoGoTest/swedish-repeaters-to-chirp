@@ -2,7 +2,10 @@
 import "./chirp-generic";
 import "./vgc-n76";
 
-export { listTargets, getTarget, requireTarget, registerTarget } from "./registry";
+export {
+  listTargets, getTarget, requireTarget, registerTarget, resolveTargetSettings,
+  type AnyExportTarget, type TargetId, type TargetSettingsMap,
+} from "./registry";
 export type { ExportTarget, ExportResult, ExportFile, HardwareLimits } from "./types";
 export { CHIRP_GENERIC_TARGET, CHIRP_GENERIC_DEFAULTS } from "./chirp-generic";
 export { VGC_N76_TARGET, VGC_N76_DEFAULTS, type VgcN76Settings } from "./vgc-n76";

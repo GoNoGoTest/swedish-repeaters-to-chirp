@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import Papa from "papaparse";
 import JSZip from "jszip";
 import type { NormalizedChannel, Settings } from "@/lib/codeplug/models";
-import { requireTarget, type ExportTarget } from "@/lib/codeplug/targets";
+import { requireTarget, resolveTargetSettings, type AnyExportTarget } from "@/lib/codeplug/targets";
 
 function downloadBlob(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
@@ -22,6 +22,25 @@ async function downloadZip(filename: string, files: { filename: string; content:
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Resolve settings for a target and invoke its export/exportMany. The
+ * generic `<T extends AnyExportTarget>` keeps `target` and `settings`
+ * paired via TargetSettingsMap, so no per-call cast is needed.
+ */
+function runExport<T extends AnyExportTarget>(
+  target: T,
+  stored: Record<string, unknown> | undefined,
+  channels: NormalizedChannel[],
+  split: Settings["export"]["split"],
+) {
+  const settings = resolveTargetSettings(target, stored);
+  const willSplit = split.mode !== "single" && !!target.exportMany;
+  if (willSplit && target.exportMany) {
+    return { kind: "many" as const, files: target.exportMany(channels, settings, split) };
+  }
+  return { kind: "one" as const, result: target.export(channels, settings) };
+}
+
 export function useCodeplugDownload(input: {
   settings: Settings;
   exportChannels: NormalizedChannel[];
@@ -29,27 +48,19 @@ export function useCodeplugDownload(input: {
   const { settings, exportChannels } = input;
 
   const exportFiles = useCallback(async () => {
-    // Narrow the registry's ExportTarget<any> once to a Record-shaped target so
-    // the export/exportMany calls below don't each need an `as never` cast.
-    // Each target performs its own internal narrowing from this shape.
-    const target = requireTarget(settings.export.targetId) as ExportTarget<Record<string, unknown>>;
-    const targetSettings = (settings.export.perTarget[settings.export.targetId]
-      ?? target.defaultSettings) as Record<string, unknown>;
-    const split = settings.export.split;
-    const willSplit = split.mode !== "single" && !!target.exportMany;
-
-    if (willSplit && target.exportMany) {
-      const files = target.exportMany(exportChannels, targetSettings, split);
-      if (files.length === 1) {
-        downloadBlob(files[0].filename, files[0].content);
+    const target = requireTarget(settings.export.targetId);
+    const stored = settings.export.perTarget[settings.export.targetId];
+    const out = runExport(target, stored, exportChannels, settings.export.split);
+    if (out.kind === "many") {
+      if (out.files.length === 1) {
+        downloadBlob(out.files[0].filename, out.files[0].content);
       } else {
         const base = target.filenameBase ?? target.id;
-        await downloadZip(`${base}.zip`, files);
+        await downloadZip(`${base}.zip`, out.files);
       }
       return;
     }
-    const result = target.export(exportChannels, targetSettings);
-    downloadBlob(result.filename, result.content);
+    downloadBlob(out.result.filename, out.result.content);
   }, [settings, exportChannels]);
 
   const exportWarnings = useCallback(() => {
