@@ -36,6 +36,52 @@ export function parseSk6baCsv(text: string): ImportResult {
   };
 }
 
+/**
+ * High-level load state for SK6BA CSV. Used by UI to either present a
+ * loaded dataset, an explicit error (with missing column names), or the
+ * initial empty state. `parseSk6baCsv` stays unchanged for the low-level
+ * pipeline; this wrapper adds the validation step the UI needs.
+ */
+export type Sk6baLoadState =
+  | { status: "empty" }
+  | {
+      status: "loaded";
+      rows: RawRow[];
+      columns: string[];
+      rowCount: number;
+      summary: Summary;
+    }
+  | { status: "error"; message: string; missingColumns?: string[] };
+
+export function loadSk6baCsv(text: string): Sk6baLoadState {
+  let parsed: ImportResult;
+  try {
+    parsed = parseSk6baCsv(text);
+  } catch (e) {
+    return { status: "error", message: e instanceof Error ? e.message : String(e) };
+  }
+  if (parsed.columns.length === 0) {
+    return { status: "error", message: "Filen verkar tom eller saknar rubrikrad." };
+  }
+  if (parsed.missingColumns.length > 0) {
+    return {
+      status: "error",
+      message: `Saknade obligatoriska kolumner: ${parsed.missingColumns.join(", ")}`,
+      missingColumns: parsed.missingColumns,
+    };
+  }
+  if (parsed.rows.length === 0) {
+    return { status: "error", message: "Inga rader i filen efter rubrikraden." };
+  }
+  return {
+    status: "loaded",
+    rows: parsed.rows,
+    columns: parsed.columns,
+    rowCount: parsed.rows.length,
+    summary: summarize(parsed.rows, parsed.columns),
+  };
+}
+
 export function parseNumberLoose(v: string | undefined | null): number | null {
   if (v == null) return null;
   const s = String(v).trim();
