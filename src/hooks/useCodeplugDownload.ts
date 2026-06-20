@@ -50,6 +50,11 @@ function invokeTarget(
       if (willSplit && target.exportMany) return { many: target.exportMany(channels, s, split) };
       return { one: target.export(channels, s) };
     }
+    case "nicsure-rt880": {
+      const s = resolveTargetSettings(target, storedPatch);
+      if (willSplit && target.exportMany) return { many: target.exportMany(channels, s, split) };
+      return { one: target.export(channels, s) };
+    }
   }
 }
 

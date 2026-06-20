@@ -2,7 +2,7 @@ import type {
   ChirpSettings, FreqDupePolicy, PackPlacement, RxOnlyPolicy, Settings,
   SplitMode, SplitSettings, HomeDistrictSort,
 } from "@/lib/codeplug/models";
-import type { VgcN76Settings } from "@/lib/codeplug/targets";
+import type { VgcN76Settings, NicsureRt880Settings } from "@/lib/codeplug/targets";
 import { requireTarget } from "@/lib/codeplug/targets";
 import { isValidMaidenhead } from "@/lib/codeplug/maidenhead";
 import { Field, Hint, NumberField, SectionLabel } from "./common";
@@ -65,6 +65,78 @@ function VgcN76Panel({ settings, update }: {
     </div>
   );
 }
+
+function NicsureRt880Panel({ settings, update }: {
+  settings: NicsureRt880Settings;
+  update: (patch: Record<string, unknown>) => void;
+}) {
+  const slotToggle = (
+    key: "slotCountry" | "slotDistrict" | "slotType" | "slotPackCategory",
+    label: string,
+    desc: string,
+  ) => (
+    <label className="flex items-start gap-2 text-sm">
+      <input
+        type="checkbox"
+        className="mt-1"
+        checked={settings[key]}
+        onChange={(e) => update({ [key]: e.target.checked })}
+      />
+      <span>
+        {label}
+        <span className="ml-2 block text-xs text-muted-foreground">{desc}</span>
+      </span>
+    </label>
+  );
+  return (
+    <div className="border-t border-border pt-4">
+      <SectionLabel>Nicsure RT-880-fält</SectionLabel>
+      <Hint>
+        CSV för Nicsures custom firmware till Radtel RT-880. 19 kolumner, frekvenser i MHz (5 decimaler), DCS-polaritet (N/I) bevaras, fyra slot-bokstäver används som zon-/gruppmedlemskap i radion.
+      </Hint>
+      <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4 mt-2">
+        <NumberField label="Startnummer (Channel_Num)" value={settings.startLocation}
+          onChange={(v) => update({ startLocation: v })}
+          hint="Numret på första kanalraden. Övriga rader inkrementeras med 1." />
+        <NumberField label="Max längd Name" value={settings.maxLength}
+          onChange={(v) => update({ maxLength: v })}
+          hint="Längre namn trunkeras. RT-880 visar längre strängar än de flesta handapparater, så 32 är säkert." />
+        <Field label="Default sändareffekt" hint="Skrivs på varje rad. Per-rad-override stöds inte i v1.">
+          <select value={settings.defaultPower}
+            onChange={(e) => update({ defaultPower: e.target.value as NicsureRt880Settings["defaultPower"] })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+            <option value="Very High">Very High</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </Field>
+        <Field label="Default bandbredd" hint="Används när kanalen saknar NFM/FM-hint.">
+          <select value={settings.defaultBandwidth}
+            onChange={(e) => update({ defaultBandwidth: e.target.value as NicsureRt880Settings["defaultBandwidth"] })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+            <option value="Wide">Wide (25 kHz)</option>
+            <option value="Narrow">Narrow (12.5 kHz)</option>
+          </select>
+        </Field>
+      </div>
+      <div className="mt-4">
+        <SectionLabel>Slot-mappning (zoner/grupper)</SectionLabel>
+      </div>
+      <Hint>
+        Varje slot rymmer en bokstav som radion grupperar/scannar på. Avmarkera för att lämna platsen tom (mellanslag).
+      </Hint>
+      <div className="mt-2 grid gap-2 md:grid-cols-2">
+        {slotToggle("slotCountry", "Slot1 — land", "SE→S, NO→N, DK→D, FI/AX→F, övrigt blank.")}
+        {slotToggle("slotDistrict", "Slot2 — distriktssiffra", "Första siffran i distriktet (SM6→6, LA3→3). Pack-kanaler blanka.")}
+        {slotToggle("slotType", "Slot3 — kanaltyp", "Repeater→R, Link→L, Hotspot→H, Simplex→S.")}
+        {slotToggle("slotPackCategory", "Slot4 — paketkategori", "Pack-rader: första bokstaven av category (amateur→A, marine→M, …). Repeatrar blanka.")}
+      </div>
+    </div>
+  );
+}
+
+
 
 function SplitPanel({ settings, setSettings }: {
   settings: Settings; setSettings: (s: Settings) => void;
@@ -335,6 +407,16 @@ export function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, ta
           ...(targetSettings as Partial<VgcN76Settings>),
         };
         return <VgcN76Panel settings={vgcSettings} update={setTargetSettings} />;
+      })()}
+
+      {settings.export.targetId === "nicsure-rt880" && (() => {
+        const nicTarget = requireTarget("nicsure-rt880");
+        if (nicTarget.id !== "nicsure-rt880") return null;
+        const nicSettings: NicsureRt880Settings = {
+          ...nicTarget.defaultSettings,
+          ...(targetSettings as Partial<NicsureRt880Settings>),
+        };
+        return <NicsureRt880Panel settings={nicSettings} update={setTargetSettings} />;
       })()}
     </div>
   );

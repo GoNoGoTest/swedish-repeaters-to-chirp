@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
-import type { ChirpSettings, NormalizedChannel } from "@/lib/codeplug/models";
+import type { ChirpSettings, NormalizedChannel, Warning } from "@/lib/codeplug/models";
 import { requireTarget, resolveTargetSettings } from "@/lib/codeplug/targets";
 import { loadSk6baCsv, type Sk6baLoadState } from "@/lib/codeplug/importers/sk6ba";
 import { useCodeplugSettings } from "@/hooks/useCodeplugSettings";
@@ -64,9 +64,16 @@ function Index() {
   // Persisted patch is opaque outside this file; pass through to ExportPanel,
   // which narrows again on `target.id` before handing to per-target sub-panels.
   const targetSettings: Record<string, unknown> = (storedPatch ?? {}) as Record<string, unknown>;
-  const maxNameLength = target.id === "chirp-generic"
-    ? (target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength)
-    : (target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength);
+  const maxNameLength = (() => {
+    switch (target.id) {
+      case "chirp-generic":
+        return target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength;
+      case "vgc-n76":
+        return target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength;
+      case "nicsure-rt880":
+        return target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength;
+    }
+  })();
 
   const setTargetSettings = useCallback((patch: Record<string, unknown>) => {
     setSettings((prev) => ({
@@ -281,9 +288,18 @@ function Index() {
                   )}
                   {(() => {
                     // Narrow on `target.id` so validate() gets its exact settings type.
-                    const tw = target.id === "chirp-generic"
-                      ? target.validate?.(exportChannels, resolveTargetSettings(target, storedPatch))
-                      : target.validate?.(exportChannels, resolveTargetSettings(target, storedPatch));
+                    let tw: Warning[] | undefined;
+                    switch (target.id) {
+                      case "chirp-generic":
+                        tw = target.validate?.(exportChannels, resolveTargetSettings(target, storedPatch));
+                        break;
+                      case "vgc-n76":
+                        tw = target.validate?.(exportChannels, resolveTargetSettings(target, storedPatch));
+                        break;
+                      case "nicsure-rt880":
+                        tw = target.validate?.(exportChannels, resolveTargetSettings(target, storedPatch));
+                        break;
+                    }
                     if (!tw || tw.length === 0) return null;
                     return (
                       <ul className="mb-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200 space-y-1">
