@@ -132,6 +132,9 @@ function NicsureRt880Panel({ settings, update }: {
       </div>
     </div>
   );
+}
+
+
 
 function SplitPanel({ settings, setSettings }: {
   settings: Settings; setSettings: (s: Settings) => void;
