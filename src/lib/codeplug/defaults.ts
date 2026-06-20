@@ -80,6 +80,6 @@ export const DEFAULT_SETTINGS: Settings = {
     placement: "append",
     selection: {},
     freqDupePolicy: "keep_both",
-    rxOnlyPolicy: "duplex_off",
+    rxOnlyPolicy: "block_tx",
   },
 };
