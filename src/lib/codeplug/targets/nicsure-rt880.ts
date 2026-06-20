@@ -163,7 +163,9 @@ export function dimensionValue(
     }
     case "district": {
       const label = c.region.districtLabel?.trim();
-      return label ? label : null;
+      if (label) return label;
+      const pid = (c.pack_id || "").trim();
+      return pid ? pid : null;
     }
     case "type": {
       const t = (c.type || "").trim();
