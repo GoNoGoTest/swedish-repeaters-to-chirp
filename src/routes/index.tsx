@@ -64,9 +64,16 @@ function Index() {
   // Persisted patch is opaque outside this file; pass through to ExportPanel,
   // which narrows again on `target.id` before handing to per-target sub-panels.
   const targetSettings: Record<string, unknown> = (storedPatch ?? {}) as Record<string, unknown>;
-  const maxNameLength = target.id === "chirp-generic"
-    ? (target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength)
-    : (target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength);
+  const maxNameLength = (() => {
+    switch (target.id) {
+      case "chirp-generic":
+        return target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength;
+      case "vgc-n76":
+        return target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength;
+      case "nicsure-rt880":
+        return target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength;
+    }
+  })();
 
   const setTargetSettings = useCallback((patch: Record<string, unknown>) => {
     setSettings((prev) => ({
