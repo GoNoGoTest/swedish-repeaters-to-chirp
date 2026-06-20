@@ -1,169 +1,74 @@
+## Mål
 
-## Insikt
+Gör RX-only-policyn target-agnostisk. Användarens val ska uttrycka **intent**, inte CHIRP-specifik mekanik. Varje target översätter intenten till sitt eget filformat — inga nya UI-komponenter per radio.
 
-Bokstäverna A–Z är **arbiträra identifierare** — Nicsure RMS-appen mappar varje bokstav till ett valfritt namn. Vi behöver alltså inte hitta "rätt" bokstav för Sverige eller Repeater; vi behöver bara tilldela en unik bokstav per distinkt grupp och ge användaren en lista över *vilken bokstav som blev vad* så hen kan namnge dem i RMS.
+## Vad som är fel idag
 
-## Förslag: dimensions-baserad auto-tilldelning
+- `RxOnlyPolicy = "duplex_off"` är döpt efter CHIRP-CSV:ns `Duplex=off`.
+- Pipeline (`applyRxOnlyPolicy`) muterar `ch.duplex = "off"` direkt. CHIRP plockar upp det automatiskt; VGC N76 ignorerar `duplex=off` och har en parallell egen path som läser `rx_only || !tx_allowed` rakt från kanalen (dubbel sanning); Nicsure RT-880 saknar TX-spärr helt och skriver tyst TX=RX (kanalen sänder på rx-frekvensen om PTT trycks).
+- UI:t (ExportPanel) säger "Exportera som Duplex=off (rekommenderas)" oavsett vald radio.
 
-Användaren väljer **vilka dimensioner** som ska grupperas på. För varje aktiv dimension samlar exporten alla unika värden i kanaldatat och tilldelar dem A, B, C, … i tur och ordning. En kanal hamnar i en zon-bokstav per aktiv dimension, max 4.
+## Lösning: generisk `block_tx`-intent
 
-### Dimensioner (v1)
+### 1. `models.ts`
 
-| ID | Källa på `NormalizedChannel` | Exempel-värden |
-|----|------------------------------|----------------|
-| `country` | `region.countryCode` | SE, NO, DK, FI |
-| `district` | `district` (sk6ba) | SM6, SM7, SM3 |
-| `type` | `type` | Repeater, Link, Hotspot, Simplex |
-| `category` | `category` (channel pack) | marine, pmr, aviation |
-| `pack` | `pack_name` / `pack_id` | "Marin VHF", "PMR446" |
+Byt `RxOnlyPolicy`:
 
-(Vi kan börja med att skeppa `country`, `district`, `type`, `category` och lägga till fler senare — `pack` är en stub om fältet finns.)
-
-### Tilldelningsregler
-
-1. **Stabil ordning**: värden sorteras alfabetiskt inom varje dimension så samma indata alltid ger samma bokstav.
-2. **Global bokstavspool**: A–Z delas mellan alla aktiva dimensioner. Dimensioner tilldelas i den ordning användaren listat dem; inom varje dimension går vi alfabetiskt.
-3. **Kollision på fler än 26 värden**: överskjutande värden får ingen bokstav, warning emitteras (`nicsure_zone_pool_exhausted`).
-4. **Per kanal**: hämta bokstaven för dess värde i varje aktiv dimension, max 4 → Slot1..Slot4 i dimensionsordningen. Tom dimension (kanal saknar värdet) = `" "`.
-5. **Mer än 4 aktiva dimensioner**: UI tillåter max 4.
-
-### Output till användaren
-
-Två saker:
-1. **CSV-filen** (oförändrat format, Slot1..4 fyllda).
-2. **En "zon-legend"** — en separat textsektion / nedladdningsbar `.txt` som visar mappningen:
-
-```
-Slot1 — Country
-  A = SE
-  B = NO
-  C = DK
-  D = FI
-
-Slot2 — District
-  A = SM3
-  B = SM6
-  C = SM7
-
-Slot3 — Type
-  A = Hotspot
-  B = Link
-  C = Repeater
-  D = Simplex
+```text
+"mark" | "duplex_off" | "skip" | "stop"
+  ->
+"mark" | "block_tx" | "skip" | "stop"
 ```
 
-Det är legenden användaren skriver in i RMS för att döpa zonerna. Den visas i UI:t under exportknappen och kan kopieras/laddas ner.
+Defaults: `rxOnlyPolicy: "block_tx"` (i `defaults.ts`).
 
-## Implementation
+Ingen migrering — appen är inte släppt och saved-exports innehåller inte policy-värdet.
 
-### `src/lib/codeplug/targets/nicsure-rt880.ts`
+### 2. `pipeline.ts` – `applyRxOnlyPolicy`
 
-Ny settings-shape:
+`case "block_tx"` sätter en **portabel signal**: `ch.duplex = "off"`. Det är redan modellens enda fält som betyder "ingen TX" och alla targets kan läsa det. Ingen ny fält-typ behövs.
 
-```ts
-export type NicsureZoneDimensionId =
-  | "country" | "district" | "type" | "category";
+Lägg till varningskod `rx_only_blocked` (ersätter implicit beteende) — text: "RX-only: TX spärrad enligt target-konvention".
 
-export interface NicsureRt880Settings {
-  startLocation: number;
-  maxLength: number;
-  defaultPower: NicsurePower;
-  defaultBandwidth: NicsureBandwidth;
-  /** Ordnad lista, max 4. Slot1 = zoneDimensions[0], osv. */
-  zoneDimensions: NicsureZoneDimensionId[];
-}
+### 3. Per target: översätt `duplex === "off"` till native TX-spärr
 
-export const NICSURE_RT880_DEFAULTS: NicsureRt880Settings = {
-  ...,
-  zoneDimensions: ["country", "district", "type", "category"],
-};
-```
+Varje target äger sin egen mappning. Pipelinen säger bara "TX är spärrad" — exportern översätter.
 
-Nya helpers:
+**CHIRP (`exporters/chirp.ts`)**: redan korrekt (`Duplex=off` skrivs). Ingen ändring.
 
-```ts
-interface ZoneLegend {
-  dimension: NicsureZoneDimensionId;
-  slot: 1 | 2 | 3 | 4;
-  entries: { letter: string; value: string }[];
-  overflow: string[]; // värden som inte fick någon bokstav
-}
+**VGC N76 (`targets/vgc-n76.ts`)**: ändra `tx_dis`-raden så den triggar på `duplex === "off"` *också*, inte bara `rx_only || !tx_allowed`. Behåll de andra två som fallback (en sk6ba-rad kan vara markerad rx_only utan att ha kört genom rx-only-policyn — säkrare att OR:a). Ingen ny UI-yta.
 
-function dimensionValue(c: NormalizedChannel, d: NicsureZoneDimensionId): string | null;
+**Nicsure RT-880 (`targets/nicsure-rt880.ts`)**: RT-880-CSV:n har ingen TX-disable-kolumn. Konvention:
+- `mobileTxMhz` returnerar `0` när `duplex === "off"` (skriver `TX = 0.00000`), vilket är den mest portabla "no TX"-signalen i fil­format som inte har egen flagga.
+- Lägg till varning `nicsure_tx_block_unsupported` (en gång per export, räknad) som förklarar att TX=0 används och att radio­operatören måste låsa kanalen i RMS om hen vill ha riktig spärr.
 
-function buildZoneLegend(
-  channels: NormalizedChannel[],
-  dims: NicsureZoneDimensionId[],
-): ZoneLegend[];
-```
+(Alternativ: skriv TX=RX som idag och bara varna. Förslag ovan är hårdare — diskutera om du föredrar det.)
 
-`buildZoneLegend` itererar dimensioner, samlar `unique sorted values`, plockar bokstäver A..Z. Pool delas globalt: om dimension 1 äter 4 bokstäver så börjar dimension 2 på E.
+### 4. UI (`ExportPanel.tsx`)
 
-I `toNicsureRows`:
-- Bygg `legend` en gång.
-- Per kanal: för varje aktiv dimension, slå upp värdet → bokstav (eller `" "`).
-- Slot5+ existerar inte → om `zoneDimensions.length > 4` slice:as till 4 (UI tillåter inte mer).
-- Returnera även `legend` så `export()` kan exponera den.
+- Byt option-label från "Exportera som Duplex=off (rekommenderas)" till **"Spärra TX i radion (rekommenderas)"**.
+- Hint för fältet: "Hur kanalen ska sända: 'Spärra TX' använder respektive radios egna metod (CHIRP Duplex=off, VGC tx_dis=1, RT-880 TX=0)."
+- Inga per-target-komponenter för RX-only.
 
-Uppdaterad export-signatur:
+### 5. Tester
 
-```ts
-export interface NicsureExportResult {
-  csv: string;
-  warnings: Warning[];
-  legend: ZoneLegend[];
-  legendText: string; // pre-formaterad för nedladdning/kopiering
-}
-
-export function exportNicsureRt880Csv(...): NicsureExportResult;
-```
-
-`NICSURE_RT880_TARGET.export()` returnerar fortfarande `{ filename, content, warnings }` (det är det generiska kontraktet). För legend lägger vi till en valfri **`extras`**-array av `{ filename, content }`:
-
-```ts
-// types.ts (ExportTarget):
-export interface ExportResult {
-  filename: string;
-  content: string;
-  warnings: Warning[];
-  extras?: { filename: string; content: string }[];
-}
-```
-
-Nicsure-targetet fyller `extras = [{ filename: "nicsure-rt880-zones.txt", content: legendText }]`. `useCodeplugDownload` zippar `content + extras` när `extras` är ifyllt; annars beteende oförändrat.
-
-### `src/hooks/useCodeplugDownload.ts`
-
-I `invokeTarget` för `case "nicsure-rt880"`: om resultatet har `extras`, paketera som zip (jszip finns redan i projektet, annars använd inbyggd Blob med multipart — kolla deps; om jszip saknas, ladda ner de två filerna separat eller bara serialisera legend som en kommentar i CSV-headern). **Enklare alternativ**: lägg legendtexten som en `# `-kommentar-header överst i CSV:n — men Nicsure-firmware kanske inte tolererar det. Säkrare: ladda ner två filer (browser tillåter två sekventiella `a.download`-klick med liten delay) **eller** rendera legend i UI:t (under exportpanelen) som kopierbar text utan att skapa en andra fil.
-
-**Val (v1, enklast):** rendera legend i UI:t, ingen extra fil. Användaren kopierar texten manuellt till RMS. Behöver då inte ändra `ExportResult`-kontraktet.
-
-→ `NICSURE_RT880_TARGET` exponerar legendText via en sidokanal (t.ex. en ny optional metod `previewExtras(channels, settings)` på `ExportTarget`, eller helt enkelt: ExportPanel kör `buildZoneLegend` direkt eftersom funktionen är ren).
-
-**Slutgiltigt val**: lägg `buildZoneLegend` och `formatZoneLegend` som **publika exports** från `nicsure-rt880.ts`. `NicsureRt880Panel` importerar dem och visar legenden live när användaren ändrar `zoneDimensions`. Inga ändringar i `ExportTarget`-typen.
-
-### `src/components/codeplug/ExportPanel.tsx`
-
-`NicsureRt880Panel` ändras:
-- Ersätt `slotCountry/slotDistrict/slotType/slotPackCategory`-checkboxar med en **ordnad lista** av dimensioner (drag-och-släpp ej nödvändigt i v1 — använd ↑/↓-knappar eller numrerad select per slot).
-- Enklast: 4 dropdowns "Slot1 dimension", …, "Slot4 dimension" med värden `country | district | type | category | (ingen)`.
-- Under panelen: rendera `formatZoneLegend(buildZoneLegend(channels, settings.zoneDimensions))` i en `<pre>` med "Kopiera"-knapp.
-- Hjälptext: *"Varje bokstav (A–Z) är ett zon-ID som du namnger i Nicsure RMS-appen."*
-
-### Tester
-
-Uppdatera `nicsure-rt880.test.ts`:
-- `buildZoneLegend` med 3 svenska repeaters i SM6/SM7 → country: A=SE, district: A=SM6 B=SM7, type: A=Repeater.
-- Bokstavspool delas globalt: 4 länder + 3 distrikt → distrikt får E/F/G, inte A/B/C.
-- >26 unika värden → warning + saknad bokstav.
-- Kanal utan värde för dimension → `" "` i sin slot.
-- `zoneDimensions: []` → alla fyra slottar `" "`.
-- `formatZoneLegend` producerar förväntad text-output.
+- Uppdatera `pipeline.test.ts`: byt `"duplex_off"` → `"block_tx"`, samma assertion (`duplex === "off"`).
+- VGC: nytt test som verifierar att en kanal med `duplex === "off"` (utan rx_only-flagga) får `tx_dis = "1"`.
+- Nicsure: nytt test som verifierar `TX = "0.00000"` och `nicsure_tx_block_unsupported`-varning för blockerade rader.
 
 ## Filer som ändras
 
-- `src/lib/codeplug/targets/nicsure-rt880.ts` — settings, dimensions, `buildZoneLegend`, `formatZoneLegend`, `toNicsureRows`.
-- `src/lib/codeplug/__tests__/targets/nicsure-rt880.test.ts` — slot→dimensions-tester.
-- `src/components/codeplug/ExportPanel.tsx` — `NicsureRt880Panel` skrivs om med 4 dimension-dropdowns + live legend.
+- `src/lib/codeplug/models.ts`
+- `src/lib/codeplug/defaults.ts`
+- `src/lib/codeplug/pipeline.ts`
+- `src/lib/codeplug/targets/vgc-n76.ts`
+- `src/lib/codeplug/targets/nicsure-rt880.ts`
+- `src/components/codeplug/ExportPanel.tsx`
+- `src/lib/codeplug/__tests__/pipeline.test.ts`
+- `src/lib/codeplug/__tests__/targets/vgc-n76.test.ts`
+- `src/lib/codeplug/__tests__/targets/nicsure-rt880.test.ts`
 
-`registry.ts`, `useCodeplugDownload.ts`, `routes/index.tsx`, `targets/index.ts`, `ExportTarget`-typen: **oförändrade**.
+## Frågor (svara gärna före implementation)
+
+1. Nicsure utan TX-disable: föredrar du **TX=0.00000 + varning** (förslaget) eller **TX=RX + varning** (dagens beteende men med varning)?
+2. Vill du behålla termen "RX-only" i UI:t eller döpa om sektionen till "TX-spärr för RX-only-kanaler" för att matcha den nya intenten?
