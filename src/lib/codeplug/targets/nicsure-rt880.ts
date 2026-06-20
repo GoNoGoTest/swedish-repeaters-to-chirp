@@ -30,7 +30,7 @@ export const NICSURE_ZONE_DIMENSIONS: ReadonlyArray<{
   description: string;
 }> = [
   { id: "country", label: "Land", description: "Landskod, t.ex. SE, NO, DK, FI." },
-  { id: "district", label: "Distrikt", description: "Distrikts­etikett, t.ex. SM6, LA, OZ." },
+  { id: "district", label: "Distrikt", description: "Repeaterdistrikt (SM6, LA, OZ) eller kanalpakets-id för paketrader." },
   { id: "type", label: "Kanaltyp", description: "Repeater, Link, Hotspot, Simplex." },
   { id: "category", label: "Paketkategori", description: "Kategori för kanalpaket (marine, pmr, …)." },
 ];
