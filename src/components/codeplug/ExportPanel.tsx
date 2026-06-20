@@ -329,13 +329,14 @@ function QthHomeDistrictPanel({ settings, updSort }: {
   );
 }
 
-export function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, targetSettings, setTargetSettings }: {
+export function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, targetSettings, setTargetSettings, channels = [] }: {
   settings: Settings;
   setSettings: (s: Settings) => void;
   hasPacks: boolean;
   chirpSettings: ChirpSettings;
   targetSettings: Record<string, unknown>;
   setTargetSettings: (patch: Record<string, unknown>) => void;
+  channels?: NormalizedChannel[];
 }) {
   const updPacks = (patch: Partial<Settings["packs"]>) => setSettings({ ...settings, packs: { ...settings.packs, ...patch } });
   const updChirp = (patch: Partial<ChirpSettings>) => setTargetSettings(patch as Record<string, unknown>);
