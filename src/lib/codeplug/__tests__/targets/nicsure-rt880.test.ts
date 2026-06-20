@@ -204,4 +204,12 @@ describe("targets/nicsure-rt880", () => {
     expect(rows[1][17]).toBe("0.00");
     expect(rows[1][18]).toBe("Off");
   });
+
+  it("duplex=off writes TX=0.00000 and emits nicsure_tx_block_unsupported warning", () => {
+    const ch = makeChannel({ generated_name_final: "RX", rx_frequency: 161.0, duplex: "off" });
+    const out = NICSURE_RT880_TARGET.export([ch], NICSURE_RT880_DEFAULTS);
+    const row = parseRows(out.content)[1];
+    expect(row[4]).toBe("0.00000");
+    expect(out.warnings.some((w) => w.code === "nicsure_tx_block_unsupported")).toBe(true);
+  });
 });
