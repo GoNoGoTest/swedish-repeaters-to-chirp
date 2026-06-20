@@ -117,6 +117,9 @@ describe("targets/vgc-n76", () => {
     const out = VGC_N76_TARGET.export([ch], VGC_N76_DEFAULTS);
     const row = Papa.parse<string[]>(out.content, { skipEmptyLines: true }).data[1];
     expect(row[11]).toBe("1");
+  });
+
+
 
   it("pads to padToChannels with empty rows", () => {
     const ch = makeChannel({ generated_name_final: "ONE", rx_frequency: 145.5 });
