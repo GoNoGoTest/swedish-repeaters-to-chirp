@@ -171,6 +171,9 @@ describe("targets/nicsure-rt880", () => {
       { letter: "A", value: "SM6" },
       { letter: "B", value: "se_marine_vhf" },
     ]);
+  });
+
+
 
   it("zoneDimensions: [] leaves every slot blank", () => {
     const ch = makeChannel({ district: "6", type: "Repeater" });
