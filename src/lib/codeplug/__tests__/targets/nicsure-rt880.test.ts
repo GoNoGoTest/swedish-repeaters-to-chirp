@@ -168,8 +168,8 @@ describe("targets/nicsure-rt880", () => {
     });
     const legend = buildZoneLegend([rpt, pack], ["district"]);
     expect(legend.slots[0].entries).toEqual([
-      { letter: "A", value: "SM6" },
-      { letter: "B", value: "se_marine_vhf" },
+      { letter: "A", value: "se_marine_vhf" },
+      { letter: "B", value: "SM6" },
     ]);
   });
 
