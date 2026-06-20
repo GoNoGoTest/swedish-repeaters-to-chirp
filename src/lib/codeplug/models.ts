@@ -18,12 +18,14 @@ export type WarningCode =
   | "freq_duplicate"
   | "rx_only_no_policy"
   | "rx_only_marked"
+  | "rx_only_blocked"
   | "ctcss_and_dcs"
   | "vgc_over_group_limit"
   | "vgc_dcs_polarity_lost"
   | "vgc_title_truncated"
   | "vgc_unsupported_mode"
-  | "nicsure_zone_pool_exhausted";
+  | "nicsure_zone_pool_exhausted"
+  | "nicsure_tx_block_unsupported";
 
 export interface Warning {
   code: WarningCode;
@@ -158,7 +160,7 @@ export interface SortSettings {
 
 export type PackPlacement = "off" | "prepend" | "append";
 export type FreqDupePolicy = "keep_both" | "drop_pack" | "drop_sk6ba" | "stop";
-export type RxOnlyPolicy = "mark" | "duplex_off" | "skip" | "stop";
+export type RxOnlyPolicy = "mark" | "block_tx" | "skip" | "stop";
 
 export interface PackSelectionEntry {
   /** Pack is included in export at all */

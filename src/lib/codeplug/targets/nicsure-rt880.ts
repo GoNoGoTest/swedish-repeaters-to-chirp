@@ -96,15 +96,18 @@ function truncateName(raw: string, maxLen: number): { name: string; truncated: b
   return { name: chars.slice(0, maxLen).join(""), truncated: true };
 }
 
-/** Mobile-side TX frequency in MHz, or null. */
+/** Mobile-side TX frequency in MHz, or null. Returns 0 when TX is blocked. */
 function mobileTxMhz(c: NormalizedChannel): number | null {
+  // RT-880 CSV has no TX-disable column; the portable "no TX" signal is
+  // duplex=off (set by the rx-only policy upstream). Write TX=0 so the radio
+  // does not transmit on the RX frequency by default.
+  if (c.duplex === "off") return 0;
   if (c.tx_frequency != null) return c.tx_frequency;
   if (c.rx_frequency == null) return null;
   if (c.duplex === "+" || c.duplex === "-") {
     const shift = c.tx_shift != null ? c.tx_shift : (c.duplex === "+" ? c.offset : -c.offset);
     return c.rx_frequency + shift;
   }
-  if (c.duplex === "off") return c.rx_frequency;
   return c.rx_frequency;
 }
 
@@ -291,6 +294,7 @@ export function toNicsureRows(
   const warnings: Warning[] = [];
   let truncCount = 0;
   let unsupported = 0;
+  let txBlocked = 0;
 
   const dims = s.zoneDimensions.slice(0, 4);
   const legend = buildZoneLegend(channels, dims);
@@ -316,6 +320,7 @@ export function toNicsureRows(
 
     const { mod, unsupported: modUnsupported } = encodeModulation(c);
     if (modUnsupported) unsupported++;
+    if (c.duplex === "off") txBlocked++;
 
     return {
       Channel_Num: String(s.startLocation + i),
@@ -350,6 +355,12 @@ export function toNicsureRows(
     warnings.push({
       code: "vgc_unsupported_mode",
       message: `${unsupported} kanal(er) har mode (USB/LSB/CW/DV) som RT-880 inte stöder; exporterade som Auto/${s.defaultBandwidth}.`,
+    });
+  }
+  if (txBlocked > 0) {
+    warnings.push({
+      code: "nicsure_tx_block_unsupported",
+      message: `${txBlocked} kanal(er) har TX spärrad (RX-only). RT-880-CSV saknar TX-disable-kolumn — TX skrivs som 0.00000. Lås kanalen manuellt i Nicsure RMS om radion ändå försöker sända.`,
     });
   }
   return { rows, warnings, legend };

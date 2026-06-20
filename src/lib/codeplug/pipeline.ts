@@ -147,8 +147,9 @@ function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): N
         ch.warnings.push({ code: "rx_only_no_policy", message: "RX-only stoppar export (policy=stop)" });
         out.push(ch);
         break;
-      case "duplex_off":
+      case "block_tx":
         ch.duplex = "off";
+        ch.warnings.push({ code: "rx_only_blocked", message: "RX-only: TX spärrad enligt target-konvention" });
         out.push(ch);
         break;
       case "mark":

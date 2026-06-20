@@ -235,7 +235,7 @@ export function toVgcN76Rows(
       talk_around: "0",
       pre_de_emph: "0",
       sign: "1",
-      tx_dis: c.rx_only || !c.tx_allowed ? "1" : "0",
+      tx_dis: c.duplex === "off" || c.rx_only || !c.tx_allowed ? "1" : "0",
       bclo: "0",
       mute: "0",
       rx_mod: am ? "1" : "0",

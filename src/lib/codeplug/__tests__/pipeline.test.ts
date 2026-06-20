@@ -97,15 +97,16 @@ describe("runPipeline with channel pack", () => {
     expect(r.packCount).toBe(2);
   });
 
-  it("rxOnlyPolicy=duplex_off marks Duplex=off", () => {
+  it("rxOnlyPolicy=block_tx sets duplex=off and emits rx_only_blocked warning", () => {
     const { rows } = parseSk6baCsv(sk6baCsv);
     const withRxOnly = packChannels.map((c, i) => i === 0 ? { ...c, rx_only: true, warnings: [...c.warnings] } : c);
     const r = runPipeline({
       sk6baRows: rows,
       packChannels: withRxOnly,
-      settings: { ...baseSettings, packs: { ...baseSettings.packs, placement: "append", rxOnlyPolicy: "duplex_off" } },
+      settings: { ...baseSettings, packs: { ...baseSettings.packs, placement: "append", rxOnlyPolicy: "block_tx" } },
     });
     const rxOnly = r.channels.find((c) => c.rx_only);
     expect(rxOnly?.duplex).toBe("off");
+    expect(rxOnly?.warnings.some((w) => w.code === "rx_only_blocked")).toBe(true);
   });
 });
