@@ -22,7 +22,8 @@ export type WarningCode =
   | "vgc_over_group_limit"
   | "vgc_dcs_polarity_lost"
   | "vgc_title_truncated"
-  | "vgc_unsupported_mode";
+  | "vgc_unsupported_mode"
+  | "nicsure_zone_pool_exhausted";
 
 export interface Warning {
   code: WarningCode;

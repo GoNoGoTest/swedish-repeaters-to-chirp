@@ -249,7 +249,9 @@ function Index() {
                   chirpSettings={chirpSettings}
                   targetSettings={targetSettings}
                   setTargetSettings={setTargetSettings}
+                  channels={exportChannels}
                 />
+
               </Section>
             )}
           </div>

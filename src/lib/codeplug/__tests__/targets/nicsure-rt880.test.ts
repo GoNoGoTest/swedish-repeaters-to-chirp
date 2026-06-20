@@ -5,6 +5,9 @@ import {
   NICSURE_RT880_DEFAULTS,
   NICSURE_RT880_COLUMNS,
   toNicsureRows,
+  buildZoneLegend,
+  formatZoneLegend,
+  type NicsureZoneDimensionId,
 } from "@/lib/codeplug/targets/nicsure-rt880";
 import { makeChannel } from "../helpers";
 
@@ -34,8 +37,8 @@ describe("targets/nicsure-rt880", () => {
       offset: 0.6,
     });
     const row = parseRows(NICSURE_RT880_TARGET.export([ch], NICSURE_RT880_DEFAULTS).content)[1];
-    expect(row[3]).toBe("145.72500"); // RX
-    expect(row[4]).toBe("145.12500"); // TX
+    expect(row[3]).toBe("145.72500");
+    expect(row[4]).toBe("145.12500");
   });
 
   it("encodes CTCSS as decimal Hz with 1 decimal", () => {
@@ -48,8 +51,8 @@ describe("targets/nicsure-rt880", () => {
       ctcss_tx: 67,
     });
     const row = parseRows(NICSURE_RT880_TARGET.export([ch], NICSURE_RT880_DEFAULTS).content)[1];
-    expect(row[5]).toBe("None"); // RX_Tone
-    expect(row[6]).toBe("67.0"); // TX_Tone
+    expect(row[5]).toBe("None");
+    expect(row[6]).toBe("67.0");
   });
 
   it("encodes DCS as D<3-digit><polarity letter> per side", () => {
@@ -60,12 +63,12 @@ describe("targets/nicsure-rt880", () => {
       tx_frequency: 462.7,
       duplex: "",
       dtcs_code: "51",
-      dtcs_polarity: "NR", // TX=N, RX=R(=I)
+      dtcs_polarity: "NR",
       tone_raw: "DTCS",
     });
     const row = parseRows(NICSURE_RT880_TARGET.export([ch], NICSURE_RT880_DEFAULTS).content)[1];
-    expect(row[5]).toBe("D051I"); // RX side R → I
-    expect(row[6]).toBe("D051N"); // TX side N → N
+    expect(row[5]).toBe("D051I");
+    expect(row[6]).toBe("D051N");
   });
 
   it("maps mode_chirp to Bandwidth and Modulation", () => {
@@ -107,43 +110,86 @@ describe("targets/nicsure-rt880", () => {
     expect(warnings.some((w) => w.code === "vgc_title_truncated")).toBe(true);
   });
 
-  it("slot mapping: country / district / type / pack category", () => {
-    const sm6 = makeChannel({
-      rx_frequency: 145.6,
-      district: "6",
-      type: "Repeater",
-    });
-    const la = makeChannel({
-      rx_frequency: 145.6,
-      district: "LA",
-      type: "Link",
-    });
-    const pack = makeChannel({
-      source_type: "channel_pack",
-      rx_frequency: 446.0,
-      duplex: "",
-      tx_frequency: 446.0,
-      district: "",
-      type: "",
-      category: "pmr",
-    });
-    const rows = parseRows(NICSURE_RT880_TARGET.export([sm6, la, pack], NICSURE_RT880_DEFAULTS).content);
-    // Slot1..Slot4 are columns 8..11
-    expect(rows[1].slice(8, 12)).toEqual(["S", "6", "R", " "]);
-    expect(rows[2].slice(8, 12)).toEqual(["N", " ", "L", " "]);
-    expect(rows[3].slice(8, 12)).toEqual([" ", " ", " ", "P"]);
+  it("assigns A–Z per dimension from a shared global pool, alphabetically", () => {
+    const se6 = makeChannel({ district: "6", type: "Repeater" });
+    const se7 = makeChannel({ district: "7", type: "Repeater" });
+    const no = makeChannel({ district: "LA", type: "Link" });
+    const legend = buildZoneLegend([se6, se7, no], ["country", "district", "type"]);
+
+    // country: NO, SE → A, B
+    expect(legend.slots[0].entries).toEqual([
+      { letter: "A", value: "NO" },
+      { letter: "B", value: "SE" },
+    ]);
+    // district: LA, SM6, SM7 → next letters from the shared pool: C, D, E
+    expect(legend.slots[1].entries).toEqual([
+      { letter: "C", value: "LA" },
+      { letter: "D", value: "SM6" },
+      { letter: "E", value: "SM7" },
+    ]);
+    // type: Link, Repeater → F, G
+    expect(legend.slots[2].entries).toEqual([
+      { letter: "F", value: "Link" },
+      { letter: "G", value: "Repeater" },
+    ]);
   });
 
-  it("slot toggles can blank individual slots", () => {
-    const ch = makeChannel({ rx_frequency: 145.6, district: "6", type: "Repeater" });
+  it("writes the assigned letters into Slot1..Slot4 in dimension order", () => {
+    const se6 = makeChannel({ district: "6", type: "Repeater" });
+    const no = makeChannel({ district: "LA", type: "Link" });
+    const rows = parseRows(NICSURE_RT880_TARGET.export([se6, no], NICSURE_RT880_DEFAULTS).content);
+    // 4 default dims; with these two channels: country (NO=A,SE=B), district (LA=C,SM6=D), type (Link=E,Repeater=F), category (none).
+    expect(rows[1].slice(8, 12)).toEqual(["B", "D", "F", " "]);
+    expect(rows[2].slice(8, 12)).toEqual(["A", "C", "E", " "]);
+  });
+
+  it("missing value for a dimension writes a blank slot", () => {
+    const noType = makeChannel({ district: "6", type: "" });
+    const legend = buildZoneLegend([noType], ["country", "type"]);
+    expect(legend.slots[0].entries).toEqual([{ letter: "A", value: "SE" }]);
+    expect(legend.slots[1].entries).toEqual([]);
     const rows = parseRows(
-      NICSURE_RT880_TARGET.export([ch], {
+      NICSURE_RT880_TARGET.export([noType], {
         ...NICSURE_RT880_DEFAULTS,
-        slotCountry: false,
-        slotType: false,
+        zoneDimensions: ["country", "type"],
       }).content,
     );
-    expect(rows[1].slice(8, 12)).toEqual([" ", "6", " ", " "]);
+    expect(rows[1].slice(8, 12)).toEqual(["A", " ", " ", " "]);
+  });
+
+  it("zoneDimensions: [] leaves every slot blank", () => {
+    const ch = makeChannel({ district: "6", type: "Repeater" });
+    const rows = parseRows(
+      NICSURE_RT880_TARGET.export([ch], { ...NICSURE_RT880_DEFAULTS, zoneDimensions: [] }).content,
+    );
+    expect(rows[1].slice(8, 12)).toEqual([" ", " ", " ", " "]);
+  });
+
+  it("emits a warning and overflow when more than 26 unique values exist", () => {
+    const chs = Array.from({ length: 30 }, (_, i) =>
+      makeChannel({ rx_frequency: 145 + i / 1000, type: `T${String(i).padStart(2, "0")}` }),
+    );
+    const { warnings, legend } = toNicsureRows(chs, {
+      ...NICSURE_RT880_DEFAULTS,
+      zoneDimensions: ["type"],
+    });
+    expect(warnings.some((w) => w.code === "nicsure_zone_pool_exhausted")).toBe(true);
+    expect(legend.slots[0].entries.length).toBe(26);
+    expect(legend.slots[0].overflow.length).toBe(4);
+  });
+
+  it("formatZoneLegend renders a readable text block", () => {
+    const se6 = makeChannel({ district: "6", type: "Repeater" });
+    const no = makeChannel({ district: "LA", type: "Link" });
+    const text = formatZoneLegend(
+      buildZoneLegend([se6, no], ["country", "type"] as NicsureZoneDimensionId[]),
+    );
+    expect(text).toContain("Slot1 — Land");
+    expect(text).toContain("A = NO");
+    expect(text).toContain("B = SE");
+    expect(text).toContain("Slot2 — Kanaltyp");
+    expect(text).toContain("C = Link");
+    expect(text).toContain("D = Repeater");
   });
 
   it("emits TX_Power from settings and default fields", () => {
@@ -152,10 +198,10 @@ describe("targets/nicsure-rt880", () => {
       NICSURE_RT880_TARGET.export([ch], { ...NICSURE_RT880_DEFAULTS, defaultPower: "Low" }).content,
     );
     expect(rows[1][7]).toBe("Low");
-    expect(rows[1][14]).toBe("False"); // BusyLock
-    expect(rows[1][15]).toBe("False"); // Reversed
-    expect(rows[1][16]).toBe("Off");   // PTTID
-    expect(rows[1][17]).toBe("0.00");  // Clarifier
-    expect(rows[1][18]).toBe("Off");   // Scrambler
+    expect(rows[1][14]).toBe("False");
+    expect(rows[1][15]).toBe("False");
+    expect(rows[1][16]).toBe("Off");
+    expect(rows[1][17]).toBe("0.00");
+    expect(rows[1][18]).toBe("Off");
   });
 });

@@ -1,8 +1,15 @@
+import { useMemo } from "react";
 import type {
   ChirpSettings, FreqDupePolicy, PackPlacement, RxOnlyPolicy, Settings,
-  SplitMode, SplitSettings, HomeDistrictSort,
+  SplitMode, SplitSettings, HomeDistrictSort, NormalizedChannel,
 } from "@/lib/codeplug/models";
 import type { VgcN76Settings, NicsureRt880Settings } from "@/lib/codeplug/targets";
+import {
+  NICSURE_ZONE_DIMENSIONS,
+  buildZoneLegend,
+  formatZoneLegend,
+  type NicsureZoneDimensionId,
+} from "@/lib/codeplug/targets/nicsure-rt880";
 import { requireTarget } from "@/lib/codeplug/targets";
 import { isValidMaidenhead } from "@/lib/codeplug/maidenhead";
 import { Field, Hint, NumberField, SectionLabel } from "./common";
@@ -66,33 +73,43 @@ function VgcN76Panel({ settings, update }: {
   );
 }
 
-function NicsureRt880Panel({ settings, update }: {
+function NicsureRt880Panel({ settings, update, channels }: {
   settings: NicsureRt880Settings;
   update: (patch: Record<string, unknown>) => void;
+  channels: NormalizedChannel[];
 }) {
-  const slotToggle = (
-    key: "slotCountry" | "slotDistrict" | "slotType" | "slotPackCategory",
-    label: string,
-    desc: string,
-  ) => (
-    <label className="flex items-start gap-2 text-sm">
-      <input
-        type="checkbox"
-        className="mt-1"
-        checked={settings[key]}
-        onChange={(e) => update({ [key]: e.target.checked })}
-      />
-      <span>
-        {label}
-        <span className="ml-2 block text-xs text-muted-foreground">{desc}</span>
-      </span>
-    </label>
+  const dims = settings.zoneDimensions;
+  const legend = useMemo(
+    () => buildZoneLegend(channels, dims),
+    [channels, dims],
   );
+  const legendText = useMemo(() => formatZoneLegend(legend), [legend]);
+
+  const setSlot = (slotIdx: number, value: NicsureZoneDimensionId | "") => {
+    // Slot list as (dim | null) of fixed length 4.
+    const arr: Array<NicsureZoneDimensionId | null> = [0, 1, 2, 3].map((i) => dims[i] ?? null);
+    if (value === "") {
+      arr[slotIdx] = null;
+    } else {
+      // Keep slots unique: if this dimension already lives in another slot, clear it there first.
+      for (let i = 0; i < arr.length; i++) if (i !== slotIdx && arr[i] === value) arr[i] = null;
+      arr[slotIdx] = value;
+    }
+    // Drop trailing nulls so zoneDimensions stays a tight ordered list.
+    const cleaned: NicsureZoneDimensionId[] = [];
+    for (const d of arr) if (d !== null) cleaned.push(d);
+    update({ zoneDimensions: cleaned });
+  };
+
+  const copyLegend = async () => {
+    try { await navigator.clipboard.writeText(legendText); } catch { /* noop */ }
+  };
+
   return (
     <div className="border-t border-border pt-4">
       <SectionLabel>Nicsure RT-880-fält</SectionLabel>
       <Hint>
-        CSV för Nicsures custom firmware till Radtel RT-880. 19 kolumner, frekvenser i MHz (5 decimaler), DCS-polaritet (N/I) bevaras, fyra slot-bokstäver används som zon-/gruppmedlemskap i radion.
+        CSV för Nicsures custom firmware till Radtel RT-880. 19 kolumner, frekvenser i MHz (5 decimaler), DCS-polaritet (N/I) bevaras, fyra slot-kolumner används som zon-/gruppmedlemskap i radion.
       </Hint>
       <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4 mt-2">
         <NumberField label="Startnummer (Channel_Num)" value={settings.startLocation}
@@ -120,17 +137,50 @@ function NicsureRt880Panel({ settings, update }: {
           </select>
         </Field>
       </div>
+
       <div className="mt-4">
-        <SectionLabel>Slot-mappning (zoner/grupper)</SectionLabel>
+        <SectionLabel>Zon-mappning (Slot1–Slot4)</SectionLabel>
       </div>
       <Hint>
-        Varje slot rymmer en bokstav som radion grupperar/scannar på. Avmarkera för att lämna platsen tom (mellanslag).
+        Varje slot grupperar på en dimension. Nicsure skriver en bokstav (A–Z) per värde — dessa
+        bokstäver är bara löpnummer och du namnger dem själv i Nicsure RMS-appen enligt legenden nedan.
       </Hint>
-      <div className="mt-2 grid gap-2 md:grid-cols-2">
-        {slotToggle("slotCountry", "Slot1 — land", "SE→S, NO→N, DK→D, FI/AX→F, övrigt blank.")}
-        {slotToggle("slotDistrict", "Slot2 — distriktssiffra", "Första siffran i distriktet (SM6→6, LA3→3). Pack-kanaler blanka.")}
-        {slotToggle("slotType", "Slot3 — kanaltyp", "Repeater→R, Link→L, Hotspot→H, Simplex→S.")}
-        {slotToggle("slotPackCategory", "Slot4 — paketkategori", "Pack-rader: första bokstaven av category (amateur→A, marine→M, …). Repeatrar blanka.")}
+      <div className="mt-2 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <Field key={i} label={`Slot${i + 1} — dimension`}>
+            <select
+              value={dims[i] ?? ""}
+              onChange={(e) => setSlot(i, e.target.value as NicsureZoneDimensionId | "")}
+              className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
+            >
+              <option value="">(tom)</option>
+              {NICSURE_ZONE_DIMENSIONS.map((d) => (
+                <option key={d.id} value={d.id}>{d.label}</option>
+              ))}
+            </select>
+            <Hint>
+              {dims[i]
+                ? NICSURE_ZONE_DIMENSIONS.find((d) => d.id === dims[i])?.description
+                : "Lämna tom för att skriva mellanslag i denna slot."}
+            </Hint>
+          </Field>
+        ))}
+      </div>
+
+      <div className="mt-4">
+        <div className="flex items-center justify-between">
+          <SectionLabel>Zon-legend (klistra in i Nicsure RMS)</SectionLabel>
+          <button
+            type="button"
+            onClick={copyLegend}
+            className="rounded border border-border px-2 py-1 text-xs"
+          >
+            Kopiera
+          </button>
+        </div>
+        <pre className="mt-2 max-h-64 overflow-auto rounded border border-border bg-muted/30 p-3 text-xs font-mono whitespace-pre-wrap">
+{legendText}
+        </pre>
       </div>
     </div>
   );
@@ -279,13 +329,14 @@ function QthHomeDistrictPanel({ settings, updSort }: {
   );
 }
 
-export function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, targetSettings, setTargetSettings }: {
+export function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, targetSettings, setTargetSettings, channels = [] }: {
   settings: Settings;
   setSettings: (s: Settings) => void;
   hasPacks: boolean;
   chirpSettings: ChirpSettings;
   targetSettings: Record<string, unknown>;
   setTargetSettings: (patch: Record<string, unknown>) => void;
+  channels?: NormalizedChannel[];
 }) {
   const updPacks = (patch: Partial<Settings["packs"]>) => setSettings({ ...settings, packs: { ...settings.packs, ...patch } });
   const updChirp = (patch: Partial<ChirpSettings>) => setTargetSettings(patch as Record<string, unknown>);
@@ -416,7 +467,7 @@ export function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, ta
           ...nicTarget.defaultSettings,
           ...(targetSettings as Partial<NicsureRt880Settings>),
         };
-        return <NicsureRt880Panel settings={nicSettings} update={setTargetSettings} />;
+        return <NicsureRt880Panel settings={nicSettings} update={setTargetSettings} channels={channels} />;
       })()}
     </div>
   );

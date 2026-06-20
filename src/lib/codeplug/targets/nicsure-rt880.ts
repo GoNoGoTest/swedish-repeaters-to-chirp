@@ -11,10 +11,29 @@ import type { ExportTarget, HardwareLimits } from "./types";
  * with polarity letter), and four single-letter "Slot" group memberships
  * (used by the radio to scope scan lists / zones). Empty slots are written
  * as a single space — matching the Nicsure example file byte-for-byte.
+ *
+ * Slot letters are arbitrary identifiers (A–Z) that the user maps to friendly
+ * names inside the Nicsure RMS app. Each enabled zone *dimension* (country,
+ * district, channel type, pack category) gets its own letters auto-assigned
+ * from a global A–Z pool in declaration order. The export panel renders a
+ * legend so the user knows which letter to label what in RMS.
  */
 
 export type NicsurePower = "Very High" | "High" | "Medium" | "Low";
 export type NicsureBandwidth = "Wide" | "Narrow";
+
+export type NicsureZoneDimensionId = "country" | "district" | "type" | "category";
+
+export const NICSURE_ZONE_DIMENSIONS: ReadonlyArray<{
+  id: NicsureZoneDimensionId;
+  label: string;
+  description: string;
+}> = [
+  { id: "country", label: "Land", description: "Landskod, t.ex. SE, NO, DK, FI." },
+  { id: "district", label: "Distrikt", description: "Distrikts­etikett, t.ex. SM6, LA, OZ." },
+  { id: "type", label: "Kanaltyp", description: "Repeater, Link, Hotspot, Simplex." },
+  { id: "category", label: "Paketkategori", description: "Kategori för kanalpaket (marine, pmr, …)." },
+];
 
 export interface NicsureRt880Settings {
   /** Number for the first channel row; subsequent rows increment by 1. */
@@ -25,14 +44,8 @@ export interface NicsureRt880Settings {
   defaultPower: NicsurePower;
   /** Default bandwidth when the channel has no mode hint. */
   defaultBandwidth: NicsureBandwidth;
-  /** Emit a country letter (S/N/D/F) in Slot1. */
-  slotCountry: boolean;
-  /** Emit the first digit of `district` (e.g. SM6 → 6) in Slot2. */
-  slotDistrict: boolean;
-  /** Emit a channel-type letter (R/L/H/S) in Slot3. */
-  slotType: boolean;
-  /** Emit a pack-category letter in Slot4 (repeaters → blank). */
-  slotPackCategory: boolean;
+  /** Ordered list of zone dimensions, max 4. Index 0 = Slot1, … index 3 = Slot4. */
+  zoneDimensions: NicsureZoneDimensionId[];
 }
 
 export const NICSURE_RT880_DEFAULTS: NicsureRt880Settings = {
@@ -40,10 +53,7 @@ export const NICSURE_RT880_DEFAULTS: NicsureRt880Settings = {
   maxLength: 32,
   defaultPower: "Very High",
   defaultBandwidth: "Wide",
-  slotCountry: true,
-  slotDistrict: true,
-  slotType: true,
-  slotPackCategory: true,
+  zoneDimensions: ["country", "district", "type", "category"],
 };
 
 const NICSURE_RT880_LIMITS: HardwareLimits = {
@@ -78,6 +88,7 @@ export const NICSURE_RT880_COLUMNS = [
 ] as const;
 
 const EMPTY_SLOT = " ";
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 function truncateName(raw: string, maxLen: number): { name: string; truncated: boolean } {
   const chars = Array.from(raw);
@@ -85,7 +96,7 @@ function truncateName(raw: string, maxLen: number): { name: string; truncated: b
   return { name: chars.slice(0, maxLen).join(""), truncated: true };
 }
 
-/** Mobile-side TX frequency in MHz, or null. Mirrors vgc-n76.mobileTxMhz. */
+/** Mobile-side TX frequency in MHz, or null. */
 function mobileTxMhz(c: NormalizedChannel): number | null {
   if (c.tx_frequency != null) return c.tx_frequency;
   if (c.rx_frequency == null) return null;
@@ -101,16 +112,6 @@ function formatMhz5(mhz: number | null): string {
   return (mhz ?? 0).toFixed(5);
 }
 
-/**
- * Encode tone for a given side.
- *  - "None" when no tone is present on that side
- *  - CTCSS as "XX.X" (one decimal)
- *  - DCS as "D" + 3-digit code + polarity letter (N/I)
- *
- * DCS polarity: NormalizedChannel uses a 2-char string per CHIRP convention
- * ("NN"/"NR"/"RN"/"RR" — first char = TX, second = RX). We map per side:
- * 'N' → "N", 'R' → "I" (inverted).
- */
 function encodeTone(side: "tx" | "rx", c: NormalizedChannel): string {
   let ctcss: number | null = null;
   if (side === "tx") {
@@ -144,41 +145,121 @@ function encodeModulation(c: NormalizedChannel): { mod: string; unsupported: boo
   const m = (c.mode_chirp || "").toUpperCase();
   if (m === "AM") return { mod: "AM", unsupported: false };
   if (m === "FM" || m === "NFM" || m === "") return { mod: "Auto", unsupported: false };
-  // USB / LSB / CW / DV — radio can't decode; emit Auto + warn.
   return { mod: "Auto", unsupported: true };
 }
 
-function slotCountry(c: NormalizedChannel): string {
-  switch (c.region.countryCode) {
-    case "SE": return "S";
-    case "NO": return "N";
-    case "DK": return "D";
-    case "FI": return "F";
-    case "AX": return "F"; // Åland — Finnish callsign space
-    default: return EMPTY_SLOT;
+/** Read the raw value (already a string id) for a given zone dimension on a channel. */
+export function dimensionValue(
+  c: NormalizedChannel,
+  d: NicsureZoneDimensionId,
+): string | null {
+  switch (d) {
+    case "country": {
+      const cc = c.region.countryCode;
+      return cc && cc !== "unknown" ? cc : null;
+    }
+    case "district": {
+      const label = c.region.districtLabel?.trim();
+      return label ? label : null;
+    }
+    case "type": {
+      const t = (c.type || "").trim();
+      return t ? t : null;
+    }
+    case "category": {
+      const cat = (c.category || "").trim();
+      return cat ? cat : null;
+    }
   }
 }
 
-function slotDistrict(c: NormalizedChannel): string {
-  if (c.source_type !== "sk6ba") return EMPTY_SLOT;
-  const match = (c.district || "").match(/\d/);
-  return match ? match[0] : EMPTY_SLOT;
+export interface ZoneLegendEntry {
+  letter: string;
+  value: string;
 }
 
-function slotType(c: NormalizedChannel): string {
-  const t = (c.type || "").toLowerCase();
-  if (t === "repeater") return "R";
-  if (t === "link") return "L";
-  if (t === "hotspot") return "H";
-  if (t === "simplex") return "S";
-  return EMPTY_SLOT;
+export interface ZoneLegendSlot {
+  slot: 1 | 2 | 3 | 4;
+  dimension: NicsureZoneDimensionId;
+  dimensionLabel: string;
+  entries: ZoneLegendEntry[];
+  /** Values that did not fit into the global A–Z pool. */
+  overflow: string[];
 }
 
-function slotPackCategory(c: NormalizedChannel): string {
-  if (c.source_type !== "channel_pack") return EMPTY_SLOT;
-  const cat = (c.category || "").trim();
-  if (!cat) return EMPTY_SLOT;
-  return cat.charAt(0).toUpperCase();
+export interface ZoneLegend {
+  slots: ZoneLegendSlot[];
+  /** value → letter, keyed by `${dimension}::${value}`. */
+  lookup: Map<string, string>;
+}
+
+function dimensionLabel(d: NicsureZoneDimensionId): string {
+  return NICSURE_ZONE_DIMENSIONS.find((x) => x.id === d)?.label ?? d;
+}
+
+/**
+ * Build the zone legend for a set of channels and an ordered dimension list.
+ *
+ * Letters are pulled from a single global A–Z pool, in the order dimensions
+ * appear in `dims`, and alphabetically within each dimension's unique values.
+ * Anything that doesn't fit goes into `overflow` (no letter assigned).
+ */
+export function buildZoneLegend(
+  channels: NormalizedChannel[],
+  dims: NicsureZoneDimensionId[],
+): ZoneLegend {
+  const slice = dims.slice(0, 4);
+  const slots: ZoneLegendSlot[] = [];
+  const lookup = new Map<string, string>();
+  let poolIdx = 0;
+
+  slice.forEach((d, i) => {
+    const seen = new Set<string>();
+    for (const c of channels) {
+      const v = dimensionValue(c, d);
+      if (v) seen.add(v);
+    }
+    const sorted = [...seen].sort((a, b) => a.localeCompare(b));
+    const entries: ZoneLegendEntry[] = [];
+    const overflow: string[] = [];
+    for (const v of sorted) {
+      if (poolIdx < ALPHABET.length) {
+        const letter = ALPHABET.charAt(poolIdx++);
+        entries.push({ letter, value: v });
+        lookup.set(`${d}::${v}`, letter);
+      } else {
+        overflow.push(v);
+      }
+    }
+    slots.push({
+      slot: (i + 1) as 1 | 2 | 3 | 4,
+      dimension: d,
+      dimensionLabel: dimensionLabel(d),
+      entries,
+      overflow,
+    });
+  });
+
+  return { slots, lookup };
+}
+
+/** Render the legend as a plain-text block the user can paste into RMS. */
+export function formatZoneLegend(legend: ZoneLegend): string {
+  if (legend.slots.length === 0) {
+    return "(inga zon-dimensioner valda — alla slot-kolumner blir tomma)";
+  }
+  const blocks = legend.slots.map((s) => {
+    const header = `Slot${s.slot} — ${s.dimensionLabel}`;
+    if (s.entries.length === 0 && s.overflow.length === 0) {
+      return `${header}\n  (inga värden i datat)`;
+    }
+    const lines = s.entries.map((e) => `  ${e.letter} = ${e.value}`);
+    if (s.overflow.length > 0) {
+      lines.push(`  (utan bokstav, A–Z slut): ${s.overflow.join(", ")}`);
+    }
+    return `${header}\n${lines.join("\n")}`;
+  });
+  return blocks.join("\n\n");
 }
 
 interface NicsureRow {
@@ -206,10 +287,28 @@ interface NicsureRow {
 export function toNicsureRows(
   channels: NormalizedChannel[],
   s: NicsureRt880Settings,
-): { rows: NicsureRow[]; warnings: Warning[] } {
+): { rows: NicsureRow[]; warnings: Warning[]; legend: ZoneLegend } {
   const warnings: Warning[] = [];
   let truncCount = 0;
   let unsupported = 0;
+
+  const dims = s.zoneDimensions.slice(0, 4);
+  const legend = buildZoneLegend(channels, dims);
+  const overflowTotal = legend.slots.reduce((n, sl) => n + sl.overflow.length, 0);
+  if (overflowTotal > 0) {
+    warnings.push({
+      code: "nicsure_zone_pool_exhausted",
+      message: `${overflowTotal} värde(n) fick ingen zon-bokstav (A–Z slut). Minska antalet dimensioner eller filtrera datat.`,
+    });
+  }
+
+  const slotFor = (c: NormalizedChannel, idx: number): string => {
+    const d = dims[idx];
+    if (!d) return EMPTY_SLOT;
+    const v = dimensionValue(c, d);
+    if (!v) return EMPTY_SLOT;
+    return legend.lookup.get(`${d}::${v}`) ?? EMPTY_SLOT;
+  };
 
   const rows: NicsureRow[] = channels.map((c, i) => {
     const { name, truncated } = truncateName(c.generated_name_final, s.maxLength);
@@ -227,10 +326,10 @@ export function toNicsureRows(
       RX_Tone: encodeTone("rx", c),
       TX_Tone: encodeTone("tx", c),
       TX_Power: s.defaultPower,
-      Slot1: s.slotCountry ? slotCountry(c) : EMPTY_SLOT,
-      Slot2: s.slotDistrict ? slotDistrict(c) : EMPTY_SLOT,
-      Slot3: s.slotType ? slotType(c) : EMPTY_SLOT,
-      Slot4: s.slotPackCategory ? slotPackCategory(c) : EMPTY_SLOT,
+      Slot1: slotFor(c, 0),
+      Slot2: slotFor(c, 1),
+      Slot3: slotFor(c, 2),
+      Slot4: slotFor(c, 3),
       Bandwidth: encodeBandwidth(c, s),
       Modulation: mod,
       BusyLock: "False",
@@ -253,17 +352,17 @@ export function toNicsureRows(
       message: `${unsupported} kanal(er) har mode (USB/LSB/CW/DV) som RT-880 inte stöder; exporterade som Auto/${s.defaultBandwidth}.`,
     });
   }
-  return { rows, warnings };
+  return { rows, warnings, legend };
 }
 
 export function exportNicsureRt880Csv(
   channels: NormalizedChannel[],
   s: NicsureRt880Settings,
-): { csv: string; warnings: Warning[] } {
-  const { rows, warnings } = toNicsureRows(channels, s);
+): { csv: string; warnings: Warning[]; legend: ZoneLegend; legendText: string } {
+  const { rows, warnings, legend } = toNicsureRows(channels, s);
   const data = rows.map((r) => NICSURE_RT880_COLUMNS.map((col) => r[col]));
   const csv = Papa.unparse({ fields: [...NICSURE_RT880_COLUMNS], data });
-  return { csv, warnings };
+  return { csv, warnings, legend, legendText: formatZoneLegend(legend) };
 }
 
 export const NICSURE_RT880_TARGET: ExportTarget<NicsureRt880Settings> = {
@@ -271,7 +370,7 @@ export const NICSURE_RT880_TARGET: ExportTarget<NicsureRt880Settings> = {
   label: "Nicsure firmware (Radtel RT-880)",
   vendor: "Nicsure",
   description:
-    "CSV för Nicsures custom firmware till Radtel RT-880. 19 kolumner, frekvenser i MHz, DCS med polaritet, fyra slot-grupper för zonering.",
+    "CSV för Nicsures custom firmware till Radtel RT-880. 19 kolumner, frekvenser i MHz, DCS med polaritet, fyra slot-grupper för zonering (bokstäver mappas i RMS-appen).",
   filenameBase: "nicsure-rt880",
   fileExtension: "csv",
   limits: NICSURE_RT880_LIMITS,
