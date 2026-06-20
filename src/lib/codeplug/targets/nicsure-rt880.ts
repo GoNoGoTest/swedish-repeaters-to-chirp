@@ -362,6 +362,7 @@ export function toNicsureRows(
       code: "nicsure_tx_block_unsupported",
       message: `${txBlocked} kanal(er) har TX spärrad (RX-only). RT-880-CSV saknar TX-disable-kolumn — TX skrivs som 0.00000. Lås kanalen manuellt i Nicsure RMS om radion ändå försöker sända.`,
     });
+  }
   return { rows, warnings, legend };
 }
 
