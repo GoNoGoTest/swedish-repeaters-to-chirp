@@ -120,7 +120,9 @@ function NicsureRt880Panel({ settings, update }: {
           </select>
         </Field>
       </div>
-      <SectionLabel className="mt-4">Slot-mappning (zoner/grupper)</SectionLabel>
+      <div className="mt-4">
+        <SectionLabel>Slot-mappning (zoner/grupper)</SectionLabel>
+      </div>
       <Hint>
         Varje slot rymmer en bokstav som radion grupperar/scannar på. Avmarkera för att lämna platsen tom (mellanslag).
       </Hint>
