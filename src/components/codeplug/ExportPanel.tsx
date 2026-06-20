@@ -373,11 +373,11 @@ export function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, ta
                 <option value="stop">Stoppa export</option>
               </select>
             </Field>
-            <Field label="RX-only-kanaler (t.ex. marin VHF, airband)" hint="Hur ska kanaler markerade som mottagning-bara hanteras vid export?">
+            <Field label="RX-only-kanaler (t.ex. marin VHF, airband)" hint="Hur ska kanaler markerade som mottagning-bara hanteras vid export? 'Spärra TX' använder respektive radios egna metod (CHIRP Duplex=off, VGC tx_dis=1, RT-880 TX=0.00000 + varning).">
               <select value={settings.packs.rxOnlyPolicy}
                 onChange={(e) => updPacks({ rxOnlyPolicy: e.target.value as RxOnlyPolicy })}
                 className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
-                <option value="duplex_off">Exportera som Duplex=off (rekommenderas)</option>
+                <option value="block_tx">Spärra TX i radion (rekommenderas)</option>
                 <option value="mark">Exportera normalt + markera RX-ONLY i Comment</option>
                 <option value="skip">Hoppa över helt</option>
                 <option value="stop">Stoppa export</option>
