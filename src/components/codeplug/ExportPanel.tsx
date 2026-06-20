@@ -86,18 +86,18 @@ function NicsureRt880Panel({ settings, update, channels }: {
   const legendText = useMemo(() => formatZoneLegend(legend), [legend]);
 
   const setSlot = (slotIdx: number, value: NicsureZoneDimensionId | "") => {
-    const next = [...dims];
-    // Remove the dimension if it's already used in another slot to keep slots unique.
-    const filtered = next.filter((d, i) => i === slotIdx || d !== value);
-    // Pad with empties so we can write a specific index.
-    while (filtered.length < 4) filtered.push("" as NicsureZoneDimensionId);
+    // Slot list as (dim | null) of fixed length 4.
+    const arr: Array<NicsureZoneDimensionId | null> = [0, 1, 2, 3].map((i) => dims[i] ?? null);
     if (value === "") {
-      filtered[slotIdx] = "" as NicsureZoneDimensionId;
+      arr[slotIdx] = null;
     } else {
-      filtered[slotIdx] = value;
+      // Keep slots unique: if this dimension already lives in another slot, clear it there first.
+      for (let i = 0; i < arr.length; i++) if (i !== slotIdx && arr[i] === value) arr[i] = null;
+      arr[slotIdx] = value;
     }
-    // Drop trailing empties for a clean ordered list.
-    const cleaned = filtered.filter((d) => d !== "");
+    // Drop trailing nulls so zoneDimensions stays a tight ordered list.
+    const cleaned: NicsureZoneDimensionId[] = [];
+    for (const d of arr) if (d !== null) cleaned.push(d);
     update({ zoneDimensions: cleaned });
   };
 
