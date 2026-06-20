@@ -168,14 +168,13 @@ function SplitPanel({ settings, setSettings }: {
           : `${target.label} stöder inte multifil-export — uppdelning ignoreras.`}
       </Hint>
       <div className="mt-2 flex flex-col gap-2">
-        {modes.map(([mode, label, desc]) => (
-          <label key={mode} className={`flex items-start gap-2 text-sm ${supportsSplit ? "" : "opacity-50"}`}>
+        {supportsSplit && modes.map(([mode, label, desc]) => (
+          <label key={mode} className="flex items-start gap-2 text-sm">
             <input
               type="radio"
               name="split-mode"
               className="mt-1"
               checked={split.mode === mode}
-              disabled={!supportsSplit}
               onChange={() => updSplit({ mode })}
             />
             <span>
@@ -185,7 +184,7 @@ function SplitPanel({ settings, setSettings }: {
           </label>
         ))}
       </div>
-      {split.mode === "per_district_chunked" && (
+      {supportsSplit && split.mode === "per_district_chunked" && (
         <div className="mt-3 max-w-xs">
           <NumberField
             label="Kanaler per chunk"
@@ -195,6 +194,7 @@ function SplitPanel({ settings, setSettings }: {
           />
         </div>
       )}
+
     </div>
   );
 }
