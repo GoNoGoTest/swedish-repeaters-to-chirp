@@ -294,6 +294,7 @@ export function toNicsureRows(
   const warnings: Warning[] = [];
   let truncCount = 0;
   let unsupported = 0;
+  let txBlocked = 0;
 
   const dims = s.zoneDimensions.slice(0, 4);
   const legend = buildZoneLegend(channels, dims);
