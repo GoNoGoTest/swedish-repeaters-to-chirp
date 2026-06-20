@@ -157,6 +157,21 @@ describe("targets/nicsure-rt880", () => {
     expect(rows[1].slice(8, 12)).toEqual(["A", " ", " ", " "]);
   });
 
+  it("district dimension falls back to pack_id for channel-pack rows", () => {
+    const rpt = makeChannel({ district: "6", type: "Repeater" });
+    const pack = makeChannel({
+      source_type: "channel_pack",
+      district: "",
+      type: "",
+      pack_id: "se_marine_vhf",
+      rx_frequency: 156.05,
+    });
+    const legend = buildZoneLegend([rpt, pack], ["district"]);
+    expect(legend.slots[0].entries).toEqual([
+      { letter: "A", value: "SM6" },
+      { letter: "B", value: "se_marine_vhf" },
+    ]);
+
   it("zoneDimensions: [] leaves every slot blank", () => {
     const ch = makeChannel({ district: "6", type: "Repeater" });
     const rows = parseRows(
