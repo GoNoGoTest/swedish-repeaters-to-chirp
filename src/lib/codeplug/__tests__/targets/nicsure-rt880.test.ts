@@ -113,9 +113,9 @@ describe("targets/nicsure-rt880", () => {
       district: "6",
       type: "Repeater",
     });
-    const la3 = makeChannel({
+    const la = makeChannel({
       rx_frequency: 145.6,
-      district: "LA3",
+      district: "LA",
       type: "Link",
     });
     const pack = makeChannel({
@@ -127,10 +127,10 @@ describe("targets/nicsure-rt880", () => {
       type: "",
       category: "pmr",
     });
-    const rows = parseRows(NICSURE_RT880_TARGET.export([sm6, la3, pack], NICSURE_RT880_DEFAULTS).content);
+    const rows = parseRows(NICSURE_RT880_TARGET.export([sm6, la, pack], NICSURE_RT880_DEFAULTS).content);
     // Slot1..Slot4 are columns 8..11
     expect(rows[1].slice(8, 12)).toEqual(["S", "6", "R", " "]);
-    expect(rows[2].slice(8, 12)).toEqual(["N", "3", "L", " "]);
+    expect(rows[2].slice(8, 12)).toEqual(["N", " ", "L", " "]);
     expect(rows[3].slice(8, 12)).toEqual([" ", " ", " ", "P"]);
   });
 
