@@ -320,6 +320,7 @@ export function toNicsureRows(
 
     const { mod, unsupported: modUnsupported } = encodeModulation(c);
     if (modUnsupported) unsupported++;
+    if (c.duplex === "off") txBlocked++;
 
     return {
       Channel_Num: String(s.startLocation + i),
