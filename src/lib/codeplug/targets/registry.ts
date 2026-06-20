@@ -1,6 +1,7 @@
 import type { ChirpSettings } from "../models";
 import type { ExportTarget } from "./types";
 import type { VgcN76Settings } from "./vgc-n76";
+import type { NicsureRt880Settings } from "./nicsure-rt880";
 
 /**
  * Closed mapping from target id → its settings type. Adding a new target
@@ -10,6 +11,7 @@ import type { VgcN76Settings } from "./vgc-n76";
 export interface TargetSettingsMap {
   "chirp-generic": ChirpSettings;
   "vgc-n76": VgcN76Settings;
+  "nicsure-rt880": NicsureRt880Settings;
 }
 
 export type TargetId = keyof TargetSettingsMap;
