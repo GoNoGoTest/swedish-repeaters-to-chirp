@@ -467,7 +467,7 @@ export function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, ta
           ...nicTarget.defaultSettings,
           ...(targetSettings as Partial<NicsureRt880Settings>),
         };
-        return <NicsureRt880Panel settings={nicSettings} update={setTargetSettings} />;
+        return <NicsureRt880Panel settings={nicSettings} update={setTargetSettings} channels={channels} />;
       })()}
     </div>
   );
