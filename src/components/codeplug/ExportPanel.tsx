@@ -1,8 +1,15 @@
+import { useMemo } from "react";
 import type {
   ChirpSettings, FreqDupePolicy, PackPlacement, RxOnlyPolicy, Settings,
-  SplitMode, SplitSettings, HomeDistrictSort,
+  SplitMode, SplitSettings, HomeDistrictSort, NormalizedChannel,
 } from "@/lib/codeplug/models";
 import type { VgcN76Settings, NicsureRt880Settings } from "@/lib/codeplug/targets";
+import {
+  NICSURE_ZONE_DIMENSIONS,
+  buildZoneLegend,
+  formatZoneLegend,
+  type NicsureZoneDimensionId,
+} from "@/lib/codeplug/targets/nicsure-rt880";
 import { requireTarget } from "@/lib/codeplug/targets";
 import { isValidMaidenhead } from "@/lib/codeplug/maidenhead";
 import { Field, Hint, NumberField, SectionLabel } from "./common";
