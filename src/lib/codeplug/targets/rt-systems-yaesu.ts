@@ -267,10 +267,10 @@ export function exportRtSystemsYaesuCsv(
 
 export const RT_SYSTEMS_YAESU_TARGET: ExportTarget<RtSystemsYaesuSettings> = {
   id: "rt-systems-yaesu-generic",
-  label: "RT Systems Yaesu ???",
+  label: "RT-Systems Yaesu FTM-510",
   vendor: "RT Systems",
   description:
-    "CSV för RT Systems programmeringsverktyg till Yaesu-radior. Stödjer FM och C4FM (Operating Mode FM/DN). Exakt radiomodell ännu inte fastslagen — formatet är gemensamt för flera Yaesu-modeller i sviten.",
+    "CSV för RT Systems programmeringsverktyg till Yaesu FTM-510. Stödjer FM och C4FM (Operating Mode FM/DN).",
   filenameBase: "rt-systems-yaesu",
   fileExtension: "csv",
   limits: RT_SYSTEMS_YAESU_LIMITS,

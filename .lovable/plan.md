@@ -1,31 +1,18 @@
-# Status
+## Problem
 
-Klar: nytt RT Systems Yaesu-exportmål + mode-toggle-omläggning.
+1. **Inte synlig i publicerad app**: Frontend-ändringar går live först när appen publiceras igen. Targetet finns i koden (`src/lib/codeplug/targets/rt-systems-yaesu.ts`, registrerat via `targets/index.ts`) och visas i preview, men `https://se-codeplug.lovable.app` kör en äldre build. Lösning: publicera om efter att namnet är uppdaterat.
 
-## Implementerat
+2. **Byt namn** från "RT Systems Yaesu ???" → "RT-Systems Yaesu FTM-510".
 
-- `src/lib/codeplug/modes.ts` — `KNOWN_MODES`, `parseModes`, alias-tabell (YSF/DN→C4FM, DSTAR→D-Star m.fl.).
-- `NormalizedChannel.mode_effective` — sätts av channel_pack-importern och av expansion-steget.
-- `FilterSettings.modes: string[]` + migrering från äldre `modeStrategy`/`customModes`.
-- `pipeline.expandModes` — multi-mode SK6BA-rader expanderas till en kanal per markerat mode.
-- `applyFilters` slutade gate:a på mode (det gör expansion nu).
-- `{mode}`-token i naming + `abbreviations.mode`-override.
-- `HardwareLimits.supportedSignalModes` — utgråad-state per target i UI.
-- `RepeaterFilterPanel` — toggles för alla `KNOWN_MODES`, utgråade om ej stödda av valt mål.
-- Nytt exportmål `rt-systems-yaesu-generic` ("RT Systems Yaesu ???"):
-  21-kolumners CSV, FM→`FM`, C4FM→`DN`, simplex/duplex/split, CTCSS/DCS/Tone-Mode, name-trunkering, Skip/Scan, `rt_unsupported_mode`-warning för D-Star/DMR/etc.
-- Stödjer split-export via `buildSplitFiles`.
-- Settings-panel i ExportPanel.
+## Ändringar
 
-## Tester
+**`src/lib/codeplug/targets/rt-systems-yaesu.ts`**
+- `label: "RT-Systems Yaesu FTM-510"`
+- Uppdatera `description` så "???"/"radiomodell ännu inte fastslagen"-formuleringen ersätts med en kort FTM-510-specifik text (CSV för RT Systems till Yaesu FTM-510, stödjer FM och C4FM/DN).
+- `id` behålls som `rt-systems-yaesu-generic` så att sparade inställningar (`settings.export.perTarget[id]`, `targetId`) och migrationslogik fortsätter fungera — id är internt, label är det användaren ser. Filenames (`filenameBase: "rt-systems-yaesu"`) behålls också.
 
-226/226 gröna. Nya:
-- `modes.test.ts` (10)
-- `targets/rt-systems-yaesu.test.ts` (13)
-- pipeline expansion-tester (4)
-- naming `{mode}`-tester (3)
+**Inga test- eller pipeline-ändringar**: tester kontrollerar header/fält/mappning, inte label. Inga andra filer refererar till strängen "Yaesu ???".
 
-## Kvarstår
+## Publicering
 
-- Ingen automatisk UI-test för utgråade toggles (visuellt).
-- Eventuell modellspecifik justering när konkret Yaesu-modell väljs (filtillägg, Step-domän, AMS-default).
+Efter ändringen: publicera om så att FTM-510-målet syns på `se-codeplug.lovable.app`. Frågar dig innan jag trycker publish.
