@@ -1,62 +1,56 @@
-## Justera RT Systems Yaesu-exporten
+# CHIRP Generic CSV — korrigera header, mode-mappning och digital-varning
 
-Tre fynd verifierade mot referensfilen `2026-06-21.csv` (1 header + 999 datarader). Alla ändringar sker i `src/lib/codeplug/targets/rt-systems-yaesu.ts` plus nya testfall.
+Verifierade fynden mot källfilerna (`src/lib/codeplug/exporters/chirp.ts`, `targets/chirp-generic.ts`, `models.ts`, `pipeline.ts`):
 
-### 1. DN-kanaler får aldrig analog ton
+- **DVCODE saknas** i `CHIRP_COLUMNS` (verifierat: 20 kolumner, ingen DVCODE). Stämmer.
+- **Mode-mappning är fel**: `resolveMode` använder bara `c.mode_chirp` för pack-rader och annars `s.mode`. `c.mode_effective` (satt av pipeline:n för SK6BA‐rader, t.ex. `"C4FM"`, `"D-Star"`, `"DMR"`) ignoreras helt. Stämmer.
+- **Ingen varning** finns för digitala moder i CHIRP-exporten idag. Stämmer.
+- **Tonlogiken** (defensiva defaults för `rToneFreq`/`cToneFreq`/`DtcsCode`/`DtcsPolarity`/`RxDtcsCode`/`CrossMode`) lämnas orörd.
 
-Om Operating Mode resolvas till `DN` ska `Tone Mode` tvingas till `None`. CTCSS/DCS-fälten behåller sina default-placeholders (`100.0` / `023`). FM-rader påverkas inte.
+## Ändringar
 
-Implementation: flytta `operatingMode(c)`-anropet före `resolveTone(...)` i `toRtSystemsYaesuRow` och skicka in `mode` till `resolveTone`. När `mode === "DN"` returneras `{ toneMode: "None", ctcss: "100.0", dcs: "023" }` direkt.
+### 1. `src/lib/codeplug/exporters/chirp.ts`
 
-### 2. Heltals-MHz-offset skrivs som `X.00000 MHz`
+- Lägg `"DVCODE"` sist i `CHIRP_COLUMNS`. Exportera som tom sträng.
+- Ny `resolveMode(c, fallback)`:
+  1. `c.source_type === "channel_pack"` och `c.mode_chirp` → `c.mode_chirp` (oförändrat).
+  2. Annars mappa `c.mode_effective`:
+     - `"FM"` → `fallback` (`settings.mode`, dvs `"NFM"`/`"FM"`)
+     - `"C4FM"` → `"DN"`
+     - `"D-Star"` → `"DV"`
+     - `"DMR"` → `"DMR"`
+     - `"DMRplus"` → `"DMR"`
+     - `"P25"` → `"P25"`
+     - `"CW"` → `"CW"`
+     - `"Tetra"`, tomt eller okänt → `fallback`
+- Ny exporterad helper `chirpDigitalWarnings(channels): Warning[]` som returnerar **en** icke-blockerande varning (code: `unknown_mode` återanvänds — befintliga koder räcker; eller vi kan lägga till `"chirp_digital_partial"` i `WarningCode` för tydlighet — väljer det senare för spårbarhet) när minst en kanal har `mode_effective ∈ {C4FM, D-Star, DMR, DMRplus, P25}`. Meddelandetext på svenska enligt spec.
 
-`formatOffsetKhz(2)` ska returnera `"2.00000 MHz"` istället för `"2 MHz"`. Sub-MHz fortsätter formateras i kHz utan decimaler (`"600 kHz"`). 7.6 MHz är fortfarande `"7600 kHz"` som idag (referensen visar inga icke-heltals-MHz, så kHz-fallback är säkrast).
+### 2. `src/lib/codeplug/models.ts`
 
-Ny logik:
-- `offsetMhz >= 1 && Number.isInteger(offsetMhz)` → `${offsetMhz.toFixed(5)} MHz` (t.ex. `"2.00000 MHz"`, `"5.00000 MHz"`)
-- annars `${khz} kHz` som idag
+- Lägg till `"chirp_digital_partial"` i `WarningCode`-unionen.
 
-### 3. Padda till 999 rader som default
+### 3. `src/lib/codeplug/targets/chirp-generic.ts`
 
-Lägg till nytt fält i `RtSystemsYaesuSettings`:
+- `supportedModes` → `["NFM","FM","WFM","AM","NAM","DV","DN","DMR","P25","CW","USB","LSB","RTTY","DIG","PKT"]`.
+- `supportedSignalModes` lämnas som idag (`["FM","C4FM","D-Star","DMR","DMRplus","P25","Tetra","CW"]`).
+- `export()` returnerar nu `warnings: chirpDigitalWarnings(channels)` istället för `[]`.
+- `exportMany`/`buildSplitFiles`: varningar är globala per export, så vi behåller dem på single-export-path; multi-file behåller nuvarande beteende (varningar visas via `validate`-vägen vid behov — lägg in `validate: (ch) => chirpDigitalWarnings(ch)` så att UI:n får varningen oavsett split).
 
-```ts
-/** Pad output to this many channel rows (header excluded). Empty rows
- *  keep the leading index and all 21 columns. Set to 0 to disable. */
-padToRows: number;
-```
+### 4. Tester (`src/lib/codeplug/__tests__/exporters/chirp.test.ts` + `targets/chirp-generic.test.ts`)
 
-Default `padToRows: 999`. Tomma rader byggs som:
+- Uppdatera `EXPECTED_HEADER` att sluta med `,DVCODE`.
+- Uppdatera "never produces empty …"-testet — DVCODE får vara tom.
+- Nya cases (SK6BA-kanal via `makeChannel({ mode_effective: ... })`):
+  - `C4FM` → `Mode === "DN"`
+  - `D-Star` → `Mode === "DV"`
+  - `DMR` → `Mode === "DMR"`
+  - `DMRplus` → `Mode === "DMR"`
+  - `P25` → `Mode === "P25"`
+  - `FM` med `settings.mode = "NFM"` → `Mode === "NFM"` (regression)
+  - `channel_pack` med `mode_chirp: "USB"` och `mode_effective: "C4FM"` → `Mode === "USB"` (override-regression bibehållen)
+- Target-test: export av en kanal med `mode_effective: "C4FM"` → `result.warnings` innehåller exakt en varning med svensk text om "CHIRP Generic CSV"/"digitala".
+- Target-test: export av bara `FM`-kanaler → `result.warnings.length === 0`.
 
-```
-String(index), "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
-```
+## Teknisk not
 
-— alltså löpnummer + 20 tomma fält (matchar headerns 21 kolumner och paddningsraderna i referensen). Inga warnings emiteras för paddningsrader (de räknas inte mot `truncCount`/`unsupportedCount`).
-
-`exportRtSystemsYaesuCsv` itererar `channels`, sedan om `channels.length < s.padToRows` läggs `padToRows - channels.length` tomma rader till med fortsatt löpnummer från `s.startNumber + channels.length`.
-
-### Splitfiler
-
-`buildSplitFiles` kallar `exportRtSystemsYaesuCsv(chunk, s)` per chunk. Paddningen ska appliceras per chunk så varje delfil också blir 999 rader — det matchar förväntan att en split-fil ska kunna importeras stand-alone i RT Systems-mjukvaran.
-
-### UI
-
-Lägg till en numerisk input för `padToRows` i target-settings-panelen (samma plats som övriga RT Systems-fält). Värde `0` = ingen padding. Min `0`, max `999` (radions kapacitet enligt referensen). Detta är en liten UI-tillägg i den befintliga settings-formen — ingen ny komponent.
-
-### Tester (`src/lib/codeplug/__tests__/targets/rt-systems-yaesu.test.ts`)
-
-Nya cases:
-- DN-kanal med `ctcss_tx` satt → `Tone Mode === "None"`, `CTCSS === "100.0"`.
-- FM-kanal med `ctcss_tx` satt → fortsatt `Tone Mode === "Tone"` (regression).
-- 2 MHz offset → `fields[3] === "2.00000 MHz"`.
-- 5 MHz offset → `fields[5] === "5.00000 MHz"`.
-- 0.6 MHz → fortsatt `"600 kHz"` (regression).
-- Export med `padToRows: 999` av lista på 3 kanaler → CSV har 1 header + 999 rader; rad 4 = `"4,,,,,,,,,,,,,,,,,,,,"`; sista raden börjar med `"999,"`.
-- `padToRows: 0` → ingen padding.
-
-### Out of scope
-
-- Inga ändringar i andra targets.
-- Ingen ändring av default `startNumber`, `defaultPower` etc.
-- Ingen ändring av tone-logik för FM (T Sql-vs-Tone-heuristiken är oförändrad).
+`makeChannel`-helpern måste tillåta att `mode_effective` sätts. Verifieras vid implementation; annars läggs default = `""` och vi sätter värdet explicit i testet.

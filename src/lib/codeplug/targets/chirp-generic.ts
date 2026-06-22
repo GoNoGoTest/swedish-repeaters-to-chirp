@@ -1,5 +1,5 @@
 import type { ChirpSettings, NormalizedChannel, SplitSettings } from "../models";
-import { exportChirpCsv } from "../exporters/chirp";
+import { exportChirpCsv, chirpDigitalWarnings } from "../exporters/chirp";
 import { registerTarget } from "./registry";
 import { buildSplitFiles } from "./split";
 import type { ExportTarget, HardwareLimits } from "./types";
@@ -16,10 +16,9 @@ const CHIRP_GENERIC_LIMITS: HardwareLimits = {
   // CHIRP itself doesn't impose a max; the actual radio does. We keep a
   // sane default name length matching CHIRP_GENERIC_DEFAULTS.maxLength.
   maxNameLength: 6,
-  supportedModes: ["NFM", "FM", "AM", "USB", "LSB", "CW", "DV"],
+  supportedModes: ["NFM","FM","WFM","AM","NAM","DV","DN","DMR","P25","CW","USB","LSB","RTTY","DIG","PKT"],
   // CHIRP-CSV is permissive: analog modes export cleanly; digital modes
-  // pass through as Mode=FM/DV with a Comment, so we accept all canonical
-  // modes here instead of forcing the user to deselect them.
+  // pass through as Mode=DN/DV/DMR/P25 with a non-blocking warning.
   supportedSignalModes: ["FM", "C4FM", "D-Star", "DMR", "DMRplus", "P25", "Tetra", "CW"],
   supportsSplit: true,
   supportsCtcss: true,
@@ -36,10 +35,11 @@ export const CHIRP_GENERIC_TARGET: ExportTarget<ChirpSettings> = {
   limits: CHIRP_GENERIC_LIMITS,
   defaultSettings: CHIRP_GENERIC_DEFAULTS,
   resolveMaxNameLength: (s) => s.maxLength,
+  validate: (channels) => chirpDigitalWarnings(channels),
   export: (channels: NormalizedChannel[], settings: ChirpSettings) => ({
     filename: "chirp.csv",
     content: exportChirpCsv(channels, settings),
-    warnings: [],
+    warnings: chirpDigitalWarnings(channels),
   }),
   exportMany: (channels: NormalizedChannel[], settings: ChirpSettings, split: SplitSettings) =>
     buildSplitFiles(channels, split, {

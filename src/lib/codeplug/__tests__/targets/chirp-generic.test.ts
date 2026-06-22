@@ -25,4 +25,26 @@ describe("targets/chirp-generic", () => {
     expect(viaTarget.filename).toBe("chirp.csv");
     expect(viaTarget.warnings).toEqual([]);
   });
+
+  it("emits a non-blocking digital warning when any channel has a digital effective mode", () => {
+    const c = makeChannel({ generated_name_final: "X", mode_effective: "C4FM" });
+    const result = CHIRP_GENERIC_TARGET.export([c], CHIRP_GENERIC_DEFAULTS);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0].code).toBe("chirp_digital_partial");
+    expect(result.warnings[0].message).toMatch(/CHIRP Generic CSV/);
+    expect(result.warnings[0].message).toMatch(/digitala/i);
+  });
+
+  it("emits no warnings when only analog FM channels are exported", () => {
+    const c = makeChannel({ generated_name_final: "X", mode_effective: "FM" });
+    const result = CHIRP_GENERIC_TARGET.export([c], CHIRP_GENERIC_DEFAULTS);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("validate() also surfaces digital warnings (for multi-file split path)", () => {
+    const c = makeChannel({ generated_name_final: "X", mode_effective: "DMR" });
+    const warns = CHIRP_GENERIC_TARGET.validate!([c], CHIRP_GENERIC_DEFAULTS);
+    expect(warns).toHaveLength(1);
+    expect(warns[0].code).toBe("chirp_digital_partial");
+  });
 });

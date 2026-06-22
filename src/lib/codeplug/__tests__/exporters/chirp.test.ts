@@ -7,14 +7,14 @@ import { CHIRP_GENERIC_DEFAULTS } from "@/lib/codeplug/targets";
 const chirp = CHIRP_GENERIC_DEFAULTS;
 
 const EXPECTED_HEADER =
-  "Location,Name,Frequency,Duplex,Offset,Tone,rToneFreq,cToneFreq,DtcsCode,DtcsPolarity,RxDtcsCode,CrossMode,Mode,TStep,Skip,Power,Comment,URCALL,RPT1CALL,RPT2CALL";
+  "Location,Name,Frequency,Duplex,Offset,Tone,rToneFreq,cToneFreq,DtcsCode,DtcsPolarity,RxDtcsCode,CrossMode,Mode,TStep,Skip,Power,Comment,URCALL,RPT1CALL,RPT2CALL,DVCODE";
 
 describe("CHIRP exporter", () => {
   it("emits the RMS/CHIRP-compatible header (Power before Comment, no DVCODE)", () => {
     const csv = exportChirpCsv([], chirp);
     const header = csv.split(/\r?\n/)[0];
     expect(header).toBe(EXPECTED_HEADER);
-    expect(CHIRP_COLUMNS).not.toContain("DVCODE");
+    expect(CHIRP_COLUMNS[CHIRP_COLUMNS.length - 1]).toBe("DVCODE");
     expect(CHIRP_COLUMNS.indexOf("Power")).toBeLessThan(CHIRP_COLUMNS.indexOf("Comment"));
   });
 
@@ -167,4 +167,58 @@ describe("CHIRP exporter", () => {
       expect(Number.isFinite(parseFloat(r.cToneFreq))).toBe(true);
     }
   });
+
+  describe("mode_effective → CHIRP Mode mapping", () => {
+    const cases: Array<[string, string]> = [
+      ["C4FM", "DN"],
+      ["D-Star", "DV"],
+      ["DMR", "DMR"],
+      ["DMRplus", "DMR"],
+      ["P25", "P25"],
+      ["CW", "CW"],
+    ];
+    for (const [eff, expected] of cases) {
+      it(`mode_effective="${eff}" → Mode="${expected}"`, () => {
+        const c = makeChannel({ generated_name_final: "X", mode_effective: eff });
+        const rows = toChirpRows([c], { ...chirp, mode: "NFM" });
+        expect(rows[0].Mode).toBe(expected);
+      });
+    }
+
+    it("analog FM uses settings.mode fallback (NFM)", () => {
+      const c = makeChannel({ generated_name_final: "X", mode_effective: "FM" });
+      const rows = toChirpRows([c], { ...chirp, mode: "NFM" });
+      expect(rows[0].Mode).toBe("NFM");
+    });
+
+    it("analog FM uses settings.mode fallback (FM)", () => {
+      const c = makeChannel({ generated_name_final: "X", mode_effective: "FM" });
+      const rows = toChirpRows([c], { ...chirp, mode: "FM" });
+      expect(rows[0].Mode).toBe("FM");
+    });
+
+    it("Tetra falls back to analog settings.mode", () => {
+      const c = makeChannel({ generated_name_final: "X", mode_effective: "Tetra" });
+      const rows = toChirpRows([c], { ...chirp, mode: "NFM" });
+      expect(rows[0].Mode).toBe("NFM");
+    });
+
+    it("channel_pack mode_chirp overrides effective-mode mapping", () => {
+      const c = makeChannel({
+        source_type: "channel_pack",
+        generated_name_final: "X",
+        mode_chirp: "USB",
+        mode_effective: "C4FM",
+      });
+      const rows = toChirpRows([c], { ...chirp, mode: "NFM" });
+      expect(rows[0].Mode).toBe("USB");
+    });
+  });
+
+  it("emits DVCODE as empty string for every row", () => {
+    const c = makeChannel({ generated_name_final: "X", mode_effective: "C4FM" });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].DVCODE).toBe("");
+  });
 });
+

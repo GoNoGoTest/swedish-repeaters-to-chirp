@@ -1,11 +1,11 @@
 import Papa from "papaparse";
-import type { ChirpSettings, NormalizedChannel } from "../models";
+import type { ChirpSettings, NormalizedChannel, Warning } from "../models";
 import { formatFrequency } from "../frequency";
 
 export const CHIRP_COLUMNS = [
   "Location","Name","Frequency","Duplex","Offset","Tone","rToneFreq","cToneFreq",
   "DtcsCode","DtcsPolarity","RxDtcsCode","CrossMode","Mode","TStep","Skip",
-  "Power","Comment","URCALL","RPT1CALL","RPT2CALL",
+  "Power","Comment","URCALL","RPT1CALL","RPT2CALL","DVCODE",
 ];
 
 // Technical CSV-import defaults. CHIRP/RMS parse these columns as float/int
@@ -19,9 +19,50 @@ const DEFAULT_RX_DTCS = "023";
 const DEFAULT_CROSS = "Tone->";
 const DEFAULT_POWER = "10.0W";
 
+// Map canonical signal mode (mode_effective) → CHIRP Generic CSV Mode token.
+// "FM" intentionally returns null to let the caller fall back to settings.mode
+// (NFM vs FM is a per-export user choice for analog).
+function mapEffectiveMode(m: string): string | null {
+  switch (m) {
+    case "C4FM": return "DN";
+    case "D-Star": return "DV";
+    case "DMR": return "DMR";
+    case "DMRplus": return "DMR";
+    case "P25": return "P25";
+    case "CW": return "CW";
+    case "FM": return null;       // use analog fallback
+    case "Tetra": return null;    // unsupported by Generic CSV → fallback
+    default: return null;         // unknown / empty → fallback
+  }
+}
+
 function resolveMode(c: NormalizedChannel, fallback: string): string {
+  // Channel-pack explicit CHIRP mode wins (e.g. USB/LSB/AM/CW).
   if (c.source_type === "channel_pack" && c.mode_chirp) return c.mode_chirp;
-  return fallback;
+  const mapped = mapEffectiveMode(c.mode_effective);
+  return mapped ?? fallback;
+}
+
+const DIGITAL_MODES = new Set(["C4FM", "D-Star", "DMR", "DMRplus", "P25"]);
+
+/**
+ * Returns a single non-blocking warning when the export contains at least
+ * one channel with a digital effective mode. CHIRP Generic CSV can carry
+ * Mode=DN/DV/DMR/P25 but full radio support depends on driver/model and
+ * system-specific fields (talkgroup, color code, slot, Fusion params) are
+ * not part of the Generic CSV schema.
+ */
+export function chirpDigitalWarnings(channels: NormalizedChannel[]): Warning[] {
+  const has = channels.some((c) => DIGITAL_MODES.has(c.mode_effective));
+  if (!has) return [];
+  return [{
+    code: "chirp_digital_partial",
+    message:
+      "CHIRP Generic CSV kan bära digitala mode-värden (DN, DV, DMR, P25), men " +
+      "fullt stöd beror på radiomodell och CHIRP-drivrutin. Systemspecifika " +
+      "inställningar som DMR talkgroup, color code, timeslot eller Fusion-" +
+      "parametrar ingår inte och kan behöva kompletteras manuellt.",
+  }];
 }
 
 function resolveTStep(c: NormalizedChannel, fallback: number): number {
@@ -60,9 +101,6 @@ interface ToneFields {
   CrossMode: string;
 }
 
-// Defaults are chosen so CHIRP generic CSV import never trips on
-// `could not convert string to float: ''`. Tone is left empty here when
-// the row has no actual tone; callers override specific fields per branch.
 const DEFAULT_TONE_FIELDS: ToneFields = {
   Tone: "",
   rToneFreq: DEFAULT_RTONE,
@@ -74,7 +112,6 @@ const DEFAULT_TONE_FIELDS: ToneFields = {
 };
 
 function resolveToneFields(c: NormalizedChannel): ToneFields {
-  // Pack-row: explicit tone_raw drives the branch.
   if (c.source_type === "channel_pack") {
     const t = (c.tone_raw || "").trim().toUpperCase();
     if (t === "TSQL") {
@@ -98,7 +135,6 @@ function resolveToneFields(c: NormalizedChannel): ToneFields {
     }
     return { ...DEFAULT_TONE_FIELDS };
   }
-  // SK6BA-row: CTCSS-TX wins; otherwise DCS-from-access → Cross; else defaults.
   if (c.ctcss_tx != null) {
     return { ...DEFAULT_TONE_FIELDS, Tone: "Tone", rToneFreq: c.ctcss_tx.toFixed(1) };
   }
@@ -140,6 +176,7 @@ export function toChirpRows(channels: NormalizedChannel[], s: ChirpSettings) {
       URCALL: "",
       RPT1CALL: "",
       RPT2CALL: "",
+      DVCODE: "",
     };
   });
 }
