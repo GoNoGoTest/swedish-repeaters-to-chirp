@@ -6,7 +6,9 @@ import {
   NORDIC_COUNTRY_CODES,
   type RegionCountryCode,
 } from "@/lib/codeplug/region";
-import { Field, Hint, MultiSelect, SectionLabel } from "./common";
+import { KNOWN_MODES } from "@/lib/codeplug/modes";
+import { getTarget } from "@/lib/codeplug/targets";
+import { Hint, MultiSelect, SectionLabel } from "./common";
 
 const ALL_COUNTRY_CODES: RegionCountryCode[] = (
   Object.keys(COUNTRY_SORT_ORDER) as RegionCountryCode[]
@@ -89,22 +91,79 @@ export function RepeaterFilterPanel({ summary, settings, setSettings }: {
         <Hint>Visar regioner som finns i den importerade filen (SM0–SM7, LA, OZ, OH0–OH9, TF, JW, JX, OY, OX).</Hint>
       </div>
 
+      <div className="mt-4">
+        <SectionLabel>Modes (tomt = alla)</SectionLabel>
+        <Hint>
+          Markera de modes som ska exporteras. En SK6BA-rad med flera modes
+          (t.ex. "FM / C4FM") expanderar till en kanal per markerat mode.
+          Modes som inte stöds av valt exportformat är utgråade.
+        </Hint>
+        <ModeToggles
+          targetId={settings.export.targetId}
+          value={settings.filter.modes ?? []}
+          onChange={(v) => upd({ modes: v })}
+        />
+      </div>
+
       <div className="grid gap-4 md:grid-cols-3 mt-3">
-        <Field label="Mode-strategi">
-          <select value={settings.filter.modeStrategy}
-            onChange={(e) => upd({ modeStrategy: e.target.value as Settings["filter"]["modeStrategy"] })}
-            className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
-            <option value="contains_fm">Mode innehåller FM</option>
-            <option value="exact_fm">Exakt FM</option>
-            <option value="all">Alla rader</option>
-          </select>
-        </Field>
-        <label className="flex items-center gap-2 text-sm mt-5">
+        <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={settings.filter.includeUnknownRegions ?? false}
             onChange={(e) => upd({ includeUnknownRegions: e.target.checked })} />
           Inkludera okända regioner
         </label>
       </div>
+    </div>
+  );
+}
+
+function ModeToggles({ targetId, value, onChange }: {
+  targetId: string;
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const target = getTarget(targetId);
+  const supported = target?.limits.supportedSignalModes;
+  // Undefined → treat as "supports all". Empty array → supports nothing
+  // (probably a misconfigured target — still render all as disabled).
+  const supportedSet = supported ? new Set(supported) : null;
+  const toggle = (mode: string) => {
+    if (value.includes(mode)) {
+      onChange(value.filter((m) => m !== mode));
+    } else {
+      onChange([...value, mode]);
+    }
+  };
+  return (
+    <div className="flex flex-wrap gap-2 mt-2">
+      {KNOWN_MODES.map((mode) => {
+        const isSupported = supportedSet === null || supportedSet.has(mode);
+        const isOn = value.includes(mode);
+        const disabled = !isSupported && !isOn;
+        const title = !isSupported
+          ? `Stöds inte av ${target?.label ?? "valt exportformat"}`
+          : undefined;
+        return (
+          <label
+            key={mode}
+            title={title}
+            className={`flex items-center gap-1.5 rounded border px-2 py-1 text-xs ${
+              isOn
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border bg-background"
+            } ${!isSupported ? "opacity-50" : ""} ${
+              disabled ? "cursor-not-allowed" : "cursor-pointer"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={isOn}
+              disabled={disabled}
+              onChange={() => toggle(mode)}
+            />
+            <span className="font-mono">{mode}</span>
+          </label>
+        );
+      })}
     </div>
   );
 }
