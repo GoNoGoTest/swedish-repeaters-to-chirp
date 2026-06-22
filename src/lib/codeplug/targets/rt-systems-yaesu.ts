@@ -265,8 +265,20 @@ export function exportRtSystemsYaesuCsv(
     if (unsupportedMode) unsupportedCount++;
     lines.push(joinRow(fields));
   });
+  // Pad with empty rows to match the reference RT Systems export shape
+  // (typically 999 channel slots for FTM-510). Empty rows preserve the
+  // leading row-index and all 21 columns so the radio software accepts
+  // the file verbatim.
+  const padTarget = Math.max(0, s.padToRows | 0);
+  if (channels.length < padTarget) {
+    const emptyTail = new Array(RT_SYSTEMS_YAESU_HEADER_FIELDS.length - 1).fill("");
+    for (let i = channels.length; i < padTarget; i++) {
+      lines.push(joinRow([String(s.startNumber + i), ...emptyTail]));
+    }
+  }
   // RT Systems exports include a trailing newline.
   const csv = lines.join("\r\n") + "\r\n";
+
 
   if (truncCount > 0) {
     warnings.push({
