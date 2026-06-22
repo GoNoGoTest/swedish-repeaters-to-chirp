@@ -14,7 +14,7 @@ describe("CHIRP exporter", () => {
     const csv = exportChirpCsv([], chirp);
     const header = csv.split(/\r?\n/)[0];
     expect(header).toBe(EXPECTED_HEADER);
-    expect(CHIRP_COLUMNS).not.toContain("DVCODE");
+    expect(CHIRP_COLUMNS[CHIRP_COLUMNS.length - 1]).toBe("DVCODE");
     expect(CHIRP_COLUMNS.indexOf("Power")).toBeLessThan(CHIRP_COLUMNS.indexOf("Comment"));
   });
 
