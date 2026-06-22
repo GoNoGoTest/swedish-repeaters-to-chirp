@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS } from "@/lib/codeplug/defaults";
 const STORAGE_KEY = "sk6ba-chirp-settings-v6";
 
 import { parseModes } from "@/lib/codeplug/modes";
+import { getTarget } from "@/lib/codeplug/targets";
 
 function migrateFilter(parsedFilter: any): Settings["filter"] {
   const base: any = { ...DEFAULT_SETTINGS.filter, ...(parsedFilter ?? {}) };
@@ -53,7 +54,9 @@ function loadStoredSettings(): Settings {
       packs: { ...DEFAULT_SETTINGS.packs, ...(parsed.packs ?? {}) },
       sort: { ...DEFAULT_SETTINGS.sort, ...(parsed.sort ?? {}) },
       export: {
-        targetId: parsed?.export?.targetId ?? DEFAULT_SETTINGS.export.targetId,
+        targetId: (parsed?.export?.targetId && getTarget(parsed.export.targetId))
+          ? parsed.export.targetId
+          : DEFAULT_SETTINGS.export.targetId,
         perTarget: { ...DEFAULT_SETTINGS.export.perTarget, ...(parsed?.export?.perTarget ?? {}) },
         split: { ...DEFAULT_SETTINGS.export.split, ...(parsed?.export?.split ?? {}) },
       },
