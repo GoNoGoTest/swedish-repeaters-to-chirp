@@ -140,15 +140,17 @@ function formatOffsetFrequency(c: NormalizedChannel): string {
 }
 
 function formatOffsetKhz(offsetMhz: number): string {
-  // 0.6 MHz → "600 kHz", 5 MHz → "5 MHz", 7.6 MHz → "7600 kHz"
+  // 0.6 MHz → "600 kHz", 2 MHz → "2.00000 MHz", 7.6 MHz → "7600 kHz".
+  // Integer MHz offsets are written with 5 decimals to match the RT Systems
+  // reference export (e.g. "2.00000 MHz" for the 70cm band). Non-integer
+  // values fall back to kHz so we never lose precision.
   if (offsetMhz >= 1 && Number.isInteger(offsetMhz)) {
-    return `${offsetMhz} MHz`;
+    return `${offsetMhz.toFixed(5)} MHz`;
   }
   const khz = Math.round(offsetMhz * 1000 * 100) / 100;
-  // Drop trailing ".0" for the common "600 kHz" case.
-  const s = Number.isInteger(khz) ? String(khz) : String(khz);
-  return `${s} kHz`;
+  return `${khz} kHz`;
 }
+
 
 function formatOffsetDirection(c: NormalizedChannel): string {
   if (c.duplex === "+") return "Plus";
