@@ -60,6 +60,7 @@ const NICSURE_RT880_LIMITS: HardwareLimits = {
   maxChannels: 999,
   maxNameLength: 32,
   supportedModes: ["NFM", "FM", "AM"],
+  supportedSignalModes: ["FM"],
   supportsSplit: false,
   supportsCtcss: true,
   supportsDcs: true,

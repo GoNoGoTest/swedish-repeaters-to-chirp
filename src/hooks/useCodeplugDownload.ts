@@ -55,6 +55,11 @@ function invokeTarget(
       if (willSplit && target.exportMany) return { many: target.exportMany(channels, s, split) };
       return { one: target.export(channels, s) };
     }
+    case "rt-systems-yaesu-generic": {
+      const s = resolveTargetSettings(target, storedPatch);
+      if (willSplit && target.exportMany) return { many: target.exportMany(channels, s, split) };
+      return { one: target.export(channels, s) };
+    }
   }
 }
 

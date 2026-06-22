@@ -125,6 +125,7 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
       type: (r.type ?? "").trim(),
       status: "",
       mode_raw: mode || "FM",
+      mode_effective: mode || "FM",
       is_analog_fm: /^(N?FM)$/.test(mode),
       band,
       district: "",

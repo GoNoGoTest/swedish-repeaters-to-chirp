@@ -4,15 +4,38 @@ import { DEFAULT_SETTINGS } from "@/lib/codeplug/defaults";
 
 const STORAGE_KEY = "sk6ba-chirp-settings-v6";
 
+import { parseModes } from "@/lib/codeplug/modes";
+
 function migrateFilter(parsedFilter: any): Settings["filter"] {
-  const base = { ...DEFAULT_SETTINGS.filter, ...(parsedFilter ?? {}) };
+  const base: any = { ...DEFAULT_SETTINGS.filter, ...(parsedFilter ?? {}) };
   // Legacy `includeUnknownDistricts` → `includeUnknownRegions` if new field missing.
   if (parsedFilter && parsedFilter.includeUnknownRegions === undefined
       && parsedFilter.includeUnknownDistricts !== undefined) {
     base.includeUnknownRegions = !!parsedFilter.includeUnknownDistricts;
   }
+  // Legacy `modeStrategy` / `customModes` → `modes`.
+  if (parsedFilter && (!Array.isArray(parsedFilter.modes))) {
+    const strategy = parsedFilter.modeStrategy;
+    if (strategy === "contains_fm" || strategy === "exact_fm") {
+      base.modes = ["FM"];
+    } else if (strategy === "all") {
+      base.modes = [];
+    } else if (strategy === "custom" && Array.isArray(parsedFilter.customModes)) {
+      // Normalise custom values through parseModes so aliases map onto KNOWN_MODES.
+      const out: string[] = [];
+      for (const raw of parsedFilter.customModes) {
+        for (const m of parseModes(String(raw))) {
+          if (!out.includes(m)) out.push(m);
+        }
+      }
+      base.modes = out;
+    } else {
+      base.modes = [...DEFAULT_SETTINGS.filter.modes];
+    }
+  }
   if (!Array.isArray(base.countries)) base.countries = DEFAULT_SETTINGS.filter.countries;
   if (!Array.isArray(base.regions)) base.regions = DEFAULT_SETTINGS.filter.regions;
+  if (!Array.isArray(base.modes)) base.modes = [...DEFAULT_SETTINGS.filter.modes];
   return base;
 }
 

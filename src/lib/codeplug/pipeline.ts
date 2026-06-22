@@ -8,6 +8,7 @@ import { sortChannels } from "./sorting";
 import { applyFreqDedupe } from "./dedupe";
 import { DEFAULT_PACK_NAMING } from "./defaults";
 import { deriveRegion } from "./region";
+import { parseModes } from "./modes";
 
 function emptyPackFields() {
   return {
@@ -85,6 +86,7 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
       source_id: (r.id ?? "").toString(),
       type, status: (r.status ?? "").toString().trim(),
       mode_raw: modeRaw,
+      mode_effective: "",
       is_analog_fm: /\bFM\b/i.test(modeRaw),
       band, district, region: deriveRegion(district, call),
       city, call, channel, network,
@@ -111,6 +113,48 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
       warnings,
     } satisfies NormalizedChannel;
   });
+}
+
+/**
+ * Per-mode expansion for SK6BA rows. A row like `mode_raw="FM / C4FM"` and
+ * `selectedModes=["FM","C4FM"]` yields two channels — one per supported
+ * mode — each with `mode_effective` set to the canonical mode.
+ *
+ * Rules:
+ *  - `parseModes(mode_raw) === []` → keep the row as-is with
+ *    `mode_effective = ""`. The user can still filter it out via other
+ *    filter settings; we don't drop unknown modes silently.
+ *  - `selectedModes === []` → no mode gating; emit one channel per parsed
+ *    mode.
+ *  - `selectedModes` set but `parsed ∩ selectedModes === []` → drop the
+ *    row entirely (mode filter excludes it).
+ *
+ * Channel-pack rows pass through unchanged (they already have a single
+ * `mode_effective` set by the channel-pack importer).
+ */
+export function expandModes(
+  channels: NormalizedChannel[],
+  selectedModes: string[],
+): NormalizedChannel[] {
+  const out: NormalizedChannel[] = [];
+  const sel = new Set(selectedModes);
+  for (const c of channels) {
+    if (c.source_type !== "sk6ba") {
+      out.push(c);
+      continue;
+    }
+    const parsed = parseModes(c.mode_raw);
+    if (parsed.length === 0) {
+      out.push({ ...c, mode_effective: "" });
+      continue;
+    }
+    const kept = sel.size === 0 ? parsed : parsed.filter((m) => sel.has(m));
+    if (kept.length === 0) continue;
+    for (const m of kept) {
+      out.push({ ...c, mode_effective: m, warnings: [...c.warnings] });
+    }
+  }
+  return out;
 }
 
 export interface PipelineInput {
@@ -168,7 +212,10 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   const totalInput = sk6baRows.length + packChannels.length;
   const normalized = normalize(sk6baRows);
   const exportable = normalized.filter((c) => c.rx_frequency != null);
-  const sk6baFiltered = applyFilters(exportable, settings.filter);
+  // Expand multi-mode SK6BA rows into one channel per selected mode.
+  // Channel-pack rows pass through unchanged.
+  const expanded = expandModes(exportable, settings.filter.modes ?? []);
+  const sk6baFiltered = applyFilters(expanded, settings.filter);
   const sk6baSorted = sortChannels(sk6baFiltered, settings.sort);
 
   // Channel-pack rows come from a module-level cache and are reused across

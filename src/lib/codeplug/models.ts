@@ -25,7 +25,9 @@ export type WarningCode =
   | "vgc_title_truncated"
   | "vgc_unsupported_mode"
   | "nicsure_zone_pool_exhausted"
-  | "nicsure_tx_block_unsupported";
+  | "nicsure_tx_block_unsupported"
+  | "rt_unsupported_mode"
+  | "rt_name_truncated";
 
 export interface Warning {
   code: WarningCode;
@@ -48,6 +50,13 @@ export interface NormalizedChannel {
   type: string;
   status: string;
   mode_raw: string;
+  /**
+   * The single canonical mode this channel will be exported under.
+   * For sk6ba rows this is one of `parseModes(mode_raw)`; for channel-pack
+   * rows it falls back to `mode_chirp` or the row's `mode_raw`. May be
+   * an empty string for unknown / unparseable inputs.
+   */
+  mode_effective: string;
   is_analog_fm: boolean;
   band: string;
   /** Raw district value from the CSV (preserved verbatim). */
@@ -104,8 +113,13 @@ export interface NormalizedChannel {
 export interface FilterSettings {
   statuses: string[];
   types: string[];
-  modeStrategy: "contains_fm" | "exact_fm" | "all" | "custom";
-  customModes: string[];
+  /**
+   * Selected modes from `KNOWN_MODES` (see modes.ts). Empty = no mode gating
+   * (every parsed mode passes). Drives the per-mode expansion step in
+   * the pipeline: a row with `mode_raw="FM / C4FM"` and `modes=["FM","C4FM"]`
+   * expands into two channels (one per mode).
+   */
+  modes: string[];
   bands: string[];
   /** Country codes to keep (empty = all). */
   countries: RegionCountryCode[];
@@ -113,6 +127,10 @@ export interface FilterSettings {
   regions: string[];
   /** Include rows whose region is "unknown". Replaces legacy `includeUnknownDistricts`. */
   includeUnknownRegions: boolean;
+  /** @deprecated replaced by `modes`. Kept for migration of old persisted settings. */
+  modeStrategy?: "contains_fm" | "exact_fm" | "all" | "custom";
+  /** @deprecated replaced by `modes`. Kept for migration of old persisted settings. */
+  customModes?: string[];
   /** @deprecated kept for backward compatibility with persisted settings. */
   districts?: string[];
   /** @deprecated alias for `includeUnknownRegions` in legacy persisted settings. */
@@ -131,6 +149,11 @@ export interface NamingSettings {
     network: Record<string, string>;
     band: Record<string, string>;
     districtPrefix: string;
+    /**
+     * Optional shorthand for `{mode}` tokens, e.g. `{ "C4FM": "YSF" }`.
+     * Missing entries pass the canonical mode through unchanged.
+     */
+    mode?: Record<string, string>;
   };
 }
 
