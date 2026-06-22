@@ -7,7 +7,7 @@ import { CHIRP_GENERIC_DEFAULTS } from "@/lib/codeplug/targets";
 const chirp = CHIRP_GENERIC_DEFAULTS;
 
 const EXPECTED_HEADER =
-  "Location,Name,Frequency,Duplex,Offset,Tone,rToneFreq,cToneFreq,DtcsCode,DtcsPolarity,RxDtcsCode,CrossMode,Mode,TStep,Skip,Power,Comment,URCALL,RPT1CALL,RPT2CALL";
+  "Location,Name,Frequency,Duplex,Offset,Tone,rToneFreq,cToneFreq,DtcsCode,DtcsPolarity,RxDtcsCode,CrossMode,Mode,TStep,Skip,Power,Comment,URCALL,RPT1CALL,RPT2CALL,DVCODE";
 
 describe("CHIRP exporter", () => {
   it("emits the RMS/CHIRP-compatible header (Power before Comment, no DVCODE)", () => {
