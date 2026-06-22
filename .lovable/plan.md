@@ -1,9 +1,23 @@
-Smal validering av `settings.export.targetId` mot target-registret i `loadStoredSettings`. Om persistat id pekar på en target som inte längre finns registrerad, faller vi tillbaka på `DEFAULT_SETTINGS.export.targetId`. Övrig state (filter, naming, packs, sort, perTarget-block) bevaras.
+## Plan
 
-## Ändring
+1. **Åtgärda sannolik grundorsak**
+   - `package.json` har `"sideEffects": false`.
+   - `src/lib/codeplug/targets/index.ts` förlitar sig på side-effect-importer (`import "./rt-systems-yaesu"`) för registrering.
+   - I deployad build verkar Yaesu-modulen tree-shakas bort eftersom den inte används som runtime-värde någon annanstans.
 
-**`src/hooks/useCodeplugSettings.ts`**
-- Importera `getTarget` från `@/lib/codeplug/targets`.
-- I `loadStoredSettings`, ersätt `targetId: parsed?.export?.targetId ?? DEFAULT_SETTINGS.export.targetId` med en variant som kontrollerar att `getTarget(storedTargetId)` returnerar något, annars defaultar.
+2. **Gör target-registreringen explicit**
+   - Ändra `src/lib/codeplug/targets/index.ts` så den importerar varje target som värde och anropar `registerTarget(...)` centralt.
+   - Det gör Yaesu-targeten till en faktisk runtime-beroende modul, inte bara en side effect som bundlern kan ta bort.
+   - Behåll idempotent registrering så HMR/SSR fortsatt fungerar.
 
-Inga andra filer. Inga tester behöver röras (befintliga tester rör inte denna kodväg; vi behåller offentlig API).
+3. **Rensa dubbel-/gammal registreringsmodell vid behov**
+   - Om modulerna fortfarande självregistrerar sig längst ned kan vi antingen låta det vara eftersom `registerTarget` är idempotent, eller ta bort självregistreringen för en tydligare modell.
+   - Jag väljer minsta säkra ändring: central explicit registrering och lämnar resten oförändrat om det inte orsakar problem.
+
+4. **Verifiera**
+   - Kontrollera lokalt att `listTargets()`/UI innehåller `RT-Systems Yaesu FTM-510`.
+   - Efter att du klickar Update igen bör både preview och `se-codeplug.lovable.app` visa Yaesu i exportformat-listan.
+
+## Förväntad effekt
+
+Det här adresserar varför Update verkar gå klart men live-sidan inte ändras: källkoden innehåller Yaesu, men deployad bundle laddar inte target-modulen, så publiceringen saknar formatet även när den lyckas.
