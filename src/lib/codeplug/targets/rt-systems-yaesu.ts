@@ -217,7 +217,8 @@ export function toRtSystemsYaesuRow(
   const txMhz = mobileTxMhz(c);
   const rxMhz = c.rx_frequency;
   const { mode, unsupported } = operatingMode(c);
-  const tone = resolveTone(c);
+  const tone = resolveTone(c, mode);
+
 
   const fields = [
     String(index),
