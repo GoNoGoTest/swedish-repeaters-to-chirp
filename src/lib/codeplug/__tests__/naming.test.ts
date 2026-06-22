@@ -73,6 +73,9 @@ describe("buildName", () => {
     const la = makeChannel({ district: "LA", city: "Oslo" });
     const r = buildName(la, { ...naming, components: ["{district}", "{city}"], separator: "-" }, 20);
     expect(r.full).toBe("OSLO");
+  });
+
+
 
   it("{mode} resolves from mode_effective", () => {
     const fm = makeChannel({ city: "Göteborg", mode_effective: "FM" });
