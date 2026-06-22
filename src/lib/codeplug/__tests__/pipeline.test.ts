@@ -51,6 +51,60 @@ describe("runPipeline (sk6ba only)", () => {
   });
 });
 
+describe("runPipeline mode expansion", () => {
+  const baseRow: Record<string, string> = {
+    id: "1", type: "Repeater", status: "QRV",
+    output: "434.6000", tx_shift: "-2",
+    band: "70", district: "6", city: "Borås", call: "SK6BA", channel: "RV48",
+  };
+
+  it("expands FM/C4FM into two channels when both modes are selected", () => {
+    const r = runPipeline({
+      sk6baRows: [{ ...baseRow, mode: "FM / C4FM" }],
+      settings: {
+        ...baseSettings,
+        filter: { ...baseSettings.filter, modes: ["FM", "C4FM"] },
+      },
+    });
+    const modes = r.channels.map((c) => c.mode_effective).sort();
+    expect(modes).toEqual(["C4FM", "FM"]);
+  });
+
+  it("only emits FM when filter.modes=['FM']", () => {
+    const r = runPipeline({
+      sk6baRows: [{ ...baseRow, mode: "FM / C4FM" }],
+      settings: {
+        ...baseSettings,
+        filter: { ...baseSettings.filter, modes: ["FM"] },
+      },
+    });
+    expect(r.channels).toHaveLength(1);
+    expect(r.channels[0].mode_effective).toBe("FM");
+  });
+
+  it("drops rows entirely when none of their modes are selected", () => {
+    const r = runPipeline({
+      sk6baRows: [{ ...baseRow, mode: "DMR / D-Star" }],
+      settings: {
+        ...baseSettings,
+        filter: { ...baseSettings.filter, modes: ["FM"] },
+      },
+    });
+    expect(r.channels).toHaveLength(0);
+  });
+
+  it("empty filter.modes = no gating (every parsed mode emitted)", () => {
+    const r = runPipeline({
+      sk6baRows: [{ ...baseRow, mode: "FM / DMR" }],
+      settings: {
+        ...baseSettings,
+        filter: { ...baseSettings.filter, modes: [] },
+      },
+    });
+    expect(r.channels.map((c) => c.mode_effective).sort()).toEqual(["DMR", "FM"]);
+  });
+});
+
 describe("runPipeline with channel pack", () => {
   const packRes = parseChannelPackCsv(pack2m, "p.csv");
   const packChannels = packRes.channels.slice(0, 3);
