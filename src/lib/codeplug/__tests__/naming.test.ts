@@ -100,6 +100,7 @@ describe("buildName", () => {
   });
 });
 
+
 describe("resolveCollisions", () => {
   it("appends numeric suffixes on collision, including the first occurrence", () => {
     const a = makeChannel({ generated_name_final: "BORAS" });
