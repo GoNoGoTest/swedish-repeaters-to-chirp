@@ -80,7 +80,7 @@ describe("buildName", () => {
   it("{mode} resolves from mode_effective", () => {
     const fm = makeChannel({ city: "Göteborg", mode_effective: "FM" });
     const c4 = makeChannel({ city: "Göteborg", mode_effective: "C4FM" });
-    const opts = { ...naming, components: ["{city}", "{mode}"], separator: "-" };
+    const opts = { ...naming, components: ["{city}", "{mode}"], separator: "-", cityMaxLength: 0 };
     expect(buildName(fm, opts, 20).full).toBe("GOTEBORG-FM");
     expect(buildName(c4, opts, 20).full).toBe("GOTEBORG-C4FM");
   });
