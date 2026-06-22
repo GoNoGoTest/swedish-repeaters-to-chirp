@@ -1,8 +1,19 @@
-// Side-effect imports register each target with the registry at app start.
-import "./chirp-generic";
-import "./vgc-n76";
-import "./nicsure-rt880";
-import "./rt-systems-yaesu";
+// Explicit value imports + registration. Using named value imports (instead of
+// bare side-effect imports) ensures the target modules are retained by the
+// bundler even with `"sideEffects": false` in package.json — otherwise targets
+// that aren't referenced elsewhere (e.g. rt-systems-yaesu) get tree-shaken
+// out of the production build and disappear from the export-format picker.
+import { registerTarget } from "./registry";
+import { CHIRP_GENERIC_TARGET } from "./chirp-generic";
+import { VGC_N76_TARGET } from "./vgc-n76";
+import { NICSURE_RT880_TARGET } from "./nicsure-rt880";
+import { RT_SYSTEMS_YAESU_TARGET } from "./rt-systems-yaesu";
+
+// Idempotent — modules also self-register at their bottom for backwards compat.
+registerTarget(CHIRP_GENERIC_TARGET);
+registerTarget(VGC_N76_TARGET);
+registerTarget(NICSURE_RT880_TARGET);
+registerTarget(RT_SYSTEMS_YAESU_TARGET);
 
 export {
   listTargets, getTarget, requireTarget, registerTarget, resolveTargetSettings,
@@ -19,5 +30,3 @@ export {
   RT_SYSTEMS_YAESU_TARGET, RT_SYSTEMS_YAESU_DEFAULTS,
   type RtSystemsYaesuSettings,
 } from "./rt-systems-yaesu";
-
-
