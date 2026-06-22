@@ -35,6 +35,12 @@ export interface RtSystemsYaesuSettings {
   skipLinks: boolean;
   /** Start number for the leading row-index column. */
   startNumber: number;
+  /**
+   * Pad output to this many channel rows (header excluded). Empty rows
+   * keep the leading index and all 21 columns. Set to 0 to disable.
+   * Reference RT Systems exports for FTM-510 are padded to 999 rows.
+   */
+  padToRows: number;
 }
 
 export const RT_SYSTEMS_YAESU_DEFAULTS: RtSystemsYaesuSettings = {
@@ -45,7 +51,9 @@ export const RT_SYSTEMS_YAESU_DEFAULTS: RtSystemsYaesuSettings = {
   defaultAms: "N",
   skipLinks: false,
   startNumber: 1,
+  padToRows: 999,
 };
+
 
 const RT_SYSTEMS_YAESU_LIMITS: HardwareLimits = {
   maxNameLength: 16,
