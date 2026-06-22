@@ -16,10 +16,9 @@ const CHIRP_GENERIC_LIMITS: HardwareLimits = {
   // CHIRP itself doesn't impose a max; the actual radio does. We keep a
   // sane default name length matching CHIRP_GENERIC_DEFAULTS.maxLength.
   maxNameLength: 6,
-  supportedModes: ["NFM", "FM", "AM", "USB", "LSB", "CW", "DV"],
+  supportedModes: ["NFM","FM","WFM","AM","NAM","DV","DN","DMR","P25","CW","USB","LSB","RTTY","DIG","PKT"],
   // CHIRP-CSV is permissive: analog modes export cleanly; digital modes
-  // pass through as Mode=FM/DV with a Comment, so we accept all canonical
-  // modes here instead of forcing the user to deselect them.
+  // pass through as Mode=DN/DV/DMR/P25 with a non-blocking warning.
   supportedSignalModes: ["FM", "C4FM", "D-Star", "DMR", "DMRplus", "P25", "Tetra", "CW"],
   supportsSplit: true,
   supportsCtcss: true,
