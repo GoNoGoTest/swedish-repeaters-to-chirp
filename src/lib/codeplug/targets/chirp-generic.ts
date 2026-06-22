@@ -35,10 +35,11 @@ export const CHIRP_GENERIC_TARGET: ExportTarget<ChirpSettings> = {
   limits: CHIRP_GENERIC_LIMITS,
   defaultSettings: CHIRP_GENERIC_DEFAULTS,
   resolveMaxNameLength: (s) => s.maxLength,
+  validate: (channels) => chirpDigitalWarnings(channels),
   export: (channels: NormalizedChannel[], settings: ChirpSettings) => ({
     filename: "chirp.csv",
     content: exportChirpCsv(channels, settings),
-    warnings: [],
+    warnings: chirpDigitalWarnings(channels),
   }),
   exportMany: (channels: NormalizedChannel[], settings: ChirpSettings, split: SplitSettings) =>
     buildSplitFiles(channels, split, {
