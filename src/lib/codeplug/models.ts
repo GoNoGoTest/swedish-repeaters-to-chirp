@@ -27,7 +27,8 @@ export type WarningCode =
   | "nicsure_zone_pool_exhausted"
   | "nicsure_tx_block_unsupported"
   | "rt_unsupported_mode"
-  | "rt_name_truncated";
+  | "rt_name_truncated"
+  | "chirp_digital_partial";
 
 export interface Warning {
   code: WarningCode;
