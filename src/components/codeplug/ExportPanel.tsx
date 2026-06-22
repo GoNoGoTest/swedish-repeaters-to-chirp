@@ -536,6 +536,9 @@ function RtSystemsYaesuPanel({ settings, update }: {
         <NumberField label="User CTCSS-index" value={settings.defaultUserCtcss}
           onChange={(v) => update({ defaultUserCtcss: v })}
           hint="0–50. RT Systems-specifikt fält som mappar till radioföreskrivna toner." />
+        <NumberField label="Padda till antal rader" value={settings.padToRows}
+          onChange={(v) => update({ padToRows: Math.max(0, Math.min(999, v | 0)) })}
+          hint="Fyller filen med tomma rader så RT Systems-mjukvaran ser ett komplett minne. 0 = ingen padding. FTM-510 har 999 minnesplatser." />
       </div>
       <label className="mt-3 flex items-center gap-2 text-sm">
         <input type="checkbox" checked={settings.skipLinks}
@@ -543,6 +546,7 @@ function RtSystemsYaesuPanel({ settings, update }: {
         Hoppa över länkar och hotspots vid skanning
         <span className="text-xs text-muted-foreground">(sätter Skip på Link/Hotspot-rader)</span>
       </label>
+
     </div>
   );
 }
