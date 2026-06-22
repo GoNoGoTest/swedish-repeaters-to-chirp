@@ -159,3 +159,97 @@ describe("RT Systems Yaesu — Skip column", () => {
     expect(fields[15]).toBe("Skip");
   });
 });
+
+describe("RT Systems Yaesu — DN never carries analog tone", () => {
+  it("C4FM channel with CTCSS source → Tone Mode='None'", () => {
+    const ch = makeChannel({
+      generated_name_final: "C4FMTONE",
+      mode_effective: "C4FM",
+      rx_frequency: 145.675, duplex: "-", offset: 0.6, tx_shift: -0.6,
+      ctcss_tx: 114.8,
+    });
+    const { fields } = toRtSystemsYaesuRow(ch, 1, S);
+    expect(fields[5]).toBe("DN");
+    expect(fields[8]).toBe("None");
+    expect(fields[9]).toBe("100.0");
+    expect(fields[10]).toBe("023");
+  });
+
+  it("FM channel with CTCSS source still emits Tone Mode='Tone' (regression)", () => {
+    const ch = makeChannel({
+      generated_name_final: "FMTONE", mode_effective: "FM",
+      rx_frequency: 145.6, duplex: "-", offset: 0.6, tx_shift: -0.6,
+      ctcss_tx: 114.8,
+    });
+    const { fields } = toRtSystemsYaesuRow(ch, 1, S);
+    expect(fields[5]).toBe("FM");
+    expect(fields[8]).toBe("Tone");
+    expect(fields[9]).toBe("114.8");
+  });
+});
+
+describe("RT Systems Yaesu — MHz offset formatting", () => {
+  it("2 MHz shift → '2.00000 MHz'", () => {
+    const ch = makeChannel({
+      generated_name_final: "X", mode_effective: "FM",
+      rx_frequency: 434.6, duplex: "-", offset: 2, tx_shift: -2,
+    });
+    const { fields } = toRtSystemsYaesuRow(ch, 1, S);
+    expect(fields[3]).toBe("2.00000 MHz");
+  });
+
+  it("5 MHz shift → '5.00000 MHz'", () => {
+    const ch = makeChannel({
+      generated_name_final: "X", mode_effective: "FM",
+      rx_frequency: 438.0, duplex: "-", offset: 5, tx_shift: -5,
+    });
+    const { fields } = toRtSystemsYaesuRow(ch, 1, S);
+    expect(fields[3]).toBe("5.00000 MHz");
+  });
+
+  it("0.6 MHz shift stays '600 kHz' (regression)", () => {
+    const ch = makeChannel({
+      generated_name_final: "X", mode_effective: "FM",
+      rx_frequency: 145.6, duplex: "-", offset: 0.6, tx_shift: -0.6,
+    });
+    const { fields } = toRtSystemsYaesuRow(ch, 1, S);
+    expect(fields[3]).toBe("600 kHz");
+  });
+});
+
+describe("RT Systems Yaesu — padding", () => {
+  it("pads short channel lists with empty rows up to padToRows", () => {
+    const ch = makeChannel({
+      generated_name_final: "ONE", mode_effective: "FM",
+      rx_frequency: 145.5, duplex: "",
+    });
+    const { csv } = exportRtSystemsYaesuCsv([ch, ch, ch], { ...S, padToRows: 999 });
+    const lines = csv.split("\r\n");
+    // 1 header + 999 rows + trailing empty line from the final "\r\n"
+    expect(lines.length).toBe(1 + 999 + 1);
+    expect(lines[1000]).toBe(""); // trailing newline split artifact
+    // First padding row continues the index sequence and has 21 fields.
+    const padRow = lines[4];
+    expect(padRow.startsWith("4,")).toBe(true);
+    expect(padRow.split(",").length).toBe(RT_SYSTEMS_YAESU_HEADER_FIELDS.length);
+    // Last row is row 999.
+    expect(lines[999].startsWith("999,")).toBe(true);
+  });
+
+  it("padToRows: 0 disables padding", () => {
+    const ch = makeChannel({
+      generated_name_final: "ONE", mode_effective: "FM",
+      rx_frequency: 145.5, duplex: "",
+    });
+    const { csv } = exportRtSystemsYaesuCsv([ch], { ...S, padToRows: 0 });
+    const lines = csv.split("\r\n");
+    // 1 header + 1 channel + trailing empty line
+    expect(lines.length).toBe(3);
+  });
+
+  it("does not count padding rows as truncated or unsupported", () => {
+    const { warnings } = exportRtSystemsYaesuCsv([], { ...S, padToRows: 999 });
+    expect(warnings).toEqual([]);
+  });
+});
+

@@ -35,6 +35,12 @@ export interface RtSystemsYaesuSettings {
   skipLinks: boolean;
   /** Start number for the leading row-index column. */
   startNumber: number;
+  /**
+   * Pad output to this many channel rows (header excluded). Empty rows
+   * keep the leading index and all 21 columns. Set to 0 to disable.
+   * Reference RT Systems exports for FTM-510 are padded to 999 rows.
+   */
+  padToRows: number;
 }
 
 export const RT_SYSTEMS_YAESU_DEFAULTS: RtSystemsYaesuSettings = {
@@ -45,7 +51,9 @@ export const RT_SYSTEMS_YAESU_DEFAULTS: RtSystemsYaesuSettings = {
   defaultAms: "N",
   skipLinks: false,
   startNumber: 1,
+  padToRows: 999,
 };
+
 
 const RT_SYSTEMS_YAESU_LIMITS: HardwareLimits = {
   maxNameLength: 16,
@@ -132,15 +140,17 @@ function formatOffsetFrequency(c: NormalizedChannel): string {
 }
 
 function formatOffsetKhz(offsetMhz: number): string {
-  // 0.6 MHz → "600 kHz", 5 MHz → "5 MHz", 7.6 MHz → "7600 kHz"
+  // 0.6 MHz → "600 kHz", 2 MHz → "2.00000 MHz", 7.6 MHz → "7600 kHz".
+  // Integer MHz offsets are written with 5 decimals to match the RT Systems
+  // reference export (e.g. "2.00000 MHz" for the 70cm band). Non-integer
+  // values fall back to kHz so we never lose precision.
   if (offsetMhz >= 1 && Number.isInteger(offsetMhz)) {
-    return `${offsetMhz} MHz`;
+    return `${offsetMhz.toFixed(5)} MHz`;
   }
   const khz = Math.round(offsetMhz * 1000 * 100) / 100;
-  // Drop trailing ".0" for the common "600 kHz" case.
-  const s = Number.isInteger(khz) ? String(khz) : String(khz);
-  return `${s} kHz`;
+  return `${khz} kHz`;
 }
+
 
 function formatOffsetDirection(c: NormalizedChannel): string {
   if (c.duplex === "+") return "Plus";
@@ -164,7 +174,13 @@ interface ToneFields {
   dcs: string;
 }
 
-function resolveTone(c: NormalizedChannel): ToneFields {
+function resolveTone(c: NormalizedChannel, mode: string): ToneFields {
+  // C4FM (Operating Mode "DN") channels must never carry an analog tone,
+  // even when the source row has CTCSS/DCS. The radio interprets Tone Mode
+  // on DN channels as analog squelch and would mute incoming digital audio.
+  if (mode === "DN") {
+    return { toneMode: "None", ctcss: "100.0", dcs: "023" };
+  }
   // CTCSS-TX from SK6BA or per-pack rtone_freq wins.
   const ctcssFreq = c.rtone_freq ?? c.ctcss_tx ?? null;
   const t = (c.tone_raw || "").toUpperCase();
@@ -181,6 +197,7 @@ function resolveTone(c: NormalizedChannel): ToneFields {
   }
   return { toneMode: "None", ctcss: "100.0", dcs: "023" };
 }
+
 
 function isScanned(c: NormalizedChannel, s: RtSystemsYaesuSettings): boolean {
   if (c.skip_raw === "S") return false;
@@ -200,7 +217,8 @@ export function toRtSystemsYaesuRow(
   const txMhz = mobileTxMhz(c);
   const rxMhz = c.rx_frequency;
   const { mode, unsupported } = operatingMode(c);
-  const tone = resolveTone(c);
+  const tone = resolveTone(c, mode);
+
 
   const fields = [
     String(index),
@@ -247,8 +265,20 @@ export function exportRtSystemsYaesuCsv(
     if (unsupportedMode) unsupportedCount++;
     lines.push(joinRow(fields));
   });
+  // Pad with empty rows to match the reference RT Systems export shape
+  // (typically 999 channel slots for FTM-510). Empty rows preserve the
+  // leading row-index and all 21 columns so the radio software accepts
+  // the file verbatim.
+  const padTarget = Math.max(0, s.padToRows | 0);
+  if (channels.length < padTarget) {
+    const emptyTail = new Array(RT_SYSTEMS_YAESU_HEADER_FIELDS.length - 1).fill("");
+    for (let i = channels.length; i < padTarget; i++) {
+      lines.push(joinRow([String(s.startNumber + i), ...emptyTail]));
+    }
+  }
   // RT Systems exports include a trailing newline.
   const csv = lines.join("\r\n") + "\r\n";
+
 
   if (truncCount > 0) {
     warnings.push({
