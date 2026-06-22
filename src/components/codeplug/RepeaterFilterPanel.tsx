@@ -89,6 +89,11 @@ export function RepeaterFilterPanel({ summary, settings, setSettings }: {
           onChange={(v) => upd({ regions: v })}
         />
         <Hint>Visar regioner som finns i den importerade filen (SM0–SM7, LA, OZ, OH0–OH9, TF, JW, JX, OY, OX).</Hint>
+        <label className="mt-2 flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={settings.filter.includeUnknownRegions ?? false}
+            onChange={(e) => upd({ includeUnknownRegions: e.target.checked })} />
+          Inkludera okända regioner
+        </label>
       </div>
 
       <div className="mt-4">
@@ -103,16 +108,29 @@ export function RepeaterFilterPanel({ summary, settings, setSettings }: {
           value={settings.filter.modes ?? []}
           onChange={(v) => upd({ modes: v })}
         />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3 mt-3">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={settings.filter.includeUnknownRegions ?? false}
-            onChange={(e) => upd({ includeUnknownRegions: e.target.checked })} />
-          Inkludera okända regioner
-        </label>
+        <ChirpDigitalNote
+          targetId={settings.export.targetId}
+          selectedModes={settings.filter.modes ?? []}
+        />
       </div>
     </div>
+  );
+}
+
+const CHIRP_DIGITAL_MODES = ["C4FM", "D-Star", "DMR", "DMRplus", "P25"];
+
+function ChirpDigitalNote({ targetId, selectedModes }: { targetId: string; selectedModes: string[] }) {
+  if (targetId !== "chirp-generic") return null;
+  const showDigital =
+    selectedModes.length === 0 || selectedModes.some((m) => CHIRP_DIGITAL_MODES.includes(m));
+  if (!showDigital) return null;
+  return (
+    <p className="mt-2 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+      CHIRP Generic CSV kan bära digitala mode-värden (DN, DV, DMR, P25), men
+      fullt stöd beror på radiomodell och CHIRP-drivrutin. Systemspecifika
+      inställningar som DMR talkgroup, color code, timeslot eller Fusion-
+      parametrar ingår inte och kan behöva kompletteras manuellt.
+    </p>
   );
 }
 
