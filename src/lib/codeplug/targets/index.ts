@@ -2,6 +2,7 @@
 import "./chirp-generic";
 import "./vgc-n76";
 import "./nicsure-rt880";
+import "./rt-systems-yaesu";
 
 export {
   listTargets, getTarget, requireTarget, registerTarget, resolveTargetSettings,
@@ -14,4 +15,9 @@ export {
   NICSURE_RT880_TARGET, NICSURE_RT880_DEFAULTS,
   type NicsureRt880Settings,
 } from "./nicsure-rt880";
+export {
+  RT_SYSTEMS_YAESU_TARGET, RT_SYSTEMS_YAESU_DEFAULTS,
+  type RtSystemsYaesuSettings,
+} from "./rt-systems-yaesu";
+
 

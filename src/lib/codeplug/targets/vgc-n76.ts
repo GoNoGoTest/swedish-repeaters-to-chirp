@@ -62,6 +62,7 @@ const VGC_N76_LIMITS: HardwareLimits = {
   maxChannelsPerGroup: VGC_N76_CHANNELS_PER_GROUP,
   maxNameLength: 8,
   supportedModes: ["NFM", "FM", "AM"],
+  supportedSignalModes: ["FM"],
   supportsSplit: true,
   supportsCtcss: true,
   supportsDcs: true,

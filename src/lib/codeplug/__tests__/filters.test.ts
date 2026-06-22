@@ -16,13 +16,10 @@ describe("applyFilters", () => {
     expect(applyFilters([ch], f)).toHaveLength(0);
   });
 
-  it("filters out digital modes when contains_fm", () => {
-    const ch = makeChannel({ mode_raw: "DMR" });
-    expect(applyFilters([ch], f)).toHaveLength(0);
-  });
-
-  it("keeps mixed mode containing FM", () => {
-    const ch = makeChannel({ mode_raw: "FM/DMR" });
+  it("no longer gates on mode (expansion-step handles it now)", () => {
+    // DMR rows that survive expandModes (because their parsed mode is in
+    // filter.modes, or filter.modes is empty) must pass applyFilters.
+    const ch = makeChannel({ mode_raw: "DMR", mode_effective: "DMR" });
     expect(applyFilters([ch], f)).toHaveLength(1);
   });
 

@@ -27,7 +27,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const REPEATER_TOKENS = ["{type}", "{network}", "{band}", "{district}", "{region}", "{country}", "{city}", "{channel}", "{call}"];
+const REPEATER_TOKENS = ["{type}", "{network}", "{band}", "{district}", "{region}", "{country}", "{city}", "{channel}", "{call}", "{mode}"];
 
 function Index() {
   const { settings, setSettings } = useCodeplugSettings();
@@ -71,6 +71,8 @@ function Index() {
       case "vgc-n76":
         return target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength;
       case "nicsure-rt880":
+        return target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength;
+      case "rt-systems-yaesu-generic":
         return target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ?? target.limits.maxNameLength;
     }
   })();

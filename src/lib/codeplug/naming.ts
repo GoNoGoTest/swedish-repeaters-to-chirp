@@ -62,6 +62,11 @@ function resolveToken(token: string, ch: NormalizedChannel, n: NamingSettings): 
       return ch.label;
     case "{name_hint}":
       return ch.name_hint;
+    case "{mode}": {
+      const m = ch.mode_effective || "";
+      if (!m) return "";
+      return n.abbreviations.mode?.[m] ?? m;
+    }
     default:
       return "";
   }

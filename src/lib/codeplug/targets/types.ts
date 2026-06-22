@@ -13,8 +13,18 @@ export interface HardwareLimits {
   maxChannelsPerGroup?: number;
   /** Display width in characters for the channel name field. */
   maxNameLength: number;
-  /** Modes the target can import. */
+  /**
+   * Modes the target can import, using the exporter's native vocabulary
+   * (e.g. CHIRP's "NFM"/"FM"/"AM" or RT Systems' "FM"/"DN"). Mostly used
+   * for documentation and the legend/validate paths.
+   */
   supportedModes: string[];
+  /**
+   * Canonical signal modes (from `KNOWN_MODES` in modes.ts) the target can
+   * meaningfully export. Drives the disabled state of the mode-filter
+   * toggles in the UI. Undefined = "all modes supported" (legacy default).
+   */
+  supportedSignalModes?: string[];
   supportsSplit: boolean;
   supportsCtcss: boolean;
   supportsDcs: boolean;

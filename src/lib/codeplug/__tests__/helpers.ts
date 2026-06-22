@@ -11,6 +11,7 @@ export function makeChannel(over: Partial<NormalizedChannel> = {}): NormalizedCh
     type: "Repeater",
     status: "QRV",
     mode_raw: "FM",
+    mode_effective: "FM",
     is_analog_fm: true,
     band: "2",
     city: "Borås",

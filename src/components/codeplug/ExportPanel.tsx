@@ -3,7 +3,7 @@ import type {
   ChirpSettings, FreqDupePolicy, PackPlacement, RxOnlyPolicy, Settings,
   SplitMode, SplitSettings, HomeDistrictSort, NormalizedChannel,
 } from "@/lib/codeplug/models";
-import type { VgcN76Settings, NicsureRt880Settings } from "@/lib/codeplug/targets";
+import type { VgcN76Settings, NicsureRt880Settings, RtSystemsYaesuSettings } from "@/lib/codeplug/targets";
 import {
   NICSURE_ZONE_DIMENSIONS,
   buildZoneLegend,
@@ -469,6 +469,80 @@ export function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, ta
         };
         return <NicsureRt880Panel settings={nicSettings} update={setTargetSettings} channels={channels} />;
       })()}
+
+      {settings.export.targetId === "rt-systems-yaesu-generic" && (() => {
+        const rtTarget = requireTarget("rt-systems-yaesu-generic");
+        if (rtTarget.id !== "rt-systems-yaesu-generic") return null;
+        const rtSettings: RtSystemsYaesuSettings = {
+          ...rtTarget.defaultSettings,
+          ...(targetSettings as Partial<RtSystemsYaesuSettings>),
+        };
+        return <RtSystemsYaesuPanel settings={rtSettings} update={setTargetSettings} />;
+      })()}
+    </div>
+  );
+}
+
+function RtSystemsYaesuPanel({ settings, update }: {
+  settings: RtSystemsYaesuSettings;
+  update: (patch: Record<string, unknown>) => void;
+}) {
+  return (
+    <div className="border-t border-border pt-4">
+      <SectionLabel>RT Systems Yaesu-fält</SectionLabel>
+      <Hint>
+        CSV-format som RT Systems programmeringsverktyg använder för flera
+        Yaesu-modeller. Stödjer FM och C4FM (Operating Mode FM/DN). Exakt radiomodell ej fastställd — använd som mellanlagring tills modellspecifika varianter finns.
+      </Hint>
+      <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5 mt-2">
+        <NumberField label="Startnummer" value={settings.startNumber}
+          onChange={(v) => update({ startNumber: v })}
+          hint="Värdet i den ledande (anonyma) kolumnen för första raden." />
+        <NumberField label="Max längd Name" value={settings.maxLength}
+          onChange={(v) => update({ maxLength: v })}
+          hint="Yaesu-displayer visar typiskt 16 tecken. Längre namn trunkeras och flaggas." />
+        <Field label="Default sändareffekt" hint="Skrivs på varje rad. Per-rad-override stöds inte i v1.">
+          <select value={settings.defaultPower}
+            onChange={(e) => update({ defaultPower: e.target.value as RtSystemsYaesuSettings["defaultPower"] })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+            <option value="Low">Low</option>
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+          </select>
+        </Field>
+        <Field label="Default Step" hint="Frekvensraster, skrivs som-is (t.ex. '12.5 kHz', '25 kHz').">
+          <select value={settings.defaultStep}
+            onChange={(e) => update({ defaultStep: e.target.value })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+            <option value="5 kHz">5 kHz</option>
+            <option value="6.25 kHz">6.25 kHz</option>
+            <option value="10 kHz">10 kHz</option>
+            <option value="12.5 kHz">12.5 kHz</option>
+            <option value="15 kHz">15 kHz</option>
+            <option value="20 kHz">20 kHz</option>
+            <option value="25 kHz">25 kHz</option>
+            <option value="50 kHz">50 kHz</option>
+            <option value="100 kHz">100 kHz</option>
+          </select>
+        </Field>
+        <Field label="Default AMS" hint="AMS = Auto Mode Select. Slå på om radion ska växla FM/C4FM automatiskt per kanal.">
+          <select value={settings.defaultAms}
+            onChange={(e) => update({ defaultAms: e.target.value as RtSystemsYaesuSettings["defaultAms"] })}
+            className="w-full rounded border border-input bg-background px-2 py-1 text-sm">
+            <option value="N">N (av)</option>
+            <option value="Y">Y (på)</option>
+          </select>
+        </Field>
+        <NumberField label="User CTCSS-index" value={settings.defaultUserCtcss}
+          onChange={(v) => update({ defaultUserCtcss: v })}
+          hint="0–50. RT Systems-specifikt fält som mappar till radioföreskrivna toner." />
+      </div>
+      <label className="mt-3 flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={settings.skipLinks}
+          onChange={(e) => update({ skipLinks: e.target.checked })} />
+        Hoppa över länkar och hotspots vid skanning
+        <span className="text-xs text-muted-foreground">(sätter Skip på Link/Hotspot-rader)</span>
+      </label>
     </div>
   );
 }

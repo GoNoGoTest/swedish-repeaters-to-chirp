@@ -20,7 +20,7 @@ function makeExampleChannel(over: Partial<NormalizedChannel>): NormalizedChannel
   const district = over.district ?? "";
   return {
     source_type: "sk6ba", source_row: 0, source_id: "ex",
-    type: "Repeater", status: "QRV", mode_raw: "FM", is_analog_fm: true,
+    type: "Repeater", status: "QRV", mode_raw: "FM", mode_effective: "FM", is_analog_fm: true,
     band: "", district, region: over.region ?? deriveRegion(district, over.call),
     city: "", call: "", channel: "",
     network: "", network_id: "", access_raw: "",

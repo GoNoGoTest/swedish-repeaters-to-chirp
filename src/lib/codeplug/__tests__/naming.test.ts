@@ -74,7 +74,35 @@ describe("buildName", () => {
     const r = buildName(la, { ...naming, components: ["{district}", "{city}"], separator: "-" }, 20);
     expect(r.full).toBe("OSLO");
   });
+
+
+
+  it("{mode} resolves from mode_effective", () => {
+    const fm = makeChannel({ city: "Göteborg", mode_effective: "FM" });
+    const c4 = makeChannel({ city: "Göteborg", mode_effective: "C4FM" });
+    const opts = { ...naming, components: ["{city}", "{mode}"], separator: "-", cityMaxLength: 0 };
+    expect(buildName(fm, opts, 20).full).toBe("GOTEBORG-FM");
+    expect(buildName(c4, opts, 20).full).toBe("GOTEBORG-C4FM");
+  });
+
+  it("{mode} honours abbreviations.mode override", () => {
+    const ch = makeChannel({ city: "GBG", mode_effective: "C4FM" });
+    const opts = {
+      ...naming,
+      components: ["{city}", "{mode}"],
+      separator: "-",
+      abbreviations: { ...naming.abbreviations, mode: { C4FM: "YSF" } },
+    };
+    expect(buildName(ch, opts, 20).full).toBe("GBG-YSF");
+  });
+
+  it("{mode} drops to empty for unknown mode_effective", () => {
+    const ch = makeChannel({ city: "GBG", mode_effective: "" });
+    const opts = { ...naming, components: ["{city}", "{mode}"], separator: "-" };
+    expect(buildName(ch, opts, 20).full).toBe("GBG");
+  });
 });
+
 
 describe("resolveCollisions", () => {
   it("appends numeric suffixes on collision, including the first occurrence", () => {

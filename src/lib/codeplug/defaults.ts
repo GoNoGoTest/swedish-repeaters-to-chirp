@@ -49,8 +49,7 @@ export const DEFAULT_SETTINGS: Settings = {
   filter: {
     statuses: ["QRV"],
     types: ["Repeater", "Link", "Hotspot"],
-    modeStrategy: "contains_fm",
-    customModes: [],
+    modes: ["FM"],
     bands: ["2", "70"],
     countries: ["SE"],
     regions: [],

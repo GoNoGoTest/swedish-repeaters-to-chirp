@@ -3,6 +3,10 @@ import type { FilterSettings, NormalizedChannel } from "./models";
 /**
  * Filter normalised channels using country/region-aware rules.
  *
+ * Mode gating is NOT done here anymore — see `expandModes` in pipeline.ts,
+ * which both expands multi-mode SK6BA rows into one channel per supported
+ * mode and drops rows whose modes don't intersect `filter.modes`.
+ *
  * - `countries` (empty = all) gates on `c.region.countryCode`.
  * - `regions` (empty = all within the gated countries) gates on
  *   `c.region.districtLabel` ("SM6", "LA", "OH0", …).
@@ -21,14 +25,6 @@ export function applyFilters(channels: NormalizedChannel[], f: FilterSettings): 
   return channels.filter((c) => {
     if (f.statuses.length && !f.statuses.includes(c.status)) return false;
     if (f.types.length && !f.types.includes(c.type)) return false;
-
-    if (f.modeStrategy === "exact_fm") {
-      if (c.mode_raw.trim().toUpperCase() !== "FM") return false;
-    } else if (f.modeStrategy === "contains_fm") {
-      if (!/\bFM\b/i.test(c.mode_raw)) return false;
-    } else if (f.modeStrategy === "custom") {
-      if (!f.customModes.includes(c.mode_raw)) return false;
-    }
 
     if (f.bands.length && !f.bands.includes(c.band)) return false;
 
