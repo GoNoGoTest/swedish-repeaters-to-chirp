@@ -174,7 +174,13 @@ interface ToneFields {
   dcs: string;
 }
 
-function resolveTone(c: NormalizedChannel): ToneFields {
+function resolveTone(c: NormalizedChannel, mode: string): ToneFields {
+  // C4FM (Operating Mode "DN") channels must never carry an analog tone,
+  // even when the source row has CTCSS/DCS. The radio interprets Tone Mode
+  // on DN channels as analog squelch and would mute incoming digital audio.
+  if (mode === "DN") {
+    return { toneMode: "None", ctcss: "100.0", dcs: "023" };
+  }
   // CTCSS-TX from SK6BA or per-pack rtone_freq wins.
   const ctcssFreq = c.rtone_freq ?? c.ctcss_tx ?? null;
   const t = (c.tone_raw || "").toUpperCase();
@@ -191,6 +197,7 @@ function resolveTone(c: NormalizedChannel): ToneFields {
   }
   return { toneMode: "None", ctcss: "100.0", dcs: "023" };
 }
+
 
 function isScanned(c: NormalizedChannel, s: RtSystemsYaesuSettings): boolean {
   if (c.skip_raw === "S") return false;
