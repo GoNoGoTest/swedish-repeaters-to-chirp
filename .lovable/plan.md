@@ -1,70 +1,56 @@
 ## Mål
 
-Ersätt de fyra varnings-räknarna i Repeater-sektionens stat-rad med tre handlingsbara siffror som speglar vad användaren faktiskt får ut av exporten.
+Behandla `type = "uW QTH"` som utanför appens scope: de filtreras bort tidigt, syns inte i Typ-filtret, och redovisas separat i tooltipen för "Bortfiltrerade".
 
-## Ny stat-rad
+## Ändringar
 
-I `src/routes/index.tsx` (rad 203–210), ersätt nuvarande grid med tre rutor:
+### 1. `src/lib/codeplug/pipeline.ts`
 
+- Lägg till exporterad konstant:
+  ```ts
+  export const OUT_OF_SCOPE_TYPES = new Set(["uW QTH"]);
+  ```
+- I `runPipeline`, direkt efter `normalize(sk6baRows)`:
+  ```ts
+  const inScope = normalized.filter((c) => !OUT_OF_SCOPE_TYPES.has(c.type));
+  const outOfScopeCount = normalized.length - inScope.length;
+  ```
+  Resten av flödet (`exportable`, `expandModes`, …) körs på `inScope` istället för `normalized`. `withRx` räknas från `inScope.filter(...)` så uW QTH inte längre dyker upp i "Saknar RX-frekvens".
+- Utöka `PipelineResult` med `outOfScope: number` och returnera den.
+
+Matchningen sker case-sensitive på exakt strängen `"uW QTH"`. Om fler liknande kategorier dyker upp senare läggs de till i `OUT_OF_SCOPE_TYPES`.
+
+### 2. `src/components/codeplug/RepeaterFilterPanel.tsx`
+
+```ts
+const allTypes = Object.keys(summary.uniqueCounts.type)
+  .filter((t) => !OUT_OF_SCOPE_TYPES.has(t));
 ```
-Rader i import · Kanaler i export · Bortfiltrerade (med tooltip)
-```
+Då försvinner "uW QTH" som alternativ i Typ-multiselectet. Om användaren har en gammal sparad inställning med "uW QTH" i `filter.types` är det harmlöst — de raderna är redan borttagna innan filter körs.
 
-- **Rader i import** = `summary.totalRows` — antal rader i CSV:n.
-- **Kanaler i export** = `pipeline.channels.length` (eller `exportChannels.length`, se nedan) — det som faktiskt skrivs till radion efter filter, mode-expansion, dedupe och ev. manuell exkludering i previewn.
-- **Bortfiltrerade** = `Rader i import − Kanaler i export`, med tooltip som visar övergripande kategorier.
+### 3. `src/routes/index.tsx` — tooltip-uppdatering
 
-Distrikt-räknaren tas också bort eftersom den inte var en av de tre du valde.
+I beräkningen som bygger tooltipen för "Bortfiltrerade":
 
-Gridden ändras från `lg:grid-cols-6` till `lg:grid-cols-3`.
+- Lägg till `outOfScope = pipeline?.outOfScope ?? 0`.
+- Justera `droppedByFilter`-uträkningen så `outOfScope` inte hamnar i "Bortfiltrerade av filter":
+  ```ts
+  const droppedByFilter = Math.max(
+    0,
+    droppedOut - missingRx - droppedByDedupe - manuallyExcluded - outOfScope,
+  );
+  ```
+- Lägg in raden `• uW QTH: N` (när > 0) i tooltipens lista, t.ex. överst bland orsakerna.
 
-## Vilken siffra används för "Kanaler i export"
+### 4. Test (`src/lib/codeplug/__tests__/pipeline.test.ts`)
 
-Två rimliga tolkningar:
-
-- **`pipeline.channels.length`** — antal kanaler efter filter/dedupe/namngivning, oberoende av om användaren manuellt klickat bort rader i previewn.
-- **`exportChannels.length`** — efter manuell exkludering också (det som faktiskt hamnar i den nedladdade filen).
-
-Jag använder `exportChannels.length`, så siffran följer med när användaren bockar av rader i previewn. Det matchar vad knappen "Ladda ner" producerar. Bortfiltrerade = `summary.totalRows − exportChannels.length` blir då sant för "allt som inte är med i nedladdningen".
-
-## Tooltip för "Bortfiltrerade"
-
-Övergripande kategorier baserat på pipelinens räknare och tillgänglig data:
-
-- **Saknar RX-frekvens** — antal rader där `rx_frequency == null` (kan inte programmeras alls).
-- **Bortfiltrerade av filter** — rader som föll bort i `applyFilters` / mode-expansion. Beräknas som mellanskillnaden: `(rader med RX) − (kanaler efter filter och mode-expansion)`. Slår samman band/status/distrikt/läge i en enda post — matchar ditt val "övergripande kategorier".
-- **Frekvensdubbletter borttagna** — `pipeline.totalInput − pipeline.channels.length − övriga`-bidraget från `applyFreqDedupe` (rader som droppats av drop_pack/drop_sk6ba-policy).
-- **Manuellt exkluderade** — `excludedKeys.size`, om > 0.
-
-Bara icke-noll-rader visas i tooltipen. Den första raden är en kort sammanfattning, t.ex.:
-
-```
-124 av 312 rader hamnar inte i exporten
-
-• Saknar RX-frekvens: 4
-• Bortfiltrerade av filter: 108
-• Frekvensdubbletter: 9
-• Manuellt exkluderade: 3
-```
-
-## Tekniska detaljer
-
-1. **Stat-komponenten** (`src/components/codeplug/common.tsx`) får en valfri `tooltip?: ReactNode`-prop. När den sätts wrappas rutan med shadcn `Tooltip` + `TooltipTrigger`/`TooltipContent`. Befintliga anrop påverkas inte.
-
-2. **Beräkning** sker i `src/routes/index.tsx` i en `useMemo` som tar `summary`, `pipeline` och `exportChannels`. För att räkna "bortfiltrerade av filter" behöver vi veta hur många som hade RX innan filter. Jag exponerar det enklast genom att utöka `PipelineResult` med ett par fält:
-
-   - `withRx: number` — `normalized.filter(c => c.rx_frequency != null).length` (SK6BA, innan filter/mode-expansion).
-   - `droppedByDedupe: number` — `dedupe.dropped.length`.
-
-   Det är två rena tilläggsfält i `pipeline.ts`; inga befintliga konsumenter rörs.
-
-3. **Tester** (`src/lib/codeplug/__tests__/pipeline.test.ts`) — lägg till ett litet test som verifierar att `withRx` och `droppedByDedupe` rapporteras korrekt för en fixture med en saknad RX och en pack-vs-sk6ba-dubblett under `drop_pack`-policy.
-
-4. **Ingen ändring** i `pipeline.ts`-logik utöver de två räknarna, och inga tester som rör befintliga räknare ändras.
+Lägg till ett kort test som matar in en `uW QTH`-rad och en vanlig FM-repeaterrad och verifierar att:
+- `outOfScope === 1`
+- den uW QTH-raden inte räknas i `withRx` och inte finns kvar i `channels`.
 
 ## Filer som ändras
 
-- `src/routes/index.tsx` — ny stat-rad, beräkning av tooltip-data.
-- `src/components/codeplug/common.tsx` — `Stat` accepterar `tooltip`.
-- `src/lib/codeplug/pipeline.ts` — `withRx`, `droppedByDedupe` läggs till `PipelineResult`.
-- `src/lib/codeplug/__tests__/pipeline.test.ts` — ett nytt test för räknarna.
+- `src/lib/codeplug/pipeline.ts` — `OUT_OF_SCOPE_TYPES`, tidig filtrering, ny räknare.
+- `src/components/codeplug/RepeaterFilterPanel.tsx` — döljer uW QTH i Typ-filtret.
+- `src/routes/index.tsx` — visar "uW QTH" i tooltipen.
+- `src/lib/codeplug/__tests__/pipeline.test.ts` — ett nytt test.

@@ -9,6 +9,7 @@ import {
 import { KNOWN_MODES } from "@/lib/codeplug/modes";
 import { formatBandLabel, parseBandLabel, sortBands } from "@/lib/codeplug/bands";
 import { getTarget } from "@/lib/codeplug/targets";
+import { OUT_OF_SCOPE_TYPES } from "@/lib/codeplug/pipeline";
 import { Hint, MultiSelect, SectionLabel } from "./common";
 
 const ALL_COUNTRY_CODES: RegionCountryCode[] = (
@@ -19,7 +20,9 @@ export function RepeaterFilterPanel({ summary, settings, setSettings }: {
   summary: Summary; settings: Settings; setSettings: (s: Settings) => void;
 }) {
   const allStatuses = Object.keys(summary.uniqueCounts.status);
-  const allTypes = Object.keys(summary.uniqueCounts.type);
+  const allTypes = Object.keys(summary.uniqueCounts.type).filter(
+    (t) => !OUT_OF_SCOPE_TYPES.has(t),
+  );
   const allBands = sortBands(Object.keys(summary.uniqueCounts.band));
 
   const upd = (patch: Partial<FilterSettings>) =>

@@ -10,6 +10,13 @@ import { DEFAULT_PACK_NAMING } from "./defaults";
 import { deriveRegion } from "./region";
 import { parseModes } from "./modes";
 
+/**
+ * Type-värden i SK6BA-exporten som ligger utanför appens scope
+ * (inte programmerbara repeatrar/kanaler). Filtreras bort tidigt så de
+ * inte räknas in i "Saknar RX-frekvens" eller dyker upp i Typ-filtret.
+ */
+export const OUT_OF_SCOPE_TYPES = new Set<string>(["uW QTH"]);
+
 function emptyPackFields() {
   return {
     pack_id: "",
@@ -181,6 +188,8 @@ export interface PipelineResult {
   withRx: number;
   /** Antal rader som droppades av frekvensdedupe-policyn. */
   droppedByDedupe: number;
+  /** Antal rader vars `type` ligger i OUT_OF_SCOPE_TYPES (t.ex. "uW QTH"). */
+  outOfScope: number;
 }
 
 function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): NormalizedChannel[] {
@@ -215,7 +224,9 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   const { sk6baRows, packChannels = [], settings, maxNameLength = 6 } = input;
   const totalInput = sk6baRows.length + packChannels.length;
   const normalized = normalize(sk6baRows);
-  const exportable = normalized.filter((c) => c.rx_frequency != null);
+  const inScope = normalized.filter((c) => !OUT_OF_SCOPE_TYPES.has(c.type));
+  const outOfScope = normalized.length - inScope.length;
+  const exportable = inScope.filter((c) => c.rx_frequency != null);
   const withRx = exportable.length;
   // Expand multi-mode SK6BA rows into one channel per selected mode.
   // Channel-pack rows pass through unchanged.
@@ -294,5 +305,6 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     duplicateStop: dedupe.stopped,
     withRx,
     droppedByDedupe,
+    outOfScope,
   };
 }
