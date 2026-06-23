@@ -26,7 +26,7 @@ export function sanitize(s: string, opts: { transliterate: boolean; uppercase: b
   if (opts.transliterate) out = translit(out);
   // Allow Unicode letters/digits so Å/Ä/Ö (and other latin chars) survive when
   // transliterate is off. \w is ASCII-only and would otherwise strip them.
-  out = out.replace(/[^\p{L}\p{N}_\-]/gu, "");
+  out = out.replace(/[^\p{L}\p{N}_-]/gu, "");
   if (opts.uppercase) out = out.toUpperCase();
   return out;
 }
