@@ -219,6 +219,6 @@ export function exportChirpCsv(channels: NormalizedChannel[], s: ChirpSettings):
   const rows = toChirpRows(channels, s);
   return Papa.unparse({
     fields: CHIRP_COLUMNS,
-    data: rows.map((r) => CHIRP_COLUMNS.map((c) => (r as any)[c])),
+    data: rows.map((r) => CHIRP_COLUMNS.map((c) => (r as Record<string, unknown>)[c])),
   });
 }
