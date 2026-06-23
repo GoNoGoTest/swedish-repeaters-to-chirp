@@ -227,7 +227,7 @@ function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): N
             {
               code: "rx_only_blocked",
               message: "RX-only: TX spärrad enligt target-konvention",
-            },
+            } satisfies Warning,
           ],
         });
         break;
@@ -241,7 +241,7 @@ function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): N
             {
               code: "rx_only_marked",
               message: "RX-only: markerad i Comment, exporteras som vanlig frekvens",
-            },
+            } satisfies Warning,
           ],
         });
         break;
