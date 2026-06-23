@@ -429,7 +429,11 @@ function Index() {
                       dubbletter.
                     </div>
                   )}
-                  <RxOnlyExportNote channels={exportChannels} targetId={settings.export.targetId} />
+                  <RxOnlyExportNote
+                    channels={exportChannels}
+                    targetId={settings.export.targetId}
+                    rxOnlyPolicy={settings.packs.rxOnlyPolicy}
+                  />
                   <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 text-sm mb-3">
                     <Stat label="Från SK6BA" value={pipeline.sk6baCount} />
                     <Stat label="Från kanalpaket" value={pipeline.packCount} />
