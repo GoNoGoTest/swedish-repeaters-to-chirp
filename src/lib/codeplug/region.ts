@@ -112,14 +112,7 @@ export const COUNTRY_NAMES: Record<RegionCountryCode, string> = {
 };
 
 /** Country codes considered "Nordic" — used by the "Norden" quick filter. */
-export const NORDIC_COUNTRY_CODES: RegionCountryCode[] = [
-  "SE",
-  "NO",
-  "DK",
-  "FI",
-  "AX",
-  "IS",
-];
+export const NORDIC_COUNTRY_CODES: RegionCountryCode[] = ["SE", "NO", "DK", "FI", "AX", "IS"];
 
 function padOrder(order: number): string {
   return order.toString().padStart(3, "0");

@@ -53,14 +53,18 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
     if (output == null) warnings.push({ code: "missing_output", message: "Saknad outputfrekvens" });
 
     const shift = parseShift(r.tx_shift);
-    if (shift.unclear) warnings.push({ code: "unclear_shift", message: `Oklar tx_shift: ${r.tx_shift}` });
+    if (shift.unclear)
+      warnings.push({ code: "unclear_shift", message: `Oklar tx_shift: ${r.tx_shift}` });
 
     const access = parseAccess(r.access);
     if (!access.ctcss && !access.uses1750 && !access.carrier && !access.dcs && r.access) {
       warnings.push({ code: "missing_access_tone", message: `Otydlig access: ${r.access}` });
     }
     if (access.ctcss != null && access.dcs) {
-      warnings.push({ code: "ctcss_and_dcs", message: `Både CTCSS och DCS hittades; CTCSS valdes för analog CHIRP-export.` });
+      warnings.push({
+        code: "ctcss_and_dcs",
+        message: `Både CTCSS och DCS hittades; CTCSS valdes för analog CHIRP-export.`,
+      });
     }
 
     const lat = parseNumberLoose(r.lat);
@@ -80,9 +84,12 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
     const locator = (r.locator ?? "").toString().trim();
 
     const commentParts = [
-      call, channel, city,
+      call,
+      channel,
+      city,
       district ? `D${district}` : "",
-      type, network,
+      type,
+      network,
       r.access ? `access=${r.access}` : "",
       locator ? `loc=${locator}` : "",
     ].filter(Boolean);
@@ -91,12 +98,18 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
       source_type: "sk6ba",
       source_row: idx + 2,
       source_id: (r.id ?? "").toString(),
-      type, status: (r.status ?? "").toString().trim(),
+      type,
+      status: (r.status ?? "").toString().trim(),
       mode_raw: modeRaw,
       mode_effective: "",
       is_analog_fm: /\bFM\b/i.test(modeRaw),
-      band, district, region: deriveRegion(district, call),
-      city, call, channel, network,
+      band,
+      district,
+      region: deriveRegion(district, call),
+      city,
+      call,
+      channel,
+      network,
       network_id: (r.network_id ?? "").toString(),
       access_raw: (r.access ?? "").toString(),
       rx_frequency: output,
@@ -107,7 +120,9 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
       offset: shift.offset,
       ctcss_tx: access.ctcss,
       uses_1750: access.uses1750,
-      lat, lng, locator,
+      lat,
+      lng,
+      locator,
       comment: commentParts.join(" | "),
       ...emptyPackFields(),
       // Re-apply DCS over the empty pack defaults so SK6BA rows with
@@ -196,23 +211,35 @@ function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): N
   const out: NormalizedChannel[] = [];
   for (const ch of channels) {
     const isRxOnly = ch.source_type === "channel_pack" && (ch.rx_only || !ch.tx_allowed);
-    if (!isRxOnly) { out.push(ch); continue; }
+    if (!isRxOnly) {
+      out.push(ch);
+      continue;
+    }
     switch (settings.packs.rxOnlyPolicy) {
       case "skip":
         continue;
       case "stop":
-        ch.warnings.push({ code: "rx_only_no_policy", message: "RX-only stoppar export (policy=stop)" });
+        ch.warnings.push({
+          code: "rx_only_no_policy",
+          message: "RX-only stoppar export (policy=stop)",
+        });
         out.push(ch);
         break;
       case "block_tx":
         ch.duplex = "off";
-        ch.warnings.push({ code: "rx_only_blocked", message: "RX-only: TX spärrad enligt target-konvention" });
+        ch.warnings.push({
+          code: "rx_only_blocked",
+          message: "RX-only: TX spärrad enligt target-konvention",
+        });
         out.push(ch);
         break;
       case "mark":
       default:
         ch.comment = ch.comment ? `RX-ONLY | ${ch.comment}` : "RX-ONLY";
-        ch.warnings.push({ code: "rx_only_marked", message: "RX-only: markerad i Comment, exporteras som vanlig frekvens" });
+        ch.warnings.push({
+          code: "rx_only_marked",
+          message: "RX-only: markerad i Comment, exporteras som vanlig frekvens",
+        });
         out.push(ch);
         break;
     }
@@ -250,7 +277,10 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   // Validate split: needs tx_frequency or it can't export properly
   for (const ch of packWithPolicy) {
     if (ch.duplex === "split" && ch.tx_frequency == null) {
-      ch.warnings.push({ code: "pack_split_unsupported", message: "Split-kanal saknar tx_frequency" });
+      ch.warnings.push({
+        code: "pack_split_unsupported",
+        message: "Split-kanal saknar tx_frequency",
+      });
     }
   }
 

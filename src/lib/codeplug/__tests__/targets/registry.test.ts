@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { registerTarget, getTarget, requireTarget, listTargets, __resetTargetsForTests } from "@/lib/codeplug/targets/registry";
+import {
+  registerTarget,
+  getTarget,
+  requireTarget,
+  listTargets,
+  __resetTargetsForTests,
+} from "@/lib/codeplug/targets/registry";
 import type { ExportTarget } from "@/lib/codeplug/targets/types";
 
 const dummy: ExportTarget<{ x: number }> = {
@@ -7,7 +13,13 @@ const dummy: ExportTarget<{ x: number }> = {
   label: "Dummy",
   vendor: "Test",
   fileExtension: "csv",
-  limits: { maxNameLength: 8, supportedModes: ["FM"], supportsSplit: false, supportsCtcss: true, supportsDcs: false },
+  limits: {
+    maxNameLength: 8,
+    supportedModes: ["FM"],
+    supportsSplit: false,
+    supportsCtcss: true,
+    supportsDcs: false,
+  },
   defaultSettings: { x: 1 },
   export: () => ({ filename: "dummy.csv", content: "", warnings: [] }),
 };

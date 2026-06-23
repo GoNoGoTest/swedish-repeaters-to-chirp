@@ -11,7 +11,12 @@ function defaultPackEntry(): PackSelectionEntry {
   return { enabled: false, bands: [], categories: [], tags: [], useEnabledDefault: true };
 }
 
-function PackRow({ pack, entry, maxLength, onChange }: {
+function PackRow({
+  pack,
+  entry,
+  maxLength,
+  onChange,
+}: {
   pack: MergedPack;
   entry: PackSelectionEntry | undefined;
   maxLength: number;
@@ -21,32 +26,57 @@ function PackRow({ pack, entry, maxLength, onChange }: {
   const sel: PackSelectionEntry = entry ?? defaultPackEntry();
   const enabled = sel.enabled;
 
-  const bands = useMemo(() => Array.from(new Set(pack.channels.map((c) => c.band).filter(Boolean))).sort(), [pack]);
-  const categories = useMemo(() => Array.from(new Set(pack.channels.map((c) => c.category).filter(Boolean))).sort(), [pack]);
-  const tags = useMemo(() => Array.from(new Set(pack.channels.flatMap((c) => c.tags))).sort(), [pack]);
-  const services = Array.from(new Set(pack.channels.map((c) => c.service).filter(Boolean))).join(", ");
+  const bands = useMemo(
+    () => Array.from(new Set(pack.channels.map((c) => c.band).filter(Boolean))).sort(),
+    [pack],
+  );
+  const categories = useMemo(
+    () => Array.from(new Set(pack.channels.map((c) => c.category).filter(Boolean))).sort(),
+    [pack],
+  );
+  const tags = useMemo(
+    () => Array.from(new Set(pack.channels.flatMap((c) => c.tags))).sort(),
+    [pack],
+  );
+  const services = Array.from(new Set(pack.channels.map((c) => c.service).filter(Boolean))).join(
+    ", ",
+  );
   const enabledDefaultCount = pack.channels.filter((c) => c.enabled_default).length;
   const allRxOnly = pack.channels.every((c) => c.rx_only);
 
   const naming = sel.naming ?? DEFAULT_PACK_NAMING;
 
   return (
-    <div className={`rounded border ${enabled ? "border-primary/50" : "border-border"} bg-background`}>
+    <div
+      className={`rounded border ${enabled ? "border-primary/50" : "border-border"} bg-background`}
+    >
       <div className="flex items-center gap-3 p-3">
-        <input type="checkbox" checked={enabled}
+        <input
+          type="checkbox"
+          checked={enabled}
           onChange={(e) => onChange({ enabled: e.target.checked })}
-          className="h-4 w-4" />
+          className="h-4 w-4"
+        />
         <button type="button" onClick={() => setOpen(!open)} className="flex-1 text-left">
           <div className="flex items-center gap-2">
             <span className="font-mono text-sm font-semibold">{pack.packId}</span>
-            {allRxOnly && <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] text-destructive">RX-only</span>}
+            {allRxOnly && (
+              <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] text-destructive">
+                RX-only
+              </span>
+            )}
           </div>
           <div className="text-xs text-muted-foreground">
             {pack.channels.length} rader · {services || "—"} · {pack.fileNames.join(", ")}
           </div>
         </button>
-        <button type="button" onClick={() => setOpen(!open)}
-          className="text-xs text-muted-foreground">{open ? "Dölj ▲" : "Inställningar ▼"}</button>
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="text-xs text-muted-foreground"
+        >
+          {open ? "Dölj ▲" : "Inställningar ▼"}
+        </button>
       </div>
 
       {open && (
@@ -54,22 +84,52 @@ function PackRow({ pack, entry, maxLength, onChange }: {
           <div>
             <SectionLabel>Vilka kanaler från paketet</SectionLabel>
             <div className="grid gap-3 md:grid-cols-3">
-              {bands.length > 0 && <MultiSelect label="Band" options={bands} value={sel.bands} onChange={(v) => onChange({ bands: v })} />}
-              {categories.length > 0 && <MultiSelect label="Kategori" options={categories} value={sel.categories} onChange={(v) => onChange({ categories: v })} />}
-              {tags.length > 0 && <MultiSelect label="Tag" options={tags} value={sel.tags} onChange={(v) => onChange({ tags: v })} />}
+              {bands.length > 0 && (
+                <MultiSelect
+                  label="Band"
+                  options={bands}
+                  value={sel.bands}
+                  onChange={(v) => onChange({ bands: v })}
+                />
+              )}
+              {categories.length > 0 && (
+                <MultiSelect
+                  label="Kategori"
+                  options={categories}
+                  value={sel.categories}
+                  onChange={(v) => onChange({ categories: v })}
+                />
+              )}
+              {tags.length > 0 && (
+                <MultiSelect
+                  label="Tag"
+                  options={tags}
+                  value={sel.tags}
+                  onChange={(v) => onChange({ tags: v })}
+                />
+              )}
             </div>
             <label className="mt-2 flex items-center gap-2 text-xs">
-              <input type="checkbox" checked={sel.useEnabledDefault}
-                onChange={(e) => onChange({ useEnabledDefault: e.target.checked })} />
-              Bara rader paketet markerat som <code>enabled_default=true</code> ({enabledDefaultCount} rader). Tomt band/kategori/tag = alla.
+              <input
+                type="checkbox"
+                checked={sel.useEnabledDefault}
+                onChange={(e) => onChange({ useEnabledDefault: e.target.checked })}
+              />
+              Bara rader paketet markerat som <code>enabled_default=true</code> (
+              {enabledDefaultCount} rader). Tomt band/kategori/tag = alla.
             </label>
           </div>
           <div className="border-t border-border pt-3">
             <div className="flex items-center justify-between mb-2">
               <SectionLabel>Namngivning för detta paket</SectionLabel>
               {sel.naming && (
-                <button type="button" onClick={() => onChange({ naming: undefined })}
-                  className="text-xs text-muted-foreground underline">Återställ till standard</button>
+                <button
+                  type="button"
+                  onClick={() => onChange({ naming: undefined })}
+                  className="text-xs text-muted-foreground underline"
+                >
+                  Återställ till standard
+                </button>
               )}
             </div>
             <NamingEditor
@@ -90,7 +150,12 @@ function PackRow({ pack, entry, maxLength, onChange }: {
 }
 
 export function ChannelPacksPanel({
-  packs, settings, setSettings, selectedPackCount, selectedChannelCount, maxNameLength,
+  packs,
+  settings,
+  setSettings,
+  selectedPackCount,
+  selectedChannelCount,
+  maxNameLength,
 }: {
   packs: MergedPack[];
   settings: Settings;
@@ -103,21 +168,28 @@ export function ChannelPacksPanel({
     const cur = settings.packs.selection[packId] ?? defaultPackEntry();
     setSettings({
       ...settings,
-      packs: { ...settings.packs, selection: { ...settings.packs.selection, [packId]: { ...cur, ...patch } } },
+      packs: {
+        ...settings.packs,
+        selection: { ...settings.packs.selection, [packId]: { ...cur, ...patch } },
+      },
     });
   };
 
   return (
     <div className="space-y-3">
       <div className="text-xs text-muted-foreground">
-        {packs.length} paket tillgängliga · {selectedPackCount} valda · {selectedChannelCount} kanaler kommer läggas till.
-        Klicka på ett paket för att fälla ut bands-/kategorifilter och egen namngivning.
+        {packs.length} paket tillgängliga · {selectedPackCount} valda · {selectedChannelCount}{" "}
+        kanaler kommer läggas till. Klicka på ett paket för att fälla ut bands-/kategorifilter och
+        egen namngivning.
       </div>
       {packs.map((pack) => (
-        <PackRow key={pack.packId} pack={pack}
+        <PackRow
+          key={pack.packId}
+          pack={pack}
           entry={settings.packs.selection[pack.packId]}
           maxLength={maxNameLength}
-          onChange={(patch) => updPack(pack.packId, patch)} />
+          onChange={(patch) => updPack(pack.packId, patch)}
+        />
       ))}
     </div>
   );

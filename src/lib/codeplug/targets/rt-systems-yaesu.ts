@@ -54,7 +54,6 @@ export const RT_SYSTEMS_YAESU_DEFAULTS: RtSystemsYaesuSettings = {
   padToRows: 999,
 };
 
-
 const RT_SYSTEMS_YAESU_LIMITS: HardwareLimits = {
   maxNameLength: 16,
   // Yaesu wire mode names.
@@ -119,7 +118,7 @@ function mobileTxMhz(c: NormalizedChannel): number | null {
   if (c.tx_frequency != null) return c.tx_frequency;
   if (c.rx_frequency == null) return null;
   if (c.duplex === "+" || c.duplex === "-") {
-    const shift = c.tx_shift != null ? c.tx_shift : (c.duplex === "+" ? c.offset : -c.offset);
+    const shift = c.tx_shift != null ? c.tx_shift : c.duplex === "+" ? c.offset : -c.offset;
     return c.rx_frequency + shift;
   }
   return c.rx_frequency;
@@ -150,7 +149,6 @@ function formatOffsetKhz(offsetMhz: number): string {
   const khz = Math.round(offsetMhz * 1000 * 100) / 100;
   return `${khz} kHz`;
 }
-
 
 function formatOffsetDirection(c: NormalizedChannel): string {
   if (c.duplex === "+") return "Plus";
@@ -198,7 +196,6 @@ function resolveTone(c: NormalizedChannel, mode: string): ToneFields {
   return { toneMode: "None", ctcss: "100.0", dcs: "023" };
 }
 
-
 function isScanned(c: NormalizedChannel, s: RtSystemsYaesuSettings): boolean {
   if (c.skip_raw === "S") return false;
   if (s.skipLinks) {
@@ -218,7 +215,6 @@ export function toRtSystemsYaesuRow(
   const rxMhz = c.rx_frequency;
   const { mode, unsupported } = operatingMode(c);
   const tone = resolveTone(c, mode);
-
 
   const fields = [
     String(index),
@@ -269,11 +265,7 @@ export function exportRtSystemsYaesuCsv(
 
   const lines: string[] = [joinRow(RT_SYSTEMS_YAESU_HEADER_FIELDS)];
   exportable.forEach((c, i) => {
-    const { fields, truncated, unsupportedMode } = toRtSystemsYaesuRow(
-      c,
-      s.startNumber + i,
-      s,
-    );
+    const { fields, truncated, unsupportedMode } = toRtSystemsYaesuRow(c, s.startNumber + i, s);
     if (truncated) truncCount++;
     if (unsupportedMode) unsupportedCount++;
     lines.push(joinRow(fields));
@@ -291,7 +283,6 @@ export function exportRtSystemsYaesuCsv(
   }
   // RT Systems exports include a trailing newline.
   const csv = lines.join("\r\n") + "\r\n";
-
 
   if (truncCount > 0) {
     warnings.push({

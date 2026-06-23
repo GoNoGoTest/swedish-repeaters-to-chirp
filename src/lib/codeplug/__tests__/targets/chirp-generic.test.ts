@@ -11,13 +11,27 @@ describe("targets/chirp-generic", () => {
   });
 
   it("resolveMaxNameLength returns user-tunable chirp maxLength", () => {
-    const len = CHIRP_GENERIC_TARGET.resolveMaxNameLength!({ ...CHIRP_GENERIC_DEFAULTS, maxLength: 9 });
+    const len = CHIRP_GENERIC_TARGET.resolveMaxNameLength!({
+      ...CHIRP_GENERIC_DEFAULTS,
+      maxLength: 9,
+    });
     expect(len).toBe(9);
   });
 
   it("produces byte-identical output to the underlying exporter (regression)", () => {
-    const c1 = makeChannel({ source_type: "sk6ba", generated_name_final: "ABC", rx_frequency: 145.6125, duplex: "-", offset: 0.6 });
-    const c2 = makeChannel({ source_type: "channel_pack", generated_name_final: "S20", rx_frequency: 145.3, duplex: "" });
+    const c1 = makeChannel({
+      source_type: "sk6ba",
+      generated_name_final: "ABC",
+      rx_frequency: 145.6125,
+      duplex: "-",
+      offset: 0.6,
+    });
+    const c2 = makeChannel({
+      source_type: "channel_pack",
+      generated_name_final: "S20",
+      rx_frequency: 145.3,
+      duplex: "",
+    });
     const channels = [c1, c2];
     const direct = exportChirpCsv(channels, CHIRP_GENERIC_DEFAULTS);
     const viaTarget = CHIRP_GENERIC_TARGET.export(channels, CHIRP_GENERIC_DEFAULTS);

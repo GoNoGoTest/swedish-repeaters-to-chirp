@@ -34,7 +34,7 @@ const MODE_ALIASES: Record<string, KnownMode> = {
   WFM: "FM",
   C4FM: "C4FM",
   YSF: "C4FM",
-  DN: "C4FM",          // RT Systems Yaesu CSV calls C4FM "DN"
+  DN: "C4FM", // RT Systems Yaesu CSV calls C4FM "DN"
   FUSION: "C4FM",
   "SYSTEM FUSION": "C4FM",
   "D-STAR": "D-Star",
@@ -64,7 +64,7 @@ const MODE_ALIASES: Record<string, KnownMode> = {
 export function parseModes(raw: string | undefined | null): KnownMode[] {
   if (!raw) return [];
   const tokens = String(raw)
-    .split(/[\/,;|]/)            // separators between modes
+    .split(/[/,;|]/) // separators between modes
     .flatMap((p) => p.split(/\s+/)) // and whitespace within a chunk
     .map((t) => t.trim())
     .filter(Boolean);

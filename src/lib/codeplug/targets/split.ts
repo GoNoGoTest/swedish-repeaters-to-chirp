@@ -63,9 +63,7 @@ export function groupChannelsForSplit(channels: NormalizedChannel[]): DistrictBu
     let key: string;
     let label: string;
     if (region.countryCode === "unknown") {
-      key = region.districtCode
-        ? `unknown_${region.districtCode.toLowerCase()}`
-        : "unknown";
+      key = region.districtCode ? `unknown_${region.districtCode.toLowerCase()}` : "unknown";
       label = region.districtCode || "Okänt";
     } else {
       key = `${region.countryCode.toLowerCase()}_${region.districtLabel.toLowerCase()}`;
@@ -166,20 +164,22 @@ export function buildSplitFiles(
   },
 ): { filename: string; content: string }[] {
   if (split.mode === "single") {
-    return [{
-      filename: `${opts.filenameBase}.${opts.extension}`,
-      content: opts.renderChunk(channels),
-    }];
+    return [
+      {
+        filename: `${opts.filenameBase}.${opts.extension}`,
+        content: opts.renderChunk(channels),
+      },
+    ];
   }
 
   const buckets = groupChannelsForSplit(channels);
-  const districtChunkSize = split.mode === "per_district_chunked" ? Math.max(1, split.chunkSize) : Infinity;
+  const districtChunkSize =
+    split.mode === "per_district_chunked" ? Math.max(1, split.chunkSize) : Infinity;
   const out: { filename: string; content: string }[] = [];
   for (const bucket of buckets) {
     const isPacks = bucket.isPack === true;
-    const packsCap = isPacks && opts.packsChunkSize && opts.packsChunkSize > 0
-      ? opts.packsChunkSize
-      : Infinity;
+    const packsCap =
+      isPacks && opts.packsChunkSize && opts.packsChunkSize > 0 ? opts.packsChunkSize : Infinity;
     const effective = Math.min(districtChunkSize, packsCap);
     const chunks = Number.isFinite(effective)
       ? chunkChannels(bucket.channels, effective)

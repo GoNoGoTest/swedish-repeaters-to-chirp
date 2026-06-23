@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { exportChirpCsv, toChirpRows, CHIRP_COLUMNS } from "../../exporters/chirp";
-import { DEFAULT_SETTINGS } from "../../defaults";
+
 import { makeChannel } from "../helpers";
 
 import { CHIRP_GENERIC_DEFAULTS } from "@/lib/codeplug/targets";
@@ -19,8 +19,18 @@ describe("CHIRP exporter", () => {
   });
 
   it("formats frequency to 6 decimals and sets Location starting at startLocation", () => {
-    const c1 = makeChannel({ generated_name_final: "BORAS", rx_frequency: 145.6, duplex: "-", offset: 0.6 });
-    const c2 = makeChannel({ generated_name_final: "SKENE", rx_frequency: 434.6, duplex: "-", offset: 2.0 });
+    const c1 = makeChannel({
+      generated_name_final: "BORAS",
+      rx_frequency: 145.6,
+      duplex: "-",
+      offset: 0.6,
+    });
+    const c2 = makeChannel({
+      generated_name_final: "SKENE",
+      rx_frequency: 434.6,
+      duplex: "-",
+      offset: 2.0,
+    });
     const rows = toChirpRows([c1, c2], { ...chirp, startLocation: 10 });
     expect(rows[0].Location).toBe("10");
     expect(rows[1].Location).toBe("11");
@@ -33,8 +43,8 @@ describe("CHIRP exporter", () => {
     const c = makeChannel({
       source_type: "channel_pack",
       generated_name_final: "SPLIT",
-      rx_frequency: 144.000,
-      tx_frequency: 145.000,
+      rx_frequency: 144.0,
+      tx_frequency: 145.0,
       duplex: "split",
     });
     const rows = toChirpRows([c], chirp);
@@ -44,7 +54,11 @@ describe("CHIRP exporter", () => {
 
   it("uses pack mode_pack when present, fallback to settings.mode otherwise", () => {
     const sk = makeChannel({ generated_name_final: "X" });
-    const pack = makeChannel({ source_type: "channel_pack", generated_name_final: "Y", mode_pack: "USB" });
+    const pack = makeChannel({
+      source_type: "channel_pack",
+      generated_name_final: "Y",
+      mode_pack: "USB",
+    });
     const rows = toChirpRows([sk, pack], { ...chirp, mode: "NFM" });
     expect(rows[0].Mode).toBe("NFM");
     expect(rows[1].Mode).toBe("USB");
@@ -96,8 +110,11 @@ describe("CHIRP exporter", () => {
 
   it("pack with tone=TSQL fills rTone and cTone", () => {
     const c = makeChannel({
-      source_type: "channel_pack", generated_name_final: "X",
-      tone_raw: "TSQL", rtone_freq: 123.0, ctone_freq: 123.0,
+      source_type: "channel_pack",
+      generated_name_final: "X",
+      tone_raw: "TSQL",
+      rtone_freq: 123.0,
+      ctone_freq: 123.0,
     });
     const rows = toChirpRows([c], chirp);
     expect(rows[0].Tone).toBe("TSQL");
@@ -108,8 +125,11 @@ describe("CHIRP exporter", () => {
 
   it("pack with tone=DTCS fills only DTCS fields, defaults on tone freqs", () => {
     const c = makeChannel({
-      source_type: "channel_pack", generated_name_final: "X",
-      tone_raw: "DTCS", dtcs_code: "411", dtcs_polarity: "NN",
+      source_type: "channel_pack",
+      generated_name_final: "X",
+      tone_raw: "DTCS",
+      dtcs_code: "411",
+      dtcs_polarity: "NN",
     });
     const rows = toChirpRows([c], chirp);
     expect(rows[0].Tone).toBe("DTCS");
@@ -140,7 +160,12 @@ describe("CHIRP exporter", () => {
   });
 
   it("SK6BA with both CTCSS and DCS prefers CTCSS", () => {
-    const c = makeChannel({ generated_name_final: "X", ctcss_tx: 123.0, dtcs_code: "025", dtcs_polarity: "NN" });
+    const c = makeChannel({
+      generated_name_final: "X",
+      ctcss_tx: 123.0,
+      dtcs_code: "025",
+      dtcs_polarity: "NN",
+    });
     const rows = toChirpRows([c], chirp);
     expect(rows[0].Tone).toBe("Tone");
     expect(rows[0].rToneFreq).toBe("123.0");
@@ -221,4 +246,3 @@ describe("CHIRP exporter", () => {
     expect(rows[0].DVCODE).toBe("");
   });
 });
-

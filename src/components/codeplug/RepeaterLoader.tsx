@@ -1,4 +1,9 @@
-import { freshnessOf, relativeTime, formatBytes, type SavedExport } from "@/lib/codeplug/saved-exports";
+import {
+  freshnessOf,
+  relativeTime,
+  formatBytes,
+  type SavedExport,
+} from "@/lib/codeplug/saved-exports";
 import type { Sk6baLoadState } from "@/lib/codeplug/importers/sk6ba";
 
 const FRESHNESS_DOT: Record<"fresh" | "stale" | "old", string> = {
@@ -7,7 +12,12 @@ const FRESHNESS_DOT: Record<"fresh" | "stale" | "old", string> = {
   old: "bg-red-500",
 };
 
-function SavedExportsPanel({ items, onPick, onDelete, onClear }: {
+function SavedExportsPanel({
+  items,
+  onPick,
+  onDelete,
+  onClear,
+}: {
   items: SavedExport[];
   onPick: (id: string) => void;
   onDelete: (id: string) => void;
@@ -21,8 +31,7 @@ function SavedExportsPanel({ items, onPick, onDelete, onClear }: {
       </div>
       {items.length === 0 ? (
         <p className="my-4 text-xs text-muted-foreground">
-          Ingen sparad än. Filer du laddar upp dyker upp här så du kan välja
-          dem direkt nästa gång.
+          Ingen sparad än. Filer du laddar upp dyker upp här så du kan välja dem direkt nästa gång.
         </p>
       ) : (
         <ul className="flex flex-col divide-y divide-border">
@@ -32,7 +41,9 @@ function SavedExportsPanel({ items, onPick, onDelete, onClear }: {
               <li key={e.id} className="group flex items-center gap-3 py-2">
                 <span
                   className={`h-2 w-2 shrink-0 rounded-full ${FRESHNESS_DOT[f]}`}
-                  aria-label={f === "fresh" ? "färsk" : f === "stale" ? "några veckor" : "kan vara gammal"}
+                  aria-label={
+                    f === "fresh" ? "färsk" : f === "stale" ? "några veckor" : "kan vara gammal"
+                  }
                   title={new Date(e.savedAt).toLocaleString("sv-SE")}
                 />
                 <button
@@ -72,7 +83,14 @@ function SavedExportsPanel({ items, onPick, onDelete, onClear }: {
   );
 }
 
-export function RepeaterLoader({ onFile, loadState, savedExports, onPickSaved, onDeleteSaved, onClearSaved }: {
+export function RepeaterLoader({
+  onFile,
+  loadState,
+  savedExports,
+  onPickSaved,
+  onDeleteSaved,
+  onClearSaved,
+}: {
   onFile: (f: File) => void;
   loadState: Sk6baLoadState;
   savedExports: SavedExport[];
@@ -87,9 +105,15 @@ export function RepeaterLoader({ onFile, loadState, savedExports, onPickSaved, o
         <label className="flex flex-col gap-2 rounded-md border border-dashed border-border bg-background p-6 cursor-pointer hover:border-foreground/40">
           <span className="text-sm font-medium">Välj fil</span>
           <span className="text-xs text-muted-foreground">SK6BA / Marks repeater-CSV (.csv)</span>
-          <input type="file" accept=".csv,text/csv" className="text-sm"
-            onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
-          <p className="mt-auto text-xs text-muted-foreground">Sparas automatiskt lokalt så du kan återanvända senare (max 5).</p>
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            className="text-sm"
+            onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
+          />
+          <p className="mt-auto text-xs text-muted-foreground">
+            Sparas automatiskt lokalt så du kan återanvända senare (max 5).
+          </p>
         </label>
         <SavedExportsPanel
           items={savedExports}
@@ -99,7 +123,10 @@ export function RepeaterLoader({ onFile, loadState, savedExports, onPickSaved, o
         />
       </div>
       {isError && (
-        <div role="alert" className="mt-3 rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <div
+          role="alert"
+          className="mt-3 rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
           <div className="font-medium">Kunde inte läsa filen</div>
           <div className="mt-1 text-xs">{loadState.message}</div>
           {loadState.missingColumns && loadState.missingColumns.length > 0 && (
@@ -108,7 +135,14 @@ export function RepeaterLoader({ onFile, loadState, savedExports, onPickSaved, o
               <code className="font-mono">{loadState.missingColumns.join(", ")}</code>
               <div className="mt-1 text-muted-foreground">
                 Kontrollera att du exporterat CSV:n från{" "}
-                <a href="https://sk6ba.se/vhf/repeater/karta/" target="_blank" rel="noopener noreferrer" className="underline">SK6BA:s repeaterkarta</a>{" "}
+                <a
+                  href="https://sk6ba.se/vhf/repeater/karta/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  SK6BA:s repeaterkarta
+                </a>{" "}
                 med standardkolumner.
               </div>
             </div>

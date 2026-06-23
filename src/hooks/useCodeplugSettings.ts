@@ -7,15 +7,20 @@ const STORAGE_KEY = "sk6ba-chirp-settings-v6";
 import { parseModes } from "@/lib/codeplug/modes";
 import { getTarget } from "@/lib/codeplug/targets";
 
-function migrateFilter(parsedFilter: any): Settings["filter"] {
-  const base: any = { ...DEFAULT_SETTINGS.filter, ...(parsedFilter ?? {}) };
+function migrateFilter(
+  parsedFilter: Record<string, unknown> | undefined | null,
+): Settings["filter"] {
+  const base: Record<string, unknown> = { ...DEFAULT_SETTINGS.filter, ...(parsedFilter ?? {}) };
   // Legacy `includeUnknownDistricts` → `includeUnknownRegions` if new field missing.
-  if (parsedFilter && parsedFilter.includeUnknownRegions === undefined
-      && parsedFilter.includeUnknownDistricts !== undefined) {
+  if (
+    parsedFilter &&
+    parsedFilter.includeUnknownRegions === undefined &&
+    parsedFilter.includeUnknownDistricts !== undefined
+  ) {
     base.includeUnknownRegions = !!parsedFilter.includeUnknownDistricts;
   }
   // Legacy `modeStrategy` / `customModes` → `modes`.
-  if (parsedFilter && (!Array.isArray(parsedFilter.modes))) {
+  if (parsedFilter && !Array.isArray(parsedFilter.modes)) {
     const strategy = parsedFilter.modeStrategy;
     if (strategy === "contains_fm" || strategy === "exact_fm") {
       base.modes = ["FM"];
@@ -37,7 +42,7 @@ function migrateFilter(parsedFilter: any): Settings["filter"] {
   if (!Array.isArray(base.countries)) base.countries = DEFAULT_SETTINGS.filter.countries;
   if (!Array.isArray(base.regions)) base.regions = DEFAULT_SETTINGS.filter.regions;
   if (!Array.isArray(base.modes)) base.modes = [...DEFAULT_SETTINGS.filter.modes];
-  return base;
+  return base as unknown as Settings["filter"];
 }
 
 function loadStoredSettings(): Settings {
@@ -54,14 +59,17 @@ function loadStoredSettings(): Settings {
       packs: { ...DEFAULT_SETTINGS.packs, ...(parsed.packs ?? {}) },
       sort: { ...DEFAULT_SETTINGS.sort, ...(parsed.sort ?? {}) },
       export: {
-        targetId: (parsed?.export?.targetId && getTarget(parsed.export.targetId))
-          ? parsed.export.targetId
-          : DEFAULT_SETTINGS.export.targetId,
+        targetId:
+          parsed?.export?.targetId && getTarget(parsed.export.targetId)
+            ? parsed.export.targetId
+            : DEFAULT_SETTINGS.export.targetId,
         perTarget: { ...DEFAULT_SETTINGS.export.perTarget, ...(parsed?.export?.perTarget ?? {}) },
         split: { ...DEFAULT_SETTINGS.export.split, ...(parsed?.export?.split ?? {}) },
       },
     };
-  } catch { return DEFAULT_SETTINGS; }
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
 }
 
 export function useCodeplugSettings() {
@@ -75,7 +83,11 @@ export function useCodeplugSettings() {
 
   useEffect(() => {
     if (!hydrated) return;
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* ignore */ }
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    } catch {
+      /* ignore */
+    }
   }, [settings, hydrated]);
 
   const reset = useCallback(() => setSettings(DEFAULT_SETTINGS), []);

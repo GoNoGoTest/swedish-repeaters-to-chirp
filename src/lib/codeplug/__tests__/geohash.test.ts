@@ -6,7 +6,7 @@ import { makeChannel } from "./helpers";
 
 describe("encodeGeohash", () => {
   it("encodes known coordinate (Borås ≈ u6scz)", () => {
-    const h = encodeGeohash(57.7210, 12.9401, 5);
+    const h = encodeGeohash(57.721, 12.9401, 5);
     expect(h).toHaveLength(5);
     expect(h.startsWith("u")).toBe(true);
   });

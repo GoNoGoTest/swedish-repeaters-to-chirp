@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  deriveRegion,
-  UNKNOWN_REGION,
-  COUNTRY_SORT_ORDER,
-  NORDIC_COUNTRY_CODES,
-} from "../region";
+import { deriveRegion, UNKNOWN_REGION, COUNTRY_SORT_ORDER, NORDIC_COUNTRY_CODES } from "../region";
 
 describe("deriveRegion — Swedish districts", () => {
   it("maps 0..7 to SE / SM0..SM7", () => {
@@ -81,8 +76,8 @@ describe("sortKey ordering", () => {
       .map((r) => r.sortKey)
       .slice()
       .sort();
-    expect(ordered[0]).toMatch(/^010-/);  // SE
-    expect(ordered[ordered.length - 1]).toMatch(/^999-/);  // unknown
+    expect(ordered[0]).toMatch(/^010-/); // SE
+    expect(ordered[ordered.length - 1]).toMatch(/^999-/); // unknown
   });
 
   it("SE districts sort numerically via label", () => {
@@ -91,8 +86,7 @@ describe("sortKey ordering", () => {
       .slice()
       .sort();
     // "10" is unknown (not in 0..7), so just check the SE three are ordered
-    expect(keys.filter((k) => k.startsWith("010-")))
-      .toEqual(["010-SM0", "010-SM3", "010-SM7"]);
+    expect(keys.filter((k) => k.startsWith("010-"))).toEqual(["010-SM0", "010-SM3", "010-SM7"]);
   });
 });
 

@@ -54,7 +54,6 @@ export const VGC_N76_DEFAULTS: VgcN76Settings = {
   reserveAprsSlot32: false,
 };
 
-
 const VGC_N76_CHANNELS_PER_GROUP = 32;
 
 const VGC_N76_LIMITS: HardwareLimits = {
@@ -67,7 +66,6 @@ const VGC_N76_LIMITS: HardwareLimits = {
   supportsCtcss: true,
   supportsDcs: true,
 };
-
 
 function isAm(c: NormalizedChannel): boolean {
   return (c.mode_pack || "").toUpperCase() === "AM";
@@ -104,7 +102,7 @@ function mobileTxMhz(c: NormalizedChannel): number | null {
   if (c.tx_frequency != null) return c.tx_frequency;
   if (c.rx_frequency == null) return null;
   if (c.duplex === "+" || c.duplex === "-") {
-    const shift = c.tx_shift != null ? c.tx_shift : (c.duplex === "+" ? c.offset : -c.offset);
+    const shift = c.tx_shift != null ? c.tx_shift : c.duplex === "+" ? c.offset : -c.offset;
     return c.rx_frequency + shift;
   }
   if (c.duplex === "off") return c.rx_frequency;
@@ -208,17 +206,14 @@ const EMPTY_ROW: VgcRow = {
  * through unchanged — their `mode_pack` (AM/FM/NFM) is what drives the
  * VGC modulation/bandwidth columns.
  */
-function filterAnalogFmSk6ba(
-  channels: NormalizedChannel[],
-): { kept: NormalizedChannel[]; droppedCount: number } {
+function filterAnalogFmSk6ba(channels: NormalizedChannel[]): {
+  kept: NormalizedChannel[];
+  droppedCount: number;
+} {
   const kept: NormalizedChannel[] = [];
   let droppedCount = 0;
   for (const c of channels) {
-    if (
-      c.source_type === "sk6ba" &&
-      c.mode_effective !== "" &&
-      c.mode_effective !== "FM"
-    ) {
+    if (c.source_type === "sk6ba" && c.mode_effective !== "" && c.mode_effective !== "FM") {
       droppedCount++;
       continue;
     }
@@ -375,7 +370,10 @@ function insertAprsRow(rows: VgcRow[], aprs: VgcRow): VgcRow[] {
   return [...rows, aprs];
 }
 
-export function exportVgcN76Csv(channels: NormalizedChannel[], s: VgcN76Settings): { csv: string; warnings: Warning[] } {
+export function exportVgcN76Csv(
+  channels: NormalizedChannel[],
+  s: VgcN76Settings,
+): { csv: string; warnings: Warning[] } {
   if (!s.reserveAprsSlot32) {
     const { rows, warnings } = toVgcN76Rows(channels, s);
     return { csv: rowsToCsv(rows), warnings };
@@ -397,7 +395,8 @@ export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
   id: "vgc-n76",
   label: "VGC N76 (app-CSV)",
   vendor: "VGC",
-  description: "CSV importerbar direkt i VGC:s iOS/Android-app. 8-tecken kanalnamn, 32 kanaler/grupp, integer-Hz frekvenser.",
+  description:
+    "CSV importerbar direkt i VGC:s iOS/Android-app. 8-tecken kanalnamn, 32 kanaler/grupp, integer-Hz frekvenser.",
   filenameBase: "vgc-n76",
   fileExtension: "csv",
   limits: VGC_N76_LIMITS,
@@ -432,6 +431,5 @@ export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
     });
   },
 };
-
 
 registerTarget(VGC_N76_TARGET);

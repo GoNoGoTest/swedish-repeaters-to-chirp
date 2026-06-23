@@ -7,10 +7,12 @@ describe("registry", () => {
     // Whatever ships in /channelpacks gets picked up; expect at least the 2m + 70cm pair.
     expect(packs.length).toBeGreaterThanOrEqual(2);
     const names = packs.map((p) => p.fileName);
-    expect(names).toEqual(expect.arrayContaining([
-      "se_amateur_2m_channel_pack.csv",
-      "se_amateur_70cm_channel_pack.csv",
-    ]));
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "se_amateur_2m_channel_pack.csv",
+        "se_amateur_70cm_channel_pack.csv",
+      ]),
+    );
   });
 
   it("merges 2m + 70cm into one logical amateur pack", () => {

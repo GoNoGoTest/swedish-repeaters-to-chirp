@@ -7,7 +7,13 @@ const f = DEFAULT_SETTINGS.filter;
 
 describe("applyFilters", () => {
   it("keeps QRV Repeater FM by default", () => {
-    const ch = makeChannel({ status: "QRV", type: "Repeater", mode_raw: "FM", band: "2", district: "6" });
+    const ch = makeChannel({
+      status: "QRV",
+      type: "Repeater",
+      mode_raw: "FM",
+      band: "2",
+      district: "6",
+    });
     expect(applyFilters([ch], f)).toHaveLength(1);
   });
 
@@ -26,13 +32,20 @@ describe("applyFilters", () => {
   it("excludes unknown districts unless allowed", () => {
     const ch = makeChannel({ district: "" });
     expect(applyFilters([ch], { ...f, includeUnknownRegions: false })).toHaveLength(0);
-    expect(applyFilters([ch], { ...f, includeUnknownRegions: true, countries: [] })).toHaveLength(1);
+    expect(applyFilters([ch], { ...f, includeUnknownRegions: true, countries: [] })).toHaveLength(
+      1,
+    );
   });
 
   it("legacy includeUnknownDistricts still works as alias when new field is undefined", () => {
     const ch = makeChannel({ district: "" });
-    const legacy: any = { ...f, includeUnknownRegions: undefined, includeUnknownDistricts: true, countries: [] };
-    expect(applyFilters([ch], legacy)).toHaveLength(1);
+    const legacy = {
+      ...f,
+      includeUnknownRegions: undefined,
+      includeUnknownDistricts: true,
+      countries: [],
+    };
+    expect(applyFilters([ch], legacy as unknown as typeof f)).toHaveLength(1);
   });
 
   it("country filter keeps SE rows, drops NO when SE-only", () => {
@@ -43,8 +56,7 @@ describe("applyFilters", () => {
   });
 
   it("Nordic countries pass with countries=[SE,NO,DK,FI,AX,IS]", () => {
-    const rows = ["6", "LA", "OZ", "OH6", "OH0", "TF"]
-      .map((d) => makeChannel({ district: d }));
+    const rows = ["6", "LA", "OZ", "OH6", "OH0", "TF"].map((d) => makeChannel({ district: d }));
     const res = applyFilters(rows, { ...f, countries: ["SE", "NO", "DK", "FI", "AX", "IS"] });
     expect(res).toHaveLength(6);
   });
