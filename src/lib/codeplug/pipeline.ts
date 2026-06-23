@@ -215,7 +215,9 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   const { sk6baRows, packChannels = [], settings, maxNameLength = 6 } = input;
   const totalInput = sk6baRows.length + packChannels.length;
   const normalized = normalize(sk6baRows);
-  const exportable = normalized.filter((c) => c.rx_frequency != null);
+  const inScope = normalized.filter((c) => !OUT_OF_SCOPE_TYPES.has(c.type));
+  const outOfScope = normalized.length - inScope.length;
+  const exportable = inScope.filter((c) => c.rx_frequency != null);
   const withRx = exportable.length;
   // Expand multi-mode SK6BA rows into one channel per selected mode.
   // Channel-pack rows pass through unchanged.
