@@ -387,12 +387,22 @@ function Index() {
                       </ul>
                     );
                   })()}
+                  {statFilter && (
+                    <div className="mb-3 flex items-center justify-between rounded border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
+                      <span>
+                        Previewen är filtrerad: <strong>{statFilterLabel[statFilter]}</strong>
+                        {" "}({previewChannels.length} rader) · exporten innehåller fortfarande alla {exportChannels.length} rader.
+                      </span>
+                      <button onClick={() => setStatFilter(null)} className="rounded border border-border px-2 py-1">Visa alla</button>
+                    </div>
+                  )}
                   <PreviewTable
-                    channels={pipeline.channels}
+                    channels={previewChannels}
                     excludedKeys={excludedKeys}
                     onToggleExclude={toggleExclude}
                     chirpMode={target.id === "chirp-generic" ? chirpSettings.mode : "NFM"}
                     startLoc={target.id === "chirp-generic" ? chirpSettings.startLocation : 1}
+                    exportCount={exportChannels.length}
                   />
                 </Section>
               </div>
