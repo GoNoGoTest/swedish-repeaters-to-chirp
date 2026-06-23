@@ -1,5 +1,6 @@
 import Papa from "papaparse";
 import type { NormalizedChannel, Warning } from "../models";
+import { channelSignalMode } from "../modes";
 import { registerTarget } from "./registry";
 import type { ExportTarget, HardwareLimits } from "./types";
 
