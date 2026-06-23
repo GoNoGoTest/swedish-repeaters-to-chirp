@@ -121,6 +121,13 @@ export function applyModeAccessSubset(c: NormalizedChannel): NormalizedChannel {
         digital_access_raw: c.access_raw,
       };
     case "none":
-      return { ...c, ...ZERO_ANALOG, ...ZERO_DMR, ...ZERO_C4FM, ...ZERO_P25, digital_access_raw: "" };
+      return {
+        ...c,
+        ...ZERO_ANALOG,
+        ...ZERO_DMR,
+        ...ZERO_C4FM,
+        ...ZERO_P25,
+        digital_access_raw: "",
+      };
   }
 }

@@ -70,7 +70,6 @@ describe("parseAccess", () => {
     expect(parseAccess("notone").carrier).toBe(true);
   });
 
-
   describe("DCS/DTCS", () => {
     it("parses 'DCS 025' as dcs=025", () => {
       const r = parseAccess("DCS 025");
@@ -160,7 +159,18 @@ describe("parseDigitalAccess", () => {
   });
 
   it("does not flag analog-consumable tokens as unknown", () => {
-    const cases = ["123.0", "1750", "DCS023", "DTCS 025", "D025", "carrier", "open", "none", "ingen", "no tone"];
+    const cases = [
+      "123.0",
+      "1750",
+      "DCS023",
+      "DTCS 025",
+      "D025",
+      "carrier",
+      "open",
+      "none",
+      "ingen",
+      "no tone",
+    ];
     for (const s of cases) {
       const r = parseDigitalAccess(s);
       expect(r.unknownTokens, `case=${s}`).toEqual([]);

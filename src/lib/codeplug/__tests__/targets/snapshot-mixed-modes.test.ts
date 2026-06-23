@@ -11,10 +11,7 @@ import { runPipeline } from "../../pipeline";
 import { DEFAULT_SETTINGS } from "../../defaults";
 import { exportVgcN76Csv, VGC_N76_DEFAULTS } from "../../targets/vgc-n76";
 import { exportNicsureRt880Csv, NICSURE_RT880_DEFAULTS } from "../../targets/nicsure-rt880";
-import {
-  exportRtSystemsYaesuCsv,
-  RT_SYSTEMS_YAESU_DEFAULTS,
-} from "../../targets/rt-systems-yaesu";
+import { exportRtSystemsYaesuCsv, RT_SYSTEMS_YAESU_DEFAULTS } from "../../targets/rt-systems-yaesu";
 import type { Settings } from "../../models";
 
 const settings: Settings = {

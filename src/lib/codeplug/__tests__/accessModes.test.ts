@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { classifyMode, classifyChannel, isAnalogToneMode, applyModeAccessSubset } from "../accessModes";
+import {
+  classifyMode,
+  classifyChannel,
+  isAnalogToneMode,
+  applyModeAccessSubset,
+} from "../accessModes";
 import { makeChannel } from "./helpers";
 
 describe("classifyMode", () => {
@@ -83,7 +88,12 @@ describe("classifyChannel + applyModeAccessSubset", () => {
     expect(c.dmr_color_code).toBe(1);
   });
   it("idempotent (running twice = once)", () => {
-    const c = makeChannel({ mode_effective: "DMR", ctcss_tx: 100, dmr_color_code: 1, access_raw: "x" });
+    const c = makeChannel({
+      mode_effective: "DMR",
+      ctcss_tx: 100,
+      dmr_color_code: 1,
+      access_raw: "x",
+    });
     const once = applyModeAccessSubset(c);
     const twice = applyModeAccessSubset(once);
     expect(twice).toEqual(once);

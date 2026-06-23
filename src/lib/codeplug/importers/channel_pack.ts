@@ -193,9 +193,7 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
     const toneRaw = (r.tone ?? "").trim();
     const DIGITAL_TONE_RE =
       /(?:\bCC\s*=?\s*\d{1,2}\b|\bTS\s*=?\s*[12]\b|\bTG\s*=?\s*[\w-]+\b|\bNAC\s*=?\s*[0-9A-F]{3}\b|\b(?:TX|RX)\s*=?\s*\d{2}\b)/i;
-    const digital = DIGITAL_TONE_RE.test(toneRaw)
-      ? parseDigitalAccess(toneRaw)
-      : null;
+    const digital = DIGITAL_TONE_RE.test(toneRaw) ? parseDigitalAccess(toneRaw) : null;
 
     const ch: ParsedPackChannel = {
       source_type: "channel_pack",
