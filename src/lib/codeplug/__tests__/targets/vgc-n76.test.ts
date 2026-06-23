@@ -249,7 +249,7 @@ describe("targets/vgc-n76 — APRS slot 32 reservation", () => {
         district: "6",
       }),
     );
-    const files = VGC_N76_TARGET.exportMany!(
+    const { files } = VGC_N76_TARGET.exportMany!(
       channels,
       { ...VGC_N76_DEFAULTS, reserveAprsSlot32: true },
       { mode: "per_district_chunked", chunkSize: 32 },
