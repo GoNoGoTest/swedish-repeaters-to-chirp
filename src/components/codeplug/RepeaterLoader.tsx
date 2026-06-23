@@ -5,6 +5,7 @@ import {
   type SavedExport,
 } from "@/lib/codeplug/saved-exports";
 import type { Sk6baLoadState } from "@/lib/codeplug/importers/sk6ba";
+import { ParseWarningsPanel } from "./ParseWarningsPanel";
 
 const FRESHNESS_DOT: Record<"fresh" | "stale" | "old", string> = {
   fresh: "bg-emerald-500",
@@ -149,21 +150,8 @@ export function RepeaterLoader({
           )}
         </div>
       )}
-      {loadState.status === "loaded" && loadState.parseWarnings.length > 0 && (
-        <div
-          role="status"
-          className="mt-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
-        >
-          <div className="font-medium">
-            CSV:n innehåller {loadState.parseWarnings.length} parse-varning
-            {loadState.parseWarnings.length === 1 ? "" : "ar"} (laddad ändå)
-          </div>
-          <ul className="mt-1 list-disc pl-5 font-mono">
-            {loadState.parseWarnings.map((w, i) => (
-              <li key={i}>{w}</li>
-            ))}
-          </ul>
-        </div>
+      {loadState.status === "loaded" && (
+        <ParseWarningsPanel title="i SK6BA-filen" warnings={loadState.parseWarnings} />
       )}
     </>
   );

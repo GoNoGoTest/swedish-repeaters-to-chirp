@@ -1,6 +1,56 @@
 import { z } from "zod";
 
 /**
+ * En strukturerad parse-varning. `row` är 1-indexerat CSV-radnummer
+ * inklusive header (`null` när Papa/zod inte kan utpeka rad). `column` är
+ * kolumnnamnet om vi vet (FieldMismatch / zod-path), annars `null`.
+ * Konsumeras av `ParseWarningsPanel` i UI.
+ */
+export interface ParseWarning {
+  row: number | null;
+  column: string | null;
+  code: string;
+  message: string;
+  source: "papa" | "schema";
+}
+
+/**
+ * Konvertera ett PapaParse-fel (`Papa.ParseError`-like) till en
+ * `ParseWarning`. Papas `row` är 0-indexerad headerless ⇒ +2 för
+ * 1-indexerat radnummer inklusive header.
+ */
+export function papaErrorToWarning(e: {
+  row?: number;
+  code?: string;
+  message?: string;
+  type?: string;
+}): ParseWarning {
+  return {
+    row: typeof e.row === "number" ? e.row + 2 : null,
+    column: null,
+    code: e.code ?? e.type ?? "PapaError",
+    message: e.message ?? "Okänt parse-fel",
+    source: "papa",
+  };
+}
+
+/**
+ * Konvertera en zod-issue (från radschemavalidering) till en `ParseWarning`.
+ * `rowIdx` är 0-indexerad headerless radindex (samma konvention som
+ * `Papa.errors[i].row`).
+ */
+export function zodIssueToWarning(rowIdx: number, issue: z.ZodIssue): ParseWarning {
+  const firstPath = issue.path[0];
+  return {
+    row: rowIdx + 2,
+    column: typeof firstPath === "string" ? firstPath : null,
+    code: "schema_invalid",
+    message: issue.message,
+    source: "schema",
+  };
+}
+
+/**
  * Minimal zod-schema för SK6BA-rader. Vi accepterar vilken kolumnuppsättning
  * som helst (`.passthrough()`); schemats roll är att garantera att raden
  * faktiskt är ett objekt med strängvärden, så att nedströmskonsumenter
@@ -35,8 +85,7 @@ export type Sk6baRowSchema = z.infer<typeof sk6baRowSchema>;
 /**
  * Channel-pack-radschema. Endast `pack_id`, `source_id` och `rx_frequency`
  * är obligatoriska — matchar `REQUIRED_COLUMNS` i parseChannelPackCsv.
- * `duplex` valideras mot tillåtna värden (Papa ger oss strängar; vi
- * accepterar både "" och de fyra giltiga + "simplex").
+ * `duplex` valideras mot tillåtna värden.
  */
 export const packRowSchema = z
   .object({
@@ -83,19 +132,3 @@ export const packRowSchema = z
   .passthrough();
 
 export type PackRowSchema = z.infer<typeof packRowSchema>;
-
-/**
- * Konvertera ett PapaParse-fel till en kort svensk meddelandesträng,
- * lämplig att visa i en info-banner. `row` är 0-indexerad headerless;
- * vi adderar +2 för 1-indexerat CSV-radnummer inklusive header.
- */
-export function formatPapaError(e: {
-  row?: number;
-  code?: string;
-  message?: string;
-  type?: string;
-}): string {
-  const rowLabel = typeof e.row === "number" ? `Rad ${e.row + 2}: ` : "";
-  const code = e.code ? `${e.code} — ` : "";
-  return `${rowLabel}${code}${e.message ?? "Okänt parse-fel"}`;
-}

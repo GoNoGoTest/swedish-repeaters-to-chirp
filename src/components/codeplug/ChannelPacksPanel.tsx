@@ -4,6 +4,7 @@ import type { MergedPack } from "@/lib/codeplug/channel_packs/registry";
 import { DEFAULT_PACK_NAMING } from "@/lib/codeplug/defaults";
 import { MultiSelect, SectionLabel } from "./common";
 import { NamingEditor } from "./NamingEditor";
+import { ParseWarningsPanel } from "./ParseWarningsPanel";
 
 const PACK_TOKENS = ["{service}", "{category}", "{label}", "{name_hint}", "{channel}", "{band}"];
 
@@ -182,6 +183,15 @@ export function ChannelPacksPanel({
         kanaler kommer läggas till. Klicka på ett paket för att fälla ut bands-/kategorifilter och
         egen namngivning.
       </div>
+      {packs
+        .filter((p) => p.parseWarnings.length > 0)
+        .map((p) => (
+          <ParseWarningsPanel
+            key={p.packId}
+            title={`i kanalpaket ${p.packId}`}
+            warnings={p.parseWarnings}
+          />
+        ))}
       {packs.map((pack) => (
         <PackRow
           key={pack.packId}
