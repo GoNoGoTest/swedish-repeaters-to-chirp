@@ -43,7 +43,7 @@ function invokeTarget(
   stored: unknown,
   channels: NormalizedChannel[],
   split: SplitSettings,
-): { one: ExportResult } | { many: ExportFile[] } {
+): { one: ExportResult } | { many: ExportManyResult } {
   const willSplit = split.mode !== "single" && !!target.exportMany;
   const storedPatch = stored as Record<string, unknown> | undefined;
   switch (target.id) {
@@ -76,7 +76,7 @@ export function useCodeplugDownload(input: {
 }) {
   const { settings, exportChannels } = input;
 
-  const exportFiles = useCallback(async () => {
+  const exportFiles = useCallback(async (): Promise<Warning[]> => {
     const target = requireTarget(settings.export.targetId);
     const out = invokeTarget(
       target,
@@ -85,16 +85,19 @@ export function useCodeplugDownload(input: {
       settings.export.split,
     );
     if ("many" in out) {
-      if (out.many.length === 1) {
-        downloadBlob(out.many[0].filename, out.many[0].content);
+      const { files, warnings } = out.many;
+      if (files.length === 1) {
+        downloadBlob(files[0].filename, files[0].content);
       } else {
         const base = target.filenameBase ?? target.id;
-        await downloadZip(`${base}.zip`, out.many);
+        await downloadZip(`${base}.zip`, files);
       }
-      return;
+      return warnings;
     }
     downloadBlob(out.one.filename, out.one.content);
+    return out.one.warnings;
   }, [settings, exportChannels]);
+
 
   const exportWarnings = useCallback(() => {
     const reportRows = exportChannels
