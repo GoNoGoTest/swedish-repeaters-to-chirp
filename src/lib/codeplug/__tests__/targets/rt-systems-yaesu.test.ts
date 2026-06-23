@@ -365,10 +365,14 @@ describe("RT Systems Yaesu — exportMany warnings", () => {
       offset: 0.6,
       tx_shift: -0.6,
     });
-    const result = RT_SYSTEMS_YAESU_TARGET.exportMany!([ch], { ...S, padToRows: 0 }, {
-      mode: "single",
-      chunkSize: 0,
-    });
+    const result = RT_SYSTEMS_YAESU_TARGET.exportMany!(
+      [ch],
+      { ...S, padToRows: 0 },
+      {
+        mode: "single",
+        chunkSize: 0,
+      },
+    );
     expect(result.files.length).toBe(1);
     expect(result.warnings.some((w) => w.code === "rt_name_truncated")).toBe(true);
   });

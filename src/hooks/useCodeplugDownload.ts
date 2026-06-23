@@ -98,7 +98,6 @@ export function useCodeplugDownload(input: {
     return out.one.warnings;
   }, [settings, exportChannels]);
 
-
   const exportWarnings = useCallback(() => {
     const reportRows = exportChannels
       .filter((c) => c.warnings.length)
