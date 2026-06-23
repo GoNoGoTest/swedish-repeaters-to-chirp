@@ -11,6 +11,7 @@ Två små disciplinfixar i `swedish-repeaters-to-codeplug`, plus regressionstest
 Idag muteras input via `ch.warnings.push(...)`. Eftersom pack-kanaler kan komma från cache kan varningar ackumuleras mellan rerenders.
 
 **Ändring:**
+
 - Bygg grupper som idag.
 - Bestäm vilka pack-rader som ska få `freq_duplicate` (samma villkor som nu: pack-vs-sk6ba eller pack-vs-pack).
 - Bygg en `Set<NormalizedChannel>` `warnSet` för rader att flagga.
@@ -20,6 +21,7 @@ Idag muteras input via `ch.warnings.push(...)`. Eftersom pack-kanaler kan komma 
 - Behåll semantik för `keep_both`, `drop_pack`, `drop_sk6ba`, `stop`.
 
 **Test:** utöka `src/lib/codeplug/__tests__/dedupe.test.ts`:
+
 - Två kanaler (sk6ba + pack) på samma RX. Spara `originalPackWarnings = pack.warnings`, `originalSk6baWarnings = sk6ba.warnings`. Kör `applyFreqDedupe([sk6ba, pack], "keep_both")`. Asserta:
   - `pack.warnings === originalPackWarnings` (oförändrat, samma referens).
   - `sk6ba.warnings === originalSk6baWarnings`.
@@ -34,6 +36,7 @@ Idag muteras input via `ch.warnings.push(...)`. Eftersom pack-kanaler kan komma 
 **Problem:** `PreviewTable` räknar Loc lokalt från `startLoc` över bara de rader den får. När `statFilter` aktiveras visas en delmängd och Loc börjar om från 1.
 
 **Ändring i `src/routes/index.tsx`:**
+
 - Bygg `locationByKey: Map<string, number>` via `useMemo` över `pipeline.channels` i exportordning:
   - Startvärde = `target.id === "chirp-generic" ? chirpSettings.startLocation : 1`.
   - Hoppa över exkluderade nycklar (`excludedKeys.has(key)`).
@@ -41,11 +44,13 @@ Idag muteras input via `ch.warnings.push(...)`. Eftersom pack-kanaler kan komma 
 - Skicka in en `getExportLocation: (c) => number | null`-callback till `PreviewTable` istället för `startLoc`.
 
 **Ändring i `src/components/codeplug/PreviewTable.tsx`:**
+
 - Ersätt prop `startLoc: number` med `getExportLocation: (c: NormalizedChannel) => number | null`.
 - I rad-render: `const locNum = getExportLocation(c); const loc = excluded || locNum == null ? "—" : String(locNum);`
 - Ta bort lokal `locCounter`.
 
 **Test:** uppdatera `src/components/codeplug/__tests__/PreviewTable.test.tsx`:
+
 - Befintliga tester: byt `startLoc={1}` mot `getExportLocation={() => null}` eller en passande stub (de testar inte Loc — null/—).
 - Nytt test: tre kanaler A, B, C. Preview visar bara C. Skicka `getExportLocation`-map där A=1, B=2, C=3. Asserta att enda dataradens Loc-cell (kolumnindex 2) innehåller `"3"`, inte `"1"`.
 - Nytt test: exkluderad rad → Loc visas som `"—"` även om callback skulle returnera nummer (den nuvarande `loc === "—"` när exkluderad bevaras).
