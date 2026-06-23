@@ -188,6 +188,8 @@ export interface PipelineResult {
   withRx: number;
   /** Antal rader som droppades av frekvensdedupe-policyn. */
   droppedByDedupe: number;
+  /** Antal rader vars `type` ligger i OUT_OF_SCOPE_TYPES (t.ex. "uW QTH"). */
+  outOfScope: number;
 }
 
 function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): NormalizedChannel[] {
