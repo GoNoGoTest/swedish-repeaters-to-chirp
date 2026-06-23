@@ -306,7 +306,7 @@ export function toVgcN76Rows(
   if (channels.length > s.channelsPerGroup) {
     warnings.push({
       code: "vgc_over_group_limit",
-      message: `${channels.length} kanaler överstiger N76:s ${s.channelsPerGroup}/grupp — dela manuellt i flera filer/grupper.`,
+      message: `${channels.length} kanaler överstiger N76:s ${s.channelsPerGroup}/grupp — välj split-läget 'Per distrikt + chunka' i exportpanelen, eller dela upp manuellt innan import.`,
     });
   }
 
