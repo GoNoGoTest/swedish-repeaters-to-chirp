@@ -47,6 +47,13 @@ export interface ExportFile {
   content: string;
 }
 
+/** Result of a multi-file export — files plus aggregated target warnings. */
+export interface ExportManyResult {
+  files: ExportFile[];
+  /** Aggregerade target-warnings för hela exporten (inte per chunk). */
+  warnings: Warning[];
+}
+
 export interface ExportTarget<TSettings = unknown> {
   /** Stable id, e.g. "chirp-generic". */
   id: string;
