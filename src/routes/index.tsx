@@ -112,7 +112,7 @@ function Index() {
     if (!pipeline) return null;
     let warned = 0, collided = 0, rxOnly = 0, dupes = 0;
     for (const c of exportChannels) {
-      if (c.warnings.length) warned++;
+      if (c.warnings.some((w) => w.code !== "name_collision")) warned++;
       if (c.collided) collided++;
       if (c.rx_only) rxOnly++;
       if (c.warnings.some((w) => w.code === "freq_duplicate")) dupes++;
@@ -125,13 +125,14 @@ function Index() {
     if (!statFilter) return pipeline.channels;
     return pipeline.channels.filter((c) => {
       switch (statFilter) {
-        case "warned": return c.warnings.length > 0;
+        case "warned": return c.warnings.some((w) => w.code !== "name_collision");
         case "collided": return c.collided;
         case "dupes": return c.warnings.some((w) => w.code === "freq_duplicate");
         case "rxOnly": return c.rx_only;
       }
     });
   }, [pipeline, statFilter]);
+
 
   const statFilterLabel: Record<StatFilter, string> = {
     warned: "Varningar",
@@ -334,7 +335,7 @@ function Index() {
                     <Stat
                       label="Varningar"
                       value={stats?.warned ?? 0}
-                      tooltip="Exportkanaler som har minst en varning (t.ex. RX-only-policy, otydlig access, namnsaknad). Klicka för att filtrera previewn — exporten påverkas inte."
+                      tooltip="Exportkanaler som har minst en varning utöver namnkollision (t.ex. RX-only-policy, otydlig access, namnsaknad). Namnkollisioner räknas separat. Klicka för att filtrera previewn — exporten påverkas inte."
                       onClick={() => toggleStatFilter("warned")}
                       active={statFilter === "warned"}
                     />
