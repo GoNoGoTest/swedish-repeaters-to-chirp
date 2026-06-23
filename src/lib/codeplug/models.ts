@@ -24,6 +24,8 @@ export type WarningCode =
   | "vgc_dcs_polarity_lost"
   | "vgc_title_truncated"
   | "vgc_unsupported_mode"
+  | "nicsure_name_truncated"
+  | "nicsure_unsupported_mode"
   | "nicsure_zone_pool_exhausted"
   | "nicsure_rx_only_marked"
   | "rt_unsupported_mode"
