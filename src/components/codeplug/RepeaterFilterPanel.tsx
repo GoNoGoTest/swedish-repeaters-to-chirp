@@ -7,6 +7,7 @@ import {
   type RegionCountryCode,
 } from "@/lib/codeplug/region";
 import { KNOWN_MODES } from "@/lib/codeplug/modes";
+import { formatBandLabel, parseBandLabel } from "@/lib/codeplug/bands";
 import { getTarget } from "@/lib/codeplug/targets";
 import { Hint, MultiSelect, SectionLabel } from "./common";
 
@@ -57,7 +58,13 @@ export function RepeaterFilterPanel({ summary, settings, setSettings }: {
       <div className="grid gap-4 md:grid-cols-2">
         <MultiSelect label="Status" options={allStatuses} value={settings.filter.statuses} onChange={(v) => upd({ statuses: v })} />
         <MultiSelect label="Typ" options={allTypes} value={settings.filter.types} onChange={(v) => upd({ types: v })} />
-        <MultiSelect label="Band" options={allBands} value={settings.filter.bands} onChange={(v) => upd({ bands: v })} />
+        <MultiSelect
+          label="Band"
+          options={allBands.map(formatBandLabel)}
+          value={settings.filter.bands.map(formatBandLabel)}
+          onChange={(v) => upd({ bands: v.map((label) => parseBandLabel(label, allBands)) })}
+        />
+
         <div>
           <MultiSelect
             label="Land (tomt = alla)"
