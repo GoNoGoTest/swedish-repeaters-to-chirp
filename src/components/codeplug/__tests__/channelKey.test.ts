@@ -18,4 +18,24 @@ describe("channelKey", () => {
   it("ger samma nyckel för identiska kanaler", () => {
     expect(channelKey(makeChannel())).toBe(channelKey(makeChannel()));
   });
+
+  it("skiljer kanaler med samma source_id men olika mode_effective (multi-mode-expansion)", () => {
+    const fm = makeChannel({ source_id: "SK6RFI", mode_effective: "FM" });
+    const c4fm = makeChannel({ source_id: "SK6RFI", mode_effective: "C4FM" });
+    expect(channelKey(fm)).not.toBe(channelKey(c4fm));
+  });
+
+  it("inkluderar pack_id så att rader från olika channel-packs inte krockar", () => {
+    const a = makeChannel({
+      source_type: "channel_pack",
+      pack_id: "se_marine_vhf_rx",
+      source_id: "M16",
+    });
+    const b = makeChannel({
+      source_type: "channel_pack",
+      pack_id: "se_pmr446_rx",
+      source_id: "M16",
+    });
+    expect(channelKey(a)).not.toBe(channelKey(b));
+  });
 });
