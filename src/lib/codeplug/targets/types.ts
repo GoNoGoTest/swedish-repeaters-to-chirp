@@ -81,7 +81,7 @@ export interface ExportTarget<TSettings = unknown> {
     channels: NormalizedChannel[],
     settings: TSettings,
     split: SplitSettings,
-  ) => ExportFile[];
+  ) => ExportManyResult;
   /**
    * Derive the effective max-name-length the pipeline should clip to,
    * given user-tunable settings (may be lower than limits.maxNameLength).
