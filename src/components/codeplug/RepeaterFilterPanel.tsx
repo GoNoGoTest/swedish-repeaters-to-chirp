@@ -20,7 +20,9 @@ export function RepeaterFilterPanel({ summary, settings, setSettings }: {
   summary: Summary; settings: Settings; setSettings: (s: Settings) => void;
 }) {
   const allStatuses = Object.keys(summary.uniqueCounts.status);
-  const allTypes = Object.keys(summary.uniqueCounts.type);
+  const allTypes = Object.keys(summary.uniqueCounts.type).filter(
+    (t) => !OUT_OF_SCOPE_TYPES.has(t),
+  );
   const allBands = sortBands(Object.keys(summary.uniqueCounts.band));
 
   const upd = (patch: Partial<FilterSettings>) =>
