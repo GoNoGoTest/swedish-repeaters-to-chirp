@@ -27,6 +27,11 @@ export type KnownMode = (typeof KNOWN_MODES)[number];
  * Alias → canonical name. Keys are upper-cased before lookup so the table
  * itself only needs the upper form. Add liberally as new SK6BA / target
  * idioms appear.
+ *
+ * Keys with embedded whitespace (e.g. "SYSTEM FUSION", "D STAR") are treated
+ * as phrases by parseModes: they only match when the entire chunk between
+ * mode-list separators (`/ , ; |`) collapses to that key. They will NOT match
+ * if the words are split across separators.
  */
 const MODE_ALIASES: Record<string, KnownMode> = {
   FM: "FM",
@@ -63,19 +68,33 @@ const MODE_ALIASES: Record<string, KnownMode> = {
  */
 export function parseModes(raw: string | undefined | null): KnownMode[] {
   if (!raw) return [];
-  const tokens = String(raw)
-    .split(/[/,;|]/) // separators between modes
-    .flatMap((p) => p.split(/\s+/)) // and whitespace within a chunk
-    .map((t) => t.trim())
+  // Chunks are the regions between mode-list separators. Inside one chunk we
+  // first try to match the whole chunk as a phrase alias (so multi-word keys
+  // like "SYSTEM FUSION" or "D STAR" in MODE_ALIASES actually fire); if that
+  // fails we fall back to splitting on whitespace and looking up each token.
+  const chunks = String(raw)
+    .split(/[/,;|]/)
+    .map((c) => c.trim())
     .filter(Boolean);
   const seen = new Set<KnownMode>();
   const out: KnownMode[] = [];
-  for (const t of tokens) {
-    const canonical = MODE_ALIASES[t.toUpperCase()];
-    if (!canonical) continue;
-    if (seen.has(canonical)) continue;
+  const push = (canonical: KnownMode) => {
+    if (seen.has(canonical)) return;
     seen.add(canonical);
     out.push(canonical);
+  };
+  for (const chunk of chunks) {
+    const phraseKey = chunk.replace(/\s+/g, " ").toUpperCase();
+    const phraseHit = MODE_ALIASES[phraseKey];
+    if (phraseHit) {
+      push(phraseHit);
+      continue;
+    }
+    for (const tok of chunk.split(/\s+/)) {
+      if (!tok) continue;
+      const canonical = MODE_ALIASES[tok.toUpperCase()];
+      if (canonical) push(canonical);
+    }
   }
   return out;
 }
