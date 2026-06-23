@@ -1,5 +1,5 @@
 import type { ChirpSettings, NormalizedChannel, SplitSettings } from "../models";
-import { exportChirpCsv, chirpDigitalWarnings } from "../exporters/chirp";
+import { exportChirpCsv, chirpDigitalWarnings, resolveChirpMode } from "../exporters/chirp";
 import { registerTarget } from "./registry";
 import { buildSplitFiles } from "./split";
 import type { ExportTarget, HardwareLimits } from "./types";
