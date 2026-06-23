@@ -517,6 +517,14 @@ function Index() {
                           resolveTargetSettings(target, storedPatch),
                         );
                         break;
+                      case "rt-systems-yaesu-generic":
+                        tw = target.validate?.(
+                          exportChannels,
+                          resolveTargetSettings(target, storedPatch),
+                        );
+                        break;
+                      default:
+                        assertNever(target);
                     }
                     if (!tw || tw.length === 0) return null;
                     return (
