@@ -339,6 +339,7 @@ function Index() {
                       Export stoppad — frekvensdubbletter enligt policy. Ändra policy eller åtgärda dubbletter.
                     </div>
                   )}
+                  <RxOnlyExportNote channels={exportChannels} targetId={settings.export.targetId} />
                   <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 text-sm mb-3">
                     <Stat label="Från SK6BA" value={pipeline.sk6baCount} />
                     <Stat label="Från kanalpaket" value={pipeline.packCount} />
