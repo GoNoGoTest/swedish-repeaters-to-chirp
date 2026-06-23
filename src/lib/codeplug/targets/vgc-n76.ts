@@ -402,6 +402,15 @@ export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
   limits: VGC_N76_LIMITS,
   defaultSettings: VGC_N76_DEFAULTS,
   resolveMaxNameLength: (s) => s.maxLength,
+  previewMode: (c, s) => {
+    // Digitala SK6BA-rader filtreras bort vid export — visa kanonisk signal
+    // i previewen så det är tydligt att de inte hamnar i filen.
+    if (c.source_type === "sk6ba" && c.mode_effective && c.mode_effective !== "FM") {
+      return c.mode_effective;
+    }
+    if (isAm(c)) return "AM";
+    return encodeBandwidth(c, s) === 12500 ? "NFM" : "FM";
+  },
   validate: (channels, s) => toVgcN76Rows(channels, s).warnings,
   export: (channels, s) => {
     const { csv, warnings } = exportVgcN76Csv(channels, s);
