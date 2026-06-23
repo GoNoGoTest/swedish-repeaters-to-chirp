@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import Papa from "papaparse";
-import { VGC_N76_TARGET, VGC_N76_DEFAULTS, VGC_N76_COLUMNS, toVgcN76Rows } from "@/lib/codeplug/targets/vgc-n76";
+import {
+  VGC_N76_TARGET,
+  VGC_N76_DEFAULTS,
+  VGC_N76_COLUMNS,
+  toVgcN76Rows,
+} from "@/lib/codeplug/targets/vgc-n76";
 import { makeChannel } from "../helpers";
 
 describe("targets/vgc-n76", () => {
@@ -32,8 +37,8 @@ describe("targets/vgc-n76", () => {
     const row = parsed.data[1]; // [header, row]
     expect(row[1]).toBe("145125000"); // tx_freq = mobile TX
     expect(row[2]).toBe("145725000"); // rx_freq = mobile RX
-    expect(row[6]).toBe("12500");     // NFM default
-    expect(row[5]).toBe("H");         // default power
+    expect(row[6]).toBe("12500"); // NFM default
+    expect(row[5]).toBe("H"); // default power
   });
 
   it("encodes CTCSS as Hz×100 on the correct side (SK6BA TX-access tone)", () => {
@@ -51,7 +56,7 @@ describe("targets/vgc-n76", () => {
     const out = VGC_N76_TARGET.export([ch], VGC_N76_DEFAULTS);
     const row = Papa.parse<string[]>(out.content, { skipEmptyLines: true }).data[1];
     expect(row[3]).toBe("11480"); // tx_sub CTCSS = 114.8 × 100
-    expect(row[4]).toBe("0");     // rx_sub none
+    expect(row[4]).toBe("0"); // rx_sub none
   });
 
   it("encodes DCS as decimal of the octal code (both sides)", () => {
@@ -97,8 +102,18 @@ describe("targets/vgc-n76", () => {
   });
 
   it("maps mode_pack NFM/FM to 12500/25000 bandwidth", () => {
-    const nfm = makeChannel({ source_type: "channel_pack", mode_pack: "NFM", rx_frequency: 144.5, tx_frequency: 144.5 });
-    const fm = makeChannel({ source_type: "channel_pack", mode_pack: "FM",  rx_frequency: 144.5, tx_frequency: 144.5 });
+    const nfm = makeChannel({
+      source_type: "channel_pack",
+      mode_pack: "NFM",
+      rx_frequency: 144.5,
+      tx_frequency: 144.5,
+    });
+    const fm = makeChannel({
+      source_type: "channel_pack",
+      mode_pack: "FM",
+      rx_frequency: 144.5,
+      tx_frequency: 144.5,
+    });
     const out = VGC_N76_TARGET.export([nfm, fm], VGC_N76_DEFAULTS);
     const rows = Papa.parse<string[]>(out.content, { skipEmptyLines: true }).data;
     expect(rows[1][6]).toBe("12500");
@@ -106,7 +121,13 @@ describe("targets/vgc-n76", () => {
   });
 
   it("flags RX-only channels via tx_dis", () => {
-    const ch = makeChannel({ source_type: "channel_pack", rx_only: true, tx_allowed: false, rx_frequency: 161.0, tx_frequency: 161.0 });
+    const ch = makeChannel({
+      source_type: "channel_pack",
+      rx_only: true,
+      tx_allowed: false,
+      rx_frequency: 161.0,
+      tx_frequency: 161.0,
+    });
     const out = VGC_N76_TARGET.export([ch], VGC_N76_DEFAULTS);
     const row = Papa.parse<string[]>(out.content, { skipEmptyLines: true }).data[1];
     expect(row[11]).toBe("1"); // tx_dis
@@ -118,8 +139,6 @@ describe("targets/vgc-n76", () => {
     const row = Papa.parse<string[]>(out.content, { skipEmptyLines: true }).data[1];
     expect(row[11]).toBe("1");
   });
-
-
 
   it("pads to padToChannels with empty rows", () => {
     const ch = makeChannel({ generated_name_final: "ONE", rx_frequency: 145.5 });
@@ -186,7 +205,11 @@ describe("targets/vgc-n76 — APRS slot 32 reservation", () => {
 
   it("toggle off (default): no APRS row appears", () => {
     const channels = Array.from({ length: 5 }, (_, i) =>
-      makeChannel({ generated_name_final: `CH${i + 1}`, rx_frequency: 145.6 + i * 0.025, is_analog_fm: true }),
+      makeChannel({
+        generated_name_final: `CH${i + 1}`,
+        rx_frequency: 145.6 + i * 0.025,
+        is_analog_fm: true,
+      }),
     );
     const out = VGC_N76_TARGET.export(channels, VGC_N76_DEFAULTS);
     expect(out.content).not.toMatch(/^APRS,/m);
@@ -194,7 +217,11 @@ describe("targets/vgc-n76 — APRS slot 32 reservation", () => {
 
   it("single mode + APRS on with 40 channels: APRS spliced at row 32, channel 32 shifts to row 33", () => {
     const channels = Array.from({ length: 40 }, (_, i) =>
-      makeChannel({ generated_name_final: `CH${i + 1}`, rx_frequency: 145.0 + i * 0.0125, is_analog_fm: true }),
+      makeChannel({
+        generated_name_final: `CH${i + 1}`,
+        rx_frequency: 145.0 + i * 0.0125,
+        is_analog_fm: true,
+      }),
     );
     const out = VGC_N76_TARGET.export(channels, { ...VGC_N76_DEFAULTS, reserveAprsSlot32: true });
     const rows = parseRows(out.content);
@@ -250,8 +277,16 @@ describe("targets/vgc-n76 — APRS slot 32 reservation", () => {
 
   describe("analog-only mode filtering", () => {
     it("mixed-mode SK6BA FM / C4FM only yields the FM row, with warning", () => {
-      const fm = makeChannel({ generated_name_final: "FMR", rx_frequency: 145.6, mode_effective: "FM" });
-      const c4 = makeChannel({ generated_name_final: "C4R", rx_frequency: 145.6, mode_effective: "C4FM" });
+      const fm = makeChannel({
+        generated_name_final: "FMR",
+        rx_frequency: 145.6,
+        mode_effective: "FM",
+      });
+      const c4 = makeChannel({
+        generated_name_final: "C4R",
+        rx_frequency: 145.6,
+        mode_effective: "C4FM",
+      });
       const out = VGC_N76_TARGET.export([fm, c4], VGC_N76_DEFAULTS);
       const rows = Papa.parse<string[]>(out.content, { skipEmptyLines: true }).data;
       expect(rows.length).toBe(2); // header + 1 row
@@ -294,5 +329,3 @@ describe("targets/vgc-n76 — APRS slot 32 reservation", () => {
     });
   });
 });
-
-

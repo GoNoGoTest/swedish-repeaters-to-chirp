@@ -4,14 +4,39 @@ import { parseNumberLoose } from "./sk6ba";
 import { UNKNOWN_REGION } from "../region";
 
 export const PACK_COLUMNS = [
-  "pack_id","source_id","enabled_default","service","band","category","tags",
-  "type","label","channel","name_hint","rx_frequency","tx_frequency","duplex",
-  "offset","mode","tstep","tone","rtone_freq","ctone_freq","dtcs_code",
-  "dtcs_polarity","skip","tx_allowed","rx_only","license_note","comment",
-  "source","source_url","inferred_from_range",
+  "pack_id",
+  "source_id",
+  "enabled_default",
+  "service",
+  "band",
+  "category",
+  "tags",
+  "type",
+  "label",
+  "channel",
+  "name_hint",
+  "rx_frequency",
+  "tx_frequency",
+  "duplex",
+  "offset",
+  "mode",
+  "tstep",
+  "tone",
+  "rtone_freq",
+  "ctone_freq",
+  "dtcs_code",
+  "dtcs_polarity",
+  "skip",
+  "tx_allowed",
+  "rx_only",
+  "license_note",
+  "comment",
+  "source",
+  "source_url",
+  "inferred_from_range",
 ] as const;
 
-const REQUIRED_COLUMNS = ["pack_id","source_id","rx_frequency"];
+const REQUIRED_COLUMNS = ["pack_id", "source_id", "rx_frequency"];
 
 export interface ParsedPackChannel extends NormalizedChannel {
   enabled_default: boolean;
@@ -30,13 +55,19 @@ function parseBool(v: string | undefined, fieldName: string, warnings: Warning[]
   if (!s) return false;
   if (s === "true" || s === "1" || s === "yes" || s === "y") return true;
   if (s === "false" || s === "0" || s === "no" || s === "n") return false;
-  warnings.push({ code: "pack_invalid_boolean", message: `Ogiltigt booleanvärde i ${fieldName}: ${v}` });
+  warnings.push({
+    code: "pack_invalid_boolean",
+    message: `Ogiltigt booleanvärde i ${fieldName}: ${v}`,
+  });
   return false;
 }
 
 function parseTags(v: string | undefined): string[] {
   if (!v) return [];
-  return v.split("|").map((t) => t.trim()).filter(Boolean);
+  return v
+    .split("|")
+    .map((t) => t.trim())
+    .filter(Boolean);
 }
 
 function deriveBandFromFreq(rx: number | null): string {
@@ -71,13 +102,17 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
     const sourceId = (r.source_id ?? "").trim();
     if (!sourceId) warnings.push({ code: "pack_missing_required", message: "Saknad source_id" });
     else if (seenIds.has(sourceId)) {
-      warnings.push({ code: "pack_duplicate_source_id", message: `Dubblett source_id: ${sourceId}` });
+      warnings.push({
+        code: "pack_duplicate_source_id",
+        message: `Dubblett source_id: ${sourceId}`,
+      });
     } else seenIds.add(sourceId);
 
     const rxRaw = (r.rx_frequency ?? "").trim();
     const rx = parseNumberLoose(rxRaw);
     if (!rxRaw) warnings.push({ code: "pack_missing_required", message: "Saknad rx_frequency" });
-    else if (rx == null) warnings.push({ code: "pack_invalid_frequency", message: `Ogiltig rx_frequency: ${rxRaw}` });
+    else if (rx == null)
+      warnings.push({ code: "pack_invalid_frequency", message: `Ogiltig rx_frequency: ${rxRaw}` });
 
     const tx = parseNumberLoose(r.tx_frequency);
     const offset = parseNumberLoose(r.offset) ?? 0;
@@ -94,7 +129,7 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
     }
 
     const mode = (r.mode ?? "").trim().toUpperCase();
-    const knownModes = ["NFM","FM","USB","LSB","CW","AM","DV","DIG"];
+    const knownModes = ["NFM", "FM", "USB", "LSB", "CW", "AM", "DV", "DIG"];
     if (mode && !knownModes.includes(mode)) {
       warnings.push({ code: "pack_unsupported_mode", message: `Okänt mode: ${r.mode}` });
     }
@@ -103,12 +138,16 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
     const channelCode = (r.channel ?? "").trim();
     const nameHint = (r.name_hint ?? "").trim();
     if (!label && !channelCode && !nameHint) {
-      warnings.push({ code: "pack_no_name_source", message: "Saknar både label, channel och name_hint" });
+      warnings.push({
+        code: "pack_no_name_source",
+        message: "Saknar både label, channel och name_hint",
+      });
     }
 
     const tags = parseTags(r.tags);
     const enabled_default = parseBool(r.enabled_default, "enabled_default", warnings);
-    const tx_allowed = (r.tx_allowed ?? "").trim() === "" ? true : parseBool(r.tx_allowed, "tx_allowed", warnings);
+    const tx_allowed =
+      (r.tx_allowed ?? "").trim() === "" ? true : parseBool(r.tx_allowed, "tx_allowed", warnings);
     const rx_only = parseBool(r.rx_only, "rx_only", warnings);
     const inferred_from_range = parseBool(r.inferred_from_range, "inferred_from_range", warnings);
 
@@ -182,9 +221,9 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
 }
 
 export interface PackFilterCriteria {
-  bands: string[];        // empty = all
-  categories: string[];   // empty = all
-  tags: string[];         // empty = all
+  bands: string[]; // empty = all
+  categories: string[]; // empty = all
+  tags: string[]; // empty = all
   useEnabledDefault: boolean;
   manualSourceIds?: string[]; // if defined non-empty, overrides
 }

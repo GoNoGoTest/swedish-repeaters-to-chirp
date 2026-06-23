@@ -3,9 +3,27 @@ import type { ChirpSettings, NormalizedChannel, Warning } from "../models";
 import { formatFrequency } from "../frequency";
 
 export const CHIRP_COLUMNS = [
-  "Location","Name","Frequency","Duplex","Offset","Tone","rToneFreq","cToneFreq",
-  "DtcsCode","DtcsPolarity","RxDtcsCode","CrossMode","Mode","TStep","Skip",
-  "Power","Comment","URCALL","RPT1CALL","RPT2CALL","DVCODE",
+  "Location",
+  "Name",
+  "Frequency",
+  "Duplex",
+  "Offset",
+  "Tone",
+  "rToneFreq",
+  "cToneFreq",
+  "DtcsCode",
+  "DtcsPolarity",
+  "RxDtcsCode",
+  "CrossMode",
+  "Mode",
+  "TStep",
+  "Skip",
+  "Power",
+  "Comment",
+  "URCALL",
+  "RPT1CALL",
+  "RPT2CALL",
+  "DVCODE",
 ];
 
 // Technical CSV-import defaults. CHIRP/RMS parse these columns as float/int
@@ -24,15 +42,24 @@ const DEFAULT_POWER = "10.0W";
 // (NFM vs FM is a per-export user choice for analog).
 function mapEffectiveMode(m: string): string | null {
   switch (m) {
-    case "C4FM": return "DN";
-    case "D-Star": return "DV";
-    case "DMR": return "DMR";
-    case "DMRplus": return "DMR";
-    case "P25": return "P25";
-    case "CW": return "CW";
-    case "FM": return null;       // use analog fallback
-    case "Tetra": return null;    // unsupported by Generic CSV → fallback
-    default: return null;         // unknown / empty → fallback
+    case "C4FM":
+      return "DN";
+    case "D-Star":
+      return "DV";
+    case "DMR":
+      return "DMR";
+    case "DMRplus":
+      return "DMR";
+    case "P25":
+      return "P25";
+    case "CW":
+      return "CW";
+    case "FM":
+      return null; // use analog fallback
+    case "Tetra":
+      return null; // unsupported by Generic CSV → fallback
+    default:
+      return null; // unknown / empty → fallback
   }
 }
 
@@ -55,14 +82,16 @@ const DIGITAL_MODES = new Set(["C4FM", "D-Star", "DMR", "DMRplus", "P25"]);
 export function chirpDigitalWarnings(channels: NormalizedChannel[]): Warning[] {
   const has = channels.some((c) => DIGITAL_MODES.has(c.mode_effective));
   if (!has) return [];
-  return [{
-    code: "chirp_digital_partial",
-    message:
-      "CHIRP Generic CSV kan bära digitala mode-värden (DN, DV, DMR, P25), men " +
-      "fullt stöd beror på radiomodell och CHIRP-drivrutin. Systemspecifika " +
-      "inställningar som DMR talkgroup, color code, timeslot eller Fusion-" +
-      "parametrar ingår inte och kan behöva kompletteras manuellt.",
-  }];
+  return [
+    {
+      code: "chirp_digital_partial",
+      message:
+        "CHIRP Generic CSV kan bära digitala mode-värden (DN, DV, DMR, P25), men " +
+        "fullt stöd beror på radiomodell och CHIRP-drivrutin. Systemspecifika " +
+        "inställningar som DMR talkgroup, color code, timeslot eller Fusion-" +
+        "parametrar ingår inte och kan behöva kompletteras manuellt.",
+    },
+  ];
 }
 
 function resolveTStep(c: NormalizedChannel, fallback: number): number {
@@ -117,7 +146,12 @@ function resolveToneFields(c: NormalizedChannel): ToneFields {
     if (t === "TSQL") {
       const f = c.ctone_freq ?? c.rtone_freq ?? c.ctcss_tx;
       if (f == null) return { ...DEFAULT_TONE_FIELDS };
-      return { ...DEFAULT_TONE_FIELDS, Tone: "TSQL", rToneFreq: f.toFixed(1), cToneFreq: f.toFixed(1) };
+      return {
+        ...DEFAULT_TONE_FIELDS,
+        Tone: "TSQL",
+        rToneFreq: f.toFixed(1),
+        cToneFreq: f.toFixed(1),
+      };
     }
     if (t === "DTCS" || t === "DCS") {
       if (!c.dtcs_code) return { ...DEFAULT_TONE_FIELDS };
@@ -183,5 +217,8 @@ export function toChirpRows(channels: NormalizedChannel[], s: ChirpSettings) {
 
 export function exportChirpCsv(channels: NormalizedChannel[], s: ChirpSettings): string {
   const rows = toChirpRows(channels, s);
-  return Papa.unparse({ fields: CHIRP_COLUMNS, data: rows.map((r) => CHIRP_COLUMNS.map((c) => (r as any)[c])) });
+  return Papa.unparse({
+    fields: CHIRP_COLUMNS,
+    data: rows.map((r) => CHIRP_COLUMNS.map((c) => (r as any)[c])),
+  });
 }

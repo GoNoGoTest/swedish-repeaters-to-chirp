@@ -173,8 +173,6 @@ describe("targets/nicsure-rt880", () => {
     ]);
   });
 
-
-
   it("zoneDimensions: [] leaves every slot blank", () => {
     const ch = makeChannel({ district: "6", type: "Repeater" });
     const rows = parseRows(
@@ -224,7 +222,13 @@ describe("targets/nicsure-rt880", () => {
   });
 
   it("rx_only writes TX=RX, TX_Power=N/T and emits nicsure_rx_only_marked warning", () => {
-    const ch = makeChannel({ generated_name_final: "RX", rx_frequency: 161.0, duplex: "", rx_only: true, tx_allowed: false });
+    const ch = makeChannel({
+      generated_name_final: "RX",
+      rx_frequency: 161.0,
+      duplex: "",
+      rx_only: true,
+      tx_allowed: false,
+    });
     const out = NICSURE_RT880_TARGET.export([ch], NICSURE_RT880_DEFAULTS);
     const row = parseRows(out.content)[1];
     expect(row[3]).toBe("161.00000"); // RX
@@ -235,8 +239,16 @@ describe("targets/nicsure-rt880", () => {
 
   describe("analog-only mode filtering", () => {
     it("mixed-mode SK6BA FM / C4FM only yields the FM row, with warning", () => {
-      const fm = makeChannel({ generated_name_final: "FMR", rx_frequency: 145.6, mode_effective: "FM" });
-      const c4 = makeChannel({ generated_name_final: "C4R", rx_frequency: 145.6, mode_effective: "C4FM" });
+      const fm = makeChannel({
+        generated_name_final: "FMR",
+        rx_frequency: 145.6,
+        mode_effective: "FM",
+      });
+      const c4 = makeChannel({
+        generated_name_final: "C4R",
+        rx_frequency: 145.6,
+        mode_effective: "C4FM",
+      });
       const out = NICSURE_RT880_TARGET.export([fm, c4], NICSURE_RT880_DEFAULTS);
       const rows = parseRows(out.content);
       expect(rows.length).toBe(2);
@@ -263,4 +275,3 @@ describe("targets/nicsure-rt880", () => {
     });
   });
 });
-

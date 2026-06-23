@@ -3,9 +3,30 @@ import type { RawRow } from "../models";
 import { deriveRegion, type RegionCountryCode } from "../region";
 
 const EXPECTED_COLS = [
-  "id","updated","type","band","mode","network","network_id","district",
-  "call","city","channel","output","tx_shift","access","status",
-  "lat","lng","locator","masl","magl","watt_pep","dir","ant","backup",
+  "id",
+  "updated",
+  "type",
+  "band",
+  "mode",
+  "network",
+  "network_id",
+  "district",
+  "call",
+  "city",
+  "channel",
+  "output",
+  "tx_shift",
+  "access",
+  "status",
+  "lat",
+  "lng",
+  "locator",
+  "masl",
+  "magl",
+  "watt_pep",
+  "dir",
+  "ant",
+  "backup",
 ];
 
 export interface ImportResult {
@@ -159,7 +180,10 @@ export function summarize(rows: RawRow[], columns: string[]): Summary {
 }
 
 function extractCtcssQuick(access: string): number | null {
-  const parts = access.split(/[\s/|,;]+/).map((s) => s.trim()).filter(Boolean);
+  const parts = access
+    .split(/[\s/|,;]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   for (const p of parts) {
     const n = parseNumberLoose(p);
     if (n != null && n !== 1750 && n >= 40 && n <= 300) return n;

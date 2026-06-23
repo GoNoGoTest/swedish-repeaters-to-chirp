@@ -21,7 +21,13 @@ describe("sortChannels — home district by distance", () => {
     const near = makeChannel({ district: "7", city: "Near", call: "SK7N", lat: 57.6, lng: 14.7 });
     const mid = makeChannel({ district: "7", city: "Mid", call: "SK7M", lat: 58.5, lng: 14.7 });
     const far = makeChannel({ district: "7", city: "Far", call: "SK7F", lat: 65.0, lng: 14.7 });
-    const other = makeChannel({ district: "6", city: "Borås", call: "SK6BA", lat: 57.7, lng: 12.9 });
+    const other = makeChannel({
+      district: "6",
+      city: "Borås",
+      call: "SK6BA",
+      lat: 57.7,
+      lng: 12.9,
+    });
 
     const sorted = sortChannels([far, other, mid, near], {
       ...baseSort,

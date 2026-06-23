@@ -23,15 +23,21 @@ function safeRead(): SavedExport[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((x): x is SavedExport =>
-      x && typeof x.id === "string" && typeof x.content === "string"
+    return parsed.filter(
+      (x): x is SavedExport => x && typeof x.id === "string" && typeof x.content === "string",
     );
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 function safeWrite(list: SavedExport[]): void {
   if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(KEY, JSON.stringify(list)); } catch { /* quota: ignore */ }
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify(list));
+  } catch {
+    /* quota: ignore */
+  }
 }
 
 export function listSavedExports(): SavedExport[] {
@@ -39,7 +45,9 @@ export function listSavedExports(): SavedExport[] {
 }
 
 function versionFilename(base: string, existing: SavedExport[]): string {
-  const sameName = existing.filter((e) => e.filename === base || e.filename.startsWith(stripExt(base) + "_v"));
+  const sameName = existing.filter(
+    (e) => e.filename === base || e.filename.startsWith(stripExt(base) + "_v"),
+  );
   if (sameName.length === 0) return base;
   const stem = stripExt(base);
   const ext = base.slice(stem.length);
@@ -60,7 +68,7 @@ export function saveExport(input: {
 }): SavedExport {
   const list = safeRead();
   const existingSame = list.find(
-    (e) => e.filename === input.filename && e.content === input.content
+    (e) => e.filename === input.filename && e.content === input.content,
   );
   if (existingSame) {
     existingSame.savedAt = Date.now();
@@ -79,9 +87,7 @@ export function saveExport(input: {
     byteSize: new Blob([input.content]).size,
     content: input.content,
   };
-  const next = [entry, ...list]
-    .sort((a, b) => b.savedAt - a.savedAt)
-    .slice(0, MAX_ENTRIES);
+  const next = [entry, ...list].sort((a, b) => b.savedAt - a.savedAt).slice(0, MAX_ENTRIES);
   safeWrite(next);
   return entry;
 }

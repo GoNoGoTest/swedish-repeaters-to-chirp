@@ -5,6 +5,7 @@ Skärpa CI/verifiering så att lokala `bun run verify` och GitHub Actions kör s
 ## Ändringar
 
 ### `package.json` — scripts
+
 ```json
 "typecheck": "tsc --noEmit",
 "lint": "eslint . --max-warnings=0",
@@ -13,10 +14,12 @@ Skärpa CI/verifiering så att lokala `bun run verify` och GitHub Actions kör s
 "test": "vitest run",
 "verify": "bun run typecheck && bun run lint && bun run format:check && bun run test && bun run build"
 ```
+
 - `verify` kör allt i ordningen som ger snabbast feedback (typecheck/lint/format först, build sist).
 - `build:dev`, `dev`, `preview`, `test:watch` lämnas orörda.
 
 ### `eslint.config.js`
+
 - Ta bort `"@typescript-eslint/no-unused-vars": "off"`.
 - Lägg till regeln explicit med `_`-escape så avsiktligt oanvända argument/variabler kan prefixas med `_`:
   ```js
@@ -30,16 +33,20 @@ Skärpa CI/verifiering så att lokala `bun run verify` och GitHub Actions kör s
   ```
 
 ### `tsconfig.json`
+
 - Lämnas orörd för nu. ESLint-regeln täcker samma yta med smidigare escape hatch; vi slipper en andra mekanism som rapporterar samma sak. (Om vi senare hittar fall som TS fångar men ESLint missar lägger vi på `noUnusedLocals`/`noUnusedParameters` då.)
 
 ### `.github/workflows/ci.yml`
+
 Ersätt två steg med ett:
+
 ```yaml
 - run: bun install --frozen-lockfile
 - run: bun run verify
 ```
 
 ### Fallout-fix
+
 1. Kör `bun run typecheck` och åtgärda eventuella typfel som idag tystas av Vite-only-builden.
 2. Kör `bun run lint` och fixa fallout från den nya regeln:
    - Avsiktligt oanvända argument: byt namn till `_argname`.

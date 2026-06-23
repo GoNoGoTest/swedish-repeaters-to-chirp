@@ -49,7 +49,10 @@ export function applyFreqDedupe(
     }
 
     if (policy === "keep_both") continue;
-    if (policy === "stop" && shouldWarn) { stopped = true; continue; }
+    if (policy === "stop" && shouldWarn) {
+      stopped = true;
+      continue;
+    }
     if (policy === "drop_pack" && hasSk6ba && hasPack) {
       for (const c of arr) if (c.source_type === "channel_pack") dropIds.add(c);
     } else if (policy === "drop_sk6ba" && hasSk6ba && hasPack) {
@@ -57,10 +60,12 @@ export function applyFreqDedupe(
     }
   }
 
-
   const dropped: NormalizedChannel[] = [];
   const kept = channels.filter((c) => {
-    if (dropIds.has(c)) { dropped.push(c); return false; }
+    if (dropIds.has(c)) {
+      dropped.push(c);
+      return false;
+    }
     return true;
   });
   return { channels: kept, stopped, dropped };

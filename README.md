@@ -7,21 +7,25 @@ Live: <https://swe-repeater-to-codeplug.lovable.app>
 ## Funktioner
 
 **Datakällor**
+
 - SK6BA/Marks repeater-CSV (semikolon, komma- eller punktdecimal, UTF-8 med/utan BOM).
 - 9 medföljande kanalpaket: amatör 2 m och 70 cm + RX-only-paket för marin VHF, PMR446, airband, jakt 155 MHz, SRBR 444, 69 MHz och CB27.
 - Båda källorna är oberoende och kan blandas i samma export.
 
 **Exportmål** (pluggbar arkitektur)
+
 - **CHIRP-generisk CSV** — fungerar för de flesta analoga 2 m/70 cm-radior via CHIRP.
 - **VGC N76** — radiospecifik CSV med korrekta kolumner, namnlängd och `tx_dis` för RX-only-kanaler.
 
 **Bearbetning**
+
 - Mall-baserad namngivning (`{type} {network} {band} {district} {city} {channel} {call}` m.fl.), med separator, maxlängd, translitterering av åäö, versaler och redigerbara förkortningar.
 - Sortering på distrikt, geohash, type, ort, frekvens — och avståndssortering från ditt eget QTH (Maidenhead-locator) eller hemdistrikt.
 - Deterministisk kollisionshantering: numeriskt eller bokstavssuffix, eller stopp.
 - Markering av frekvensdubbletter mellan källor med valbar policy.
 
 **UX**
+
 - Datainspektion med räknare för saknad output, koordinater, oklar shift och otolkbar CTCSS.
 - Interaktiva filter på status, type, mode, band, **land och region** (Sverige + nordiska/utländska regioner).
 - Preview över hela exporten med per-rad-exkludering, kollisionsmarkering och varningar.
@@ -34,18 +38,18 @@ Live: <https://swe-repeater-to-codeplug.lovable.app>
 
 SK6BA/Marks-exporten innehåller också nordiska och utländska repeatrar. `district`-fältet tolkas så här:
 
-| Råvärde | Land | Region (`{region}`) | Land (`{country}`) |
-| --- | --- | --- | --- |
-| `0`–`7` | Sverige | `SM0`–`SM7` | `SE` |
-| `LA` | Norge | `LA` | `NO` |
-| `OZ` | Danmark | `OZ` | `DK` |
-| `OH0` | Åland | `OH0` | `AX` |
-| `OH1`–`OH9` | Finland | `OH1`–`OH9` | `FI` |
-| `TF` | Island | `TF` | `IS` |
-| `JW` | Svalbard | `JW` | `SJ` |
-| `JX` | Jan Mayen | `JX` | `SJ` |
-| `OY` | Färöarna | `OY` | `FO` |
-| `OX` | Grönland | `OX` | `GL` |
+| Råvärde     | Land      | Region (`{region}`) | Land (`{country}`) |
+| ----------- | --------- | ------------------- | ------------------ |
+| `0`–`7`     | Sverige   | `SM0`–`SM7`         | `SE`               |
+| `LA`        | Norge     | `LA`                | `NO`               |
+| `OZ`        | Danmark   | `OZ`                | `DK`               |
+| `OH0`       | Åland     | `OH0`               | `AX`               |
+| `OH1`–`OH9` | Finland   | `OH1`–`OH9`         | `FI`               |
+| `TF`        | Island    | `TF`                | `IS`               |
+| `JW`        | Svalbard  | `JW`                | `SJ`               |
+| `JX`        | Jan Mayen | `JX`                | `SJ`               |
+| `OY`        | Färöarna  | `OY`                | `FO`               |
+| `OX`        | Grönland  | `OX`                | `GL`               |
 
 - Filterpanelen har separata land- och regionväljare med snabbknapparna **Bara Sverige**, **Norden** och **Alla**.
 - Naming har två nya tokens: `{region}` (SM6, LA, OH0, …) och `{country}` (SE, NO, AX, …). Befintliga `{district}` ger fortsatt `D6` för svenska distrikt men är tom för utländska prefix så `DLA`/`DOZ` aldrig dyker upp.
@@ -64,16 +68,19 @@ För CHIRP: öppna CHIRP → öppna din radioimage → File → Import → välj
 ## Regler i korthet
 
 **Frekvens & shift**
+
 - `Frequency` = `output` (repeaterns utfrekvens = radions RX).
 - Negativ `tx_shift` → `Duplex = -`, positiv → `+`, tom/`0`/`simplex` → tom Duplex.
 - Oklart värde markeras med varning men exporteras med tom Duplex.
 
 **CTCSS & 1750**
+
 - `1750` är alltid tonburst, aldrig CTCSS.
 - Numeriskt värde 40–300 Hz tolkas som CTCSS; sista vinner (`1750 / 77.0` → 77.0).
 - Rå `access` bevaras alltid i `Comment`.
 
 **Kollisioner**
+
 - Default lägger till numeriskt suffix där alla dubletter numreras (`LUND1`, `LUND2`, `LUND3`), och basnamnet trunkeras så slutresultatet ryms inom maxlängden.
 
 **Frekvensdubbletter** mellan SK6BA och kanalpaket: behåll båda (default), hoppa över paket-raden, hoppa över SK6BA-raden, eller stoppa exporten.

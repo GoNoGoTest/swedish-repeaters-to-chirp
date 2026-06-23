@@ -8,11 +8,19 @@ import { DEFAULT_SETTINGS } from "../defaults";
 import type { Settings } from "../models";
 
 const sk6baCsv = readFileSync(resolve(__dirname, "fixtures/sk6ba-sample.csv"), "utf8");
-const pack2m = readFileSync(resolve(__dirname, "../../../../channelpacks/se_amateur_2m_channel_pack.csv"), "utf8");
+const pack2m = readFileSync(
+  resolve(__dirname, "../../../../channelpacks/se_amateur_2m_channel_pack.csv"),
+  "utf8",
+);
 
 const baseSettings: Settings = {
   ...DEFAULT_SETTINGS,
-  filter: { ...DEFAULT_SETTINGS.filter, statuses: ["QRV"], includeUnknownRegions: true, countries: [] },
+  filter: {
+    ...DEFAULT_SETTINGS.filter,
+    statuses: ["QRV"],
+    includeUnknownRegions: true,
+    countries: [],
+  },
 };
 
 describe("runPipeline (sk6ba only)", () => {
@@ -35,16 +43,34 @@ describe("runPipeline (sk6ba only)", () => {
 
   it("excludes type=uW QTH rows from scope and reports outOfScope", () => {
     const uwRow: Record<string, string> = {
-      id: "777", type: "uW QTH", status: "QRV", mode: "FM",
-      output: "10368.000", tx_shift: "0",
-      band: "3", district: "6", city: "Test", call: "SK6TST",
-      channel: "uW1", lat: "57.7", lng: "12.9",
+      id: "777",
+      type: "uW QTH",
+      status: "QRV",
+      mode: "FM",
+      output: "10368.000",
+      tx_shift: "0",
+      band: "3",
+      district: "6",
+      city: "Test",
+      call: "SK6TST",
+      channel: "uW1",
+      lat: "57.7",
+      lng: "12.9",
     };
     const fmRow: Record<string, string> = {
-      id: "778", type: "Repeater", status: "QRV", mode: "FM",
-      output: "145.6000", tx_shift: "-0.6",
-      band: "2", district: "6", city: "Test", call: "SK6TST",
-      channel: "RV48", lat: "57.7", lng: "12.9",
+      id: "778",
+      type: "Repeater",
+      status: "QRV",
+      mode: "FM",
+      output: "145.6000",
+      tx_shift: "-0.6",
+      band: "2",
+      district: "6",
+      city: "Test",
+      call: "SK6TST",
+      channel: "RV48",
+      lat: "57.7",
+      lng: "12.9",
     };
     const r = runPipeline({ sk6baRows: [uwRow, fmRow], settings: baseSettings });
     expect(r.outOfScope).toBe(1);
@@ -61,15 +87,28 @@ describe("runPipeline (sk6ba only)", () => {
 
   it("DCS access on Link row exports as Cross + DTCS->", () => {
     const dcsRow: Record<string, string> = {
-      id: "999", type: "Link", status: "QRV", mode: "FM",
-      network: "AllStarLink", access: "DCS 025",
-      output: "145.2375", tx_shift: "0",
-      band: "2", district: "6", city: "Test", call: "SK6TST",
-      channel: "L1", lat: "57.7", lng: "12.9",
+      id: "999",
+      type: "Link",
+      status: "QRV",
+      mode: "FM",
+      network: "AllStarLink",
+      access: "DCS 025",
+      output: "145.2375",
+      tx_shift: "0",
+      band: "2",
+      district: "6",
+      city: "Test",
+      call: "SK6TST",
+      channel: "L1",
+      lat: "57.7",
+      lng: "12.9",
     };
     const r = runPipeline({
       sk6baRows: [dcsRow],
-      settings: { ...baseSettings, filter: { ...baseSettings.filter, types: ["Link"], statuses: ["QRV"] } },
+      settings: {
+        ...baseSettings,
+        filter: { ...baseSettings.filter, types: ["Link"], statuses: ["QRV"] },
+      },
     });
     const ch = r.channels[0];
     expect(ch).toBeDefined();
@@ -81,9 +120,16 @@ describe("runPipeline (sk6ba only)", () => {
 
 describe("runPipeline mode expansion", () => {
   const baseRow: Record<string, string> = {
-    id: "1", type: "Repeater", status: "QRV",
-    output: "434.6000", tx_shift: "-2",
-    band: "70", district: "6", city: "Borås", call: "SK6BA", channel: "RV48",
+    id: "1",
+    type: "Repeater",
+    status: "QRV",
+    output: "434.6000",
+    tx_shift: "-2",
+    band: "70",
+    district: "6",
+    city: "Borås",
+    call: "SK6BA",
+    channel: "RV48",
   };
 
   it("expands FM/C4FM into two channels when both modes are selected", () => {
@@ -170,22 +216,32 @@ describe("runPipeline with channel pack", () => {
 
   it("rxOnlyPolicy=skip removes rx_only rows", () => {
     const { rows } = parseSk6baCsv(sk6baCsv);
-    const withRxOnly = packChannels.map((c, i) => i === 0 ? { ...c, rx_only: true, warnings: [...c.warnings] } : c);
+    const withRxOnly = packChannels.map((c, i) =>
+      i === 0 ? { ...c, rx_only: true, warnings: [...c.warnings] } : c,
+    );
     const r = runPipeline({
       sk6baRows: rows,
       packChannels: withRxOnly,
-      settings: { ...baseSettings, packs: { ...baseSettings.packs, placement: "append", rxOnlyPolicy: "skip" } },
+      settings: {
+        ...baseSettings,
+        packs: { ...baseSettings.packs, placement: "append", rxOnlyPolicy: "skip" },
+      },
     });
     expect(r.packCount).toBe(2);
   });
 
   it("rxOnlyPolicy=block_tx sets duplex=off and emits rx_only_blocked warning", () => {
     const { rows } = parseSk6baCsv(sk6baCsv);
-    const withRxOnly = packChannels.map((c, i) => i === 0 ? { ...c, rx_only: true, warnings: [...c.warnings] } : c);
+    const withRxOnly = packChannels.map((c, i) =>
+      i === 0 ? { ...c, rx_only: true, warnings: [...c.warnings] } : c,
+    );
     const r = runPipeline({
       sk6baRows: rows,
       packChannels: withRxOnly,
-      settings: { ...baseSettings, packs: { ...baseSettings.packs, placement: "append", rxOnlyPolicy: "block_tx" } },
+      settings: {
+        ...baseSettings,
+        packs: { ...baseSettings.packs, placement: "append", rxOnlyPolicy: "block_tx" },
+      },
     });
     const rxOnly = r.channels.find((c) => c.rx_only);
     expect(rxOnly?.duplex).toBe("off");

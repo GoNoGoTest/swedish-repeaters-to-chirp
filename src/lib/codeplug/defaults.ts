@@ -1,5 +1,10 @@
 import type { NamingSettings, Settings } from "./models";
-import { CHIRP_GENERIC_TARGET, CHIRP_GENERIC_DEFAULTS, VGC_N76_TARGET, VGC_N76_DEFAULTS } from "./targets";
+import {
+  CHIRP_GENERIC_TARGET,
+  CHIRP_GENERIC_DEFAULTS,
+  VGC_N76_TARGET,
+  VGC_N76_DEFAULTS,
+} from "./targets";
 
 /**
  * Standardnamn för repeatrar/länkar/hotspots från SK6BA-importen.
@@ -37,7 +42,7 @@ export const DEFAULT_REPEATER_NAMING: NamingSettings = {
 export const DEFAULT_PACK_NAMING: NamingSettings = {
   components: ["{name_hint}"],
   separator: "-",
-  
+
   cityMaxLength: 6,
   transliterate: true,
   uppercase: true,

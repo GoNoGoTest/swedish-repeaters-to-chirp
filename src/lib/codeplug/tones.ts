@@ -21,7 +21,10 @@ function normalizeDcs(raw: string | number): string | null {
 export function parseAccess(raw: string | undefined | null): ToneParse {
   if (!raw) return { ctcss: null, uses1750: false, carrier: false, dcs: null };
   const s = String(raw);
-  const parts = s.split(/[\s/|;]+/).map((p) => p.trim()).filter(Boolean);
+  const parts = s
+    .split(/[\s/|;]+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
   const consumed = new Set<number>();
   let uses1750 = false;
   let carrier = false;
@@ -68,10 +71,16 @@ export function parseAccess(raw: string | undefined | null): ToneParse {
   for (let i = 0; i < parts.length; i++) {
     if (consumed.has(i)) continue;
     const p = parts[i];
-    if (CARRIER_RE.test(p)) { carrier = true; continue; }
+    if (CARRIER_RE.test(p)) {
+      carrier = true;
+      continue;
+    }
     const n = parseNumberLoose(p);
     if (n == null) continue;
-    if (n === 1750) { uses1750 = true; continue; }
+    if (n === 1750) {
+      uses1750 = true;
+      continue;
+    }
     if (n >= 40 && n <= 300) candidates.push(n);
   }
   const ctcss = candidates.length ? candidates[candidates.length - 1] : null;

@@ -16,9 +16,11 @@ import type { FilterSettings, NormalizedChannel } from "./models";
  * `includeUnknownRegions` when the new field is undefined, so old
  * persisted settings keep working without a forced reset.
  */
-export function applyFilters(channels: NormalizedChannel[], f: FilterSettings): NormalizedChannel[] {
-  const includeUnknown =
-    f.includeUnknownRegions ?? f.includeUnknownDistricts ?? false;
+export function applyFilters(
+  channels: NormalizedChannel[],
+  f: FilterSettings,
+): NormalizedChannel[] {
+  const includeUnknown = f.includeUnknownRegions ?? f.includeUnknownDistricts ?? false;
   const countries = f.countries ?? [];
   const regions = f.regions ?? [];
 

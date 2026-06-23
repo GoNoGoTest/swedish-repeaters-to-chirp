@@ -22,10 +22,22 @@ function sortByKeys(channels: NormalizedChannel[], s: SortSettings): NormalizedC
           av = a.c.region.sortKey || "~";
           bv = b.c.region.sortKey || "~";
           break;
-        case "geohash": av = a.geohash; bv = b.geohash; break;
-        case "type": av = a.c.type; bv = b.c.type; break;
-        case "city": av = a.c.city; bv = b.c.city; break;
-        case "frequency": av = a.c.rx_frequency ?? Infinity; bv = b.c.rx_frequency ?? Infinity; break;
+        case "geohash":
+          av = a.geohash;
+          bv = b.geohash;
+          break;
+        case "type":
+          av = a.c.type;
+          bv = b.c.type;
+          break;
+        case "city":
+          av = a.c.city;
+          bv = b.c.city;
+          break;
+        case "frequency":
+          av = a.c.rx_frequency ?? Infinity;
+          bv = b.c.rx_frequency ?? Infinity;
+          break;
       }
       if (av < bv) return -1;
       if (av > bv) return 1;
@@ -41,10 +53,7 @@ function districtOf(c: NormalizedChannel): string {
   return extractDistrict(c.call) ?? "";
 }
 
-function sortHomeChannels(
-  channels: NormalizedChannel[],
-  s: SortSettings,
-): NormalizedChannel[] {
+function sortHomeChannels(channels: NormalizedChannel[], s: SortSettings): NormalizedChannel[] {
   switch (s.home_district_sort) {
     case "distance": {
       const qth = s.qth_maidenhead ? maidenheadToLatLon(s.qth_maidenhead) : null;
@@ -54,9 +63,7 @@ function sortHomeChannels(
       }
       const decorated = channels.map((c) => {
         const dist =
-          c.lat != null && c.lng != null
-            ? haversineKm(qth, { lat: c.lat, lon: c.lng })
-            : Infinity;
+          c.lat != null && c.lng != null ? haversineKm(qth, { lat: c.lat, lon: c.lng }) : Infinity;
         return { c, dist };
       });
       decorated.sort((a, b) => a.dist - b.dist);
@@ -75,10 +82,7 @@ function sortHomeChannels(
   }
 }
 
-function sortOtherDistricts(
-  channels: NormalizedChannel[],
-  s: SortSettings,
-): NormalizedChannel[] {
+function sortOtherDistricts(channels: NormalizedChannel[], s: SortSettings): NormalizedChannel[] {
   // Group by region sortKey so countries cluster in COUNTRY_SORT_ORDER,
   // and SE districts stay numerically ordered (SM0..SM7).
   const groups = new Map<string, NormalizedChannel[]>();

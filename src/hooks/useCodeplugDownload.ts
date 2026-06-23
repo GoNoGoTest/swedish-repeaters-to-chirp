@@ -3,15 +3,20 @@ import Papa from "papaparse";
 import JSZip from "jszip";
 import type { NormalizedChannel, Settings, SplitSettings } from "@/lib/codeplug/models";
 import {
-  requireTarget, resolveTargetSettings,
-  type AnyExportTarget, type ExportFile, type ExportResult,
+  requireTarget,
+  resolveTargetSettings,
+  type AnyExportTarget,
+  type ExportFile,
+  type ExportResult,
 } from "@/lib/codeplug/targets";
 
 function downloadBlob(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
+  a.href = url;
+  a.download = filename;
+  a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -21,7 +26,9 @@ async function downloadZip(filename: string, files: { filename: string; content:
   const blob = await zip.generateAsync({ type: "blob" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
+  a.href = url;
+  a.download = filename;
+  a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -88,8 +95,6 @@ export function useCodeplugDownload(input: {
     }
     downloadBlob(out.one.filename, out.one.content);
   }, [settings, exportChannels]);
-
-
 
   const exportWarnings = useCallback(() => {
     const reportRows = exportChannels

@@ -3,8 +3,14 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseChannelPackCsv, selectPackChannels } from "../../importers/channel_pack";
 
-const pack2m = readFileSync(resolve(__dirname, "../../../../../channelpacks/se_amateur_2m_channel_pack.csv"), "utf8");
-const pack70 = readFileSync(resolve(__dirname, "../../../../../channelpacks/se_amateur_70cm_channel_pack.csv"), "utf8");
+const pack2m = readFileSync(
+  resolve(__dirname, "../../../../../channelpacks/se_amateur_2m_channel_pack.csv"),
+  "utf8",
+);
+const pack70 = readFileSync(
+  resolve(__dirname, "../../../../../channelpacks/se_amateur_70cm_channel_pack.csv"),
+  "utf8",
+);
 
 describe("parseChannelPackCsv", () => {
   it("parses 2m pack with expected pack id and channels", () => {
@@ -56,7 +62,10 @@ describe("selectPackChannels", () => {
     const cats = Array.from(new Set(r.channels.map((c) => c.category))).filter(Boolean);
     expect(cats.length).toBeGreaterThan(0);
     const picked = selectPackChannels(r.channels, {
-      bands: [], categories: [cats[0]], tags: [], useEnabledDefault: false,
+      bands: [],
+      categories: [cats[0]],
+      tags: [],
+      useEnabledDefault: false,
     });
     expect(picked.every((c) => c.category === cats[0])).toBe(true);
   });
@@ -64,7 +73,10 @@ describe("selectPackChannels", () => {
   it("manual source ids override other filters", () => {
     const id = r.channels[0].source_id;
     const picked = selectPackChannels(r.channels, {
-      bands: ["nonexistent"], categories: [], tags: [], useEnabledDefault: true,
+      bands: ["nonexistent"],
+      categories: [],
+      tags: [],
+      useEnabledDefault: true,
       manualSourceIds: [id],
     });
     expect(picked).toHaveLength(1);

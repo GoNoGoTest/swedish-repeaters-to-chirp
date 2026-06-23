@@ -1,13 +1,23 @@
 import type { ReactNode } from "react";
 
-export function Section({ title, subtitle, right, children }: {
-  title: string; subtitle?: string; right?: ReactNode; children: ReactNode;
+export function Section({
+  title,
+  subtitle,
+  right,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  right?: ReactNode;
+  children: ReactNode;
 }) {
   return (
     <section className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-start justify-between mb-4 gap-4">
         <div>
-          <h2 className="font-mono text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
+          <h2 className="font-mono text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            {title}
+          </h2>
           {subtitle && <p className="text-xs text-muted-foreground mt-1 max-w-3xl">{subtitle}</p>}
         </div>
         {right}
@@ -18,10 +28,18 @@ export function Section({ title, subtitle, right, children }: {
 }
 
 export function SectionLabel({ children }: { children: ReactNode }) {
-  return <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{children}</div>;
+  return (
+    <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{children}</div>
+  );
 }
 
-export function Stat({ label, value, tooltip, onClick, active }: {
+export function Stat({
+  label,
+  value,
+  tooltip,
+  onClick,
+  active,
+}: {
   label: string;
   value: number | string;
   tooltip?: string;
@@ -41,14 +59,24 @@ export function Stat({ label, value, tooltip, onClick, active }: {
     <>
       <div className="text-xs text-muted-foreground break-words leading-tight">
         {label}
-        {tooltip ? <span aria-hidden className="ml-1 text-muted-foreground/60">ⓘ</span> : null}
+        {tooltip ? (
+          <span aria-hidden className="ml-1 text-muted-foreground/60">
+            ⓘ
+          </span>
+        ) : null}
       </div>
       <div className="font-mono text-lg">{value}</div>
     </>
   );
   if (interactive) {
     return (
-      <button type="button" onClick={onClick} title={tooltip} aria-pressed={active} className={className}>
+      <button
+        type="button"
+        onClick={onClick}
+        title={tooltip}
+        aria-pressed={active}
+        className={className}
+      >
         {content}
       </button>
     );
@@ -64,7 +92,15 @@ export function Hint({ children }: { children: ReactNode }) {
   return <p className="mt-1 text-[11px] text-muted-foreground leading-snug">{children}</p>;
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+}) {
   return (
     <div>
       <div className="text-xs text-muted-foreground mb-1">{label}</div>
@@ -74,20 +110,42 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
   );
 }
 
-export function NumberField({ label, value, onChange, step = 1, hint }: {
-  label: string; value: number; onChange: (v: number) => void; step?: number; hint?: string;
+export function NumberField({
+  label,
+  value,
+  onChange,
+  step = 1,
+  hint,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  step?: number;
+  hint?: string;
 }) {
   return (
     <Field label={label} hint={hint}>
-      <input type="number" value={value} step={step}
+      <input
+        type="number"
+        value={value}
+        step={step}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full rounded border border-input bg-background px-2 py-1 text-sm font-mono" />
+        className="w-full rounded border border-input bg-background px-2 py-1 text-sm font-mono"
+      />
     </Field>
   );
 }
 
-export function MultiSelect({ label, options, value, onChange }: {
-  label: string; options: string[]; value: string[]; onChange: (v: string[]) => void;
+export function MultiSelect({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string[];
+  onChange: (v: string[]) => void;
 }) {
   return (
     <div>
@@ -96,9 +154,12 @@ export function MultiSelect({ label, options, value, onChange }: {
         {options.map((o) => {
           const on = value.includes(o);
           return (
-            <button key={o} type="button"
+            <button
+              key={o}
+              type="button"
               onClick={() => onChange(on ? value.filter((x) => x !== o) : [...value, o])}
-              className={`rounded border px-2 py-0.5 text-xs font-mono ${on ? "bg-primary text-primary-foreground border-primary" : "border-border bg-background"}`}>
+              className={`rounded border px-2 py-0.5 text-xs font-mono ${on ? "bg-primary text-primary-foreground border-primary" : "border-border bg-background"}`}
+            >
               {o || "(tom)"}
             </button>
           );

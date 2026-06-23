@@ -21,7 +21,8 @@ export function useSelectedPackChannels(settings: Settings): {
         categories: sel.categories,
         tags: sel.tags,
         useEnabledDefault: sel.useEnabledDefault,
-        manualSourceIds: sel.manualSourceIds && sel.manualSourceIds.length > 0 ? sel.manualSourceIds : undefined,
+        manualSourceIds:
+          sel.manualSourceIds && sel.manualSourceIds.length > 0 ? sel.manualSourceIds : undefined,
       });
       out.push(...picked);
     }

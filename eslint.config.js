@@ -33,13 +33,16 @@ export default tseslint.config(
         },
       ],
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
-      "@typescript-eslint/no-unused-vars": ["error", {
-        argsIgnorePattern: "^_",
-        varsIgnorePattern: "^_",
-        caughtErrorsIgnorePattern: "^_",
-        destructuredArrayIgnorePattern: "^_",
-        ignoreRestSiblings: true,
-      }],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
+      ],
     },
   },
   eslintPluginPrettier,

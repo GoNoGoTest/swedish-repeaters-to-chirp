@@ -1,8 +1,20 @@
 import type { NamingSettings, NormalizedChannel } from "./models";
 
 const TRANSLIT: Record<string, string> = {
-  "Å": "A", "Ä": "A", "Ö": "O", "É": "E", "Ü": "U", "Ø": "O", "Æ": "AE",
-  "å": "a", "ä": "a", "ö": "o", "é": "e", "ü": "u", "ø": "o", "æ": "ae",
+  Å: "A",
+  Ä: "A",
+  Ö: "O",
+  É: "E",
+  Ü: "U",
+  Ø: "O",
+  Æ: "AE",
+  å: "a",
+  ä: "a",
+  ö: "o",
+  é: "e",
+  ü: "u",
+  ø: "o",
+  æ: "ae",
 };
 
 export function translit(s: string): string {
@@ -47,7 +59,10 @@ function resolveToken(token: string, ch: NormalizedChannel, n: NamingSettings): 
     case "{city}": {
       const primary = (ch.city || "").split("/")[0].trim();
       if (!primary) return "";
-      const sanitized = sanitize(primary, { transliterate: n.transliterate, uppercase: n.uppercase });
+      const sanitized = sanitize(primary, {
+        transliterate: n.transliterate,
+        uppercase: n.uppercase,
+      });
       return n.cityMaxLength > 0 ? sanitized.slice(0, n.cityMaxLength) : sanitized;
     }
     case "{channel}":
@@ -82,7 +97,11 @@ function resolveToken(token: string, ch: NormalizedChannel, n: NamingSettings): 
  * faller vi tillbaka på name_hint / channel / label så att raden får ett vettigt
  * default-namn utan att användaren behöver mecka med tokens.
  */
-export function buildName(ch: NormalizedChannel, n: NamingSettings, maxLength: number): { full: string; clipped: string } {
+export function buildName(
+  ch: NormalizedChannel,
+  n: NamingSettings,
+  maxLength: number,
+): { full: string; clipped: string } {
   const parts = n.components
     .map((t) => resolveToken(t, ch, n))
     .map((p) => sanitize(p, { transliterate: n.transliterate, uppercase: n.uppercase }))
@@ -163,7 +182,10 @@ export function resolveCollisions(
       candidate = (base + suffix).slice(0, max);
       if (!taken.has(candidate)) break;
       attempt++;
-      if (++safety > 200) { unresolved++; break; }
+      if (++safety > 200) {
+        unresolved++;
+        break;
+      }
     }
     perBase.set(name, attempt);
     taken.add(candidate);

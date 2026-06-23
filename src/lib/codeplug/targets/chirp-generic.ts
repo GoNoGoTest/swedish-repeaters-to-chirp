@@ -16,7 +16,23 @@ const CHIRP_GENERIC_LIMITS: HardwareLimits = {
   // CHIRP itself doesn't impose a max; the actual radio does. We keep a
   // sane default name length matching CHIRP_GENERIC_DEFAULTS.maxLength.
   maxNameLength: 6,
-  supportedModes: ["NFM","FM","WFM","AM","NAM","DV","DN","DMR","P25","CW","USB","LSB","RTTY","DIG","PKT"],
+  supportedModes: [
+    "NFM",
+    "FM",
+    "WFM",
+    "AM",
+    "NAM",
+    "DV",
+    "DN",
+    "DMR",
+    "P25",
+    "CW",
+    "USB",
+    "LSB",
+    "RTTY",
+    "DIG",
+    "PKT",
+  ],
   // CHIRP-CSV is permissive: analog modes export cleanly; digital modes
   // pass through as Mode=DN/DV/DMR/P25 with a non-blocking warning.
   supportedSignalModes: ["FM", "C4FM", "D-Star", "DMR", "DMRplus", "P25", "Tetra", "CW"],
@@ -29,7 +45,8 @@ export const CHIRP_GENERIC_TARGET: ExportTarget<ChirpSettings> = {
   id: "chirp-generic",
   label: "CHIRP generic CSV",
   vendor: "CHIRP",
-  description: "Standard CHIRP-CSV — öppna i CHIRP och importera till valfri radioimage. Bredast hårdvarustöd.",
+  description:
+    "Standard CHIRP-CSV — öppna i CHIRP och importera till valfri radioimage. Bredast hårdvarustöd.",
   filenameBase: "chirp",
   fileExtension: "csv",
   limits: CHIRP_GENERIC_LIMITS,

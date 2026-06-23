@@ -24,15 +24,22 @@ describe("buildName", () => {
 
   it("smart-joins skipping empty tokens (no double separator)", () => {
     const ch = makeChannel({ city: "", call: "SK6BA", channel: "RV48" });
-    const r = buildName(ch, { ...naming, components: ["{city}", "{call}", "{channel}"], separator: "-" }, 20);
+    const r = buildName(
+      ch,
+      { ...naming, components: ["{city}", "{call}", "{channel}"], separator: "-" },
+      20,
+    );
     expect(r.full).toBe("SK6BA-RV48");
   });
 
   it("falls back for empty channel_pack name", () => {
     const ch = makeChannel({
       source_type: "channel_pack",
-      city: "", call: "", channel: "",
-      label: "CW ACT", name_hint: "CW ACT",
+      city: "",
+      call: "",
+      channel: "",
+      label: "CW ACT",
+      name_hint: "CW ACT",
     });
     const r = buildName(ch, { ...naming, components: ["{city}", "{call}"] }, 12);
     expect(r.full.length).toBeGreaterThan(0);
@@ -47,7 +54,11 @@ describe("buildName", () => {
 
   it("expands district prefix and band abbrev", () => {
     const ch = makeChannel({ district: "6", band: "2" });
-    const r = buildName(ch, { ...naming, components: ["{district}", "{band}"], separator: "-" }, 20);
+    const r = buildName(
+      ch,
+      { ...naming, components: ["{district}", "{band}"], separator: "-" },
+      20,
+    );
     expect(r.full).toBe("D6-2M");
   });
 
@@ -71,11 +82,13 @@ describe("buildName", () => {
 
   it("{district} returns empty for non-Swedish raw values (no DLA/DOZ artefacts)", () => {
     const la = makeChannel({ district: "LA", city: "Oslo" });
-    const r = buildName(la, { ...naming, components: ["{district}", "{city}"], separator: "-" }, 20);
+    const r = buildName(
+      la,
+      { ...naming, components: ["{district}", "{city}"], separator: "-" },
+      20,
+    );
     expect(r.full).toBe("OSLO");
   });
-
-
 
   it("{mode} resolves from mode_effective", () => {
     const fm = makeChannel({ city: "Göteborg", mode_effective: "FM" });
@@ -103,13 +116,16 @@ describe("buildName", () => {
   });
 });
 
-
 describe("resolveCollisions", () => {
   it("appends numeric suffixes on collision, including the first occurrence", () => {
     const a = makeChannel({ generated_name_final: "BORAS" });
     const b = makeChannel({ generated_name_final: "BORAS" });
     const c = makeChannel({ generated_name_final: "BORAS" });
-    const { unresolved } = resolveCollisions([a, b, c], { ...naming, collisionPolicy: "numeric_suffix" }, 6);
+    const { unresolved } = resolveCollisions(
+      [a, b, c],
+      { ...naming, collisionPolicy: "numeric_suffix" },
+      6,
+    );
     expect(unresolved).toBe(0);
     expect(a.generated_name_final).toBe("BORAS1");
     expect(b.generated_name_final).toBe("BORAS2");

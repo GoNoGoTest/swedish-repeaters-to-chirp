@@ -30,9 +30,17 @@ export const NICSURE_ZONE_DIMENSIONS: ReadonlyArray<{
   description: string;
 }> = [
   { id: "country", label: "Land", description: "Landskod, t.ex. SE, NO, DK, FI." },
-  { id: "district", label: "Distrikt", description: "Repeaterdistrikt (SM6, LA, OZ) eller kanalpakets-id för paketrader." },
+  {
+    id: "district",
+    label: "Distrikt",
+    description: "Repeaterdistrikt (SM6, LA, OZ) eller kanalpakets-id för paketrader.",
+  },
   { id: "type", label: "Kanaltyp", description: "Repeater, Link, Hotspot, Simplex." },
-  { id: "category", label: "Paketkategori", description: "Kategori för kanalpaket (marine, pmr, …)." },
+  {
+    id: "category",
+    label: "Paketkategori",
+    description: "Kategori för kanalpaket (marine, pmr, …).",
+  },
 ];
 
 export interface NicsureRt880Settings {
@@ -105,7 +113,7 @@ function mobileTxMhz(c: NormalizedChannel): number | null {
   if (c.tx_frequency != null) return c.tx_frequency;
   if (c.rx_frequency == null) return null;
   if (c.duplex === "+" || c.duplex === "-") {
-    const shift = c.tx_shift != null ? c.tx_shift : (c.duplex === "+" ? c.offset : -c.offset);
+    const shift = c.tx_shift != null ? c.tx_shift : c.duplex === "+" ? c.offset : -c.offset;
     return c.rx_frequency + shift;
   }
   return c.rx_frequency;
@@ -152,10 +160,7 @@ function encodeModulation(c: NormalizedChannel): { mod: string; unsupported: boo
 }
 
 /** Read the raw value (already a string id) for a given zone dimension on a channel. */
-export function dimensionValue(
-  c: NormalizedChannel,
-  d: NicsureZoneDimensionId,
-): string | null {
+export function dimensionValue(c: NormalizedChannel, d: NicsureZoneDimensionId): string | null {
   switch (d) {
     case "country": {
       const cc = c.region.countryCode;
@@ -294,17 +299,14 @@ interface NicsureRow {
  * digital variant (C4FM/D-Star/DMR/DMRplus/P25). Channel-pack rows pass
  * through unchanged.
  */
-function filterAnalogFmSk6ba(
-  channels: NormalizedChannel[],
-): { kept: NormalizedChannel[]; droppedCount: number } {
+function filterAnalogFmSk6ba(channels: NormalizedChannel[]): {
+  kept: NormalizedChannel[];
+  droppedCount: number;
+} {
   const kept: NormalizedChannel[] = [];
   let droppedCount = 0;
   for (const c of channels) {
-    if (
-      c.source_type === "sk6ba" &&
-      c.mode_effective !== "" &&
-      c.mode_effective !== "FM"
-    ) {
+    if (c.source_type === "sk6ba" && c.mode_effective !== "" && c.mode_effective !== "FM") {
       droppedCount++;
       continue;
     }
@@ -330,7 +332,6 @@ export function toNicsureRows(
     });
   }
   channels = kept;
-
 
   const dims = s.zoneDimensions.slice(0, 4);
   const legend = buildZoneLegend(channels, dims);

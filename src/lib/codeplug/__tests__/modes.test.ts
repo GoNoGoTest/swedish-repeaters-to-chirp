@@ -18,12 +18,7 @@ describe("parseModes", () => {
   });
 
   it("splits on commas, semicolons, pipes", () => {
-    expect(parseModes("FM, DMR ; C4FM | D-Star")).toEqual([
-      "FM",
-      "DMR",
-      "C4FM",
-      "D-Star",
-    ]);
+    expect(parseModes("FM, DMR ; C4FM | D-Star")).toEqual(["FM", "DMR", "C4FM", "D-Star"]);
   });
 
   it("dedupes while preserving order", () => {
@@ -45,12 +40,7 @@ describe("parseModes", () => {
   });
 
   it("handles realistic SK6BA multi-mode strings", () => {
-    expect(parseModes("FM / C4FM / DMR / D-Star")).toEqual([
-      "FM",
-      "C4FM",
-      "DMR",
-      "D-Star",
-    ]);
+    expect(parseModes("FM / C4FM / DMR / D-Star")).toEqual(["FM", "C4FM", "DMR", "D-Star"]);
   });
 });
 

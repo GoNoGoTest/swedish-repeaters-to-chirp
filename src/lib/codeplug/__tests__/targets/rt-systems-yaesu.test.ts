@@ -25,7 +25,10 @@ describe("RT Systems Yaesu — Operating Mode mapping", () => {
     const ch = makeChannel({
       generated_name_final: "BORAS",
       mode_effective: "FM",
-      rx_frequency: 145.6, duplex: "-", offset: 0.6, tx_shift: -0.6,
+      rx_frequency: 145.6,
+      duplex: "-",
+      offset: 0.6,
+      tx_shift: -0.6,
     });
     const { fields } = toRtSystemsYaesuRow(ch, 1, S);
     expect(fields[5]).toBe("FM"); // Operating Mode
@@ -37,7 +40,10 @@ describe("RT Systems Yaesu — Operating Mode mapping", () => {
     const ch = makeChannel({
       generated_name_final: "BORASYSF",
       mode_effective: "C4FM",
-      rx_frequency: 145.6, duplex: "-", offset: 0.6, tx_shift: -0.6,
+      rx_frequency: 145.6,
+      duplex: "-",
+      offset: 0.6,
+      tx_shift: -0.6,
     });
     const { fields, unsupportedMode } = toRtSystemsYaesuRow(ch, 1, S);
     expect(fields[5]).toBe("DN");
@@ -48,7 +54,10 @@ describe("RT Systems Yaesu — Operating Mode mapping", () => {
     const ch = makeChannel({
       generated_name_final: "DSTAR",
       mode_effective: "D-Star",
-      rx_frequency: 434.6, duplex: "-", offset: 2, tx_shift: -2,
+      rx_frequency: 434.6,
+      duplex: "-",
+      offset: 2,
+      tx_shift: -2,
     });
     const { fields, unsupportedMode } = toRtSystemsYaesuRow(ch, 1, S);
     expect(fields[5]).toBe("FM");
@@ -57,8 +66,11 @@ describe("RT Systems Yaesu — Operating Mode mapping", () => {
 
   it("emits the rt_unsupported_mode warning when any row is unsupported", () => {
     const ch = makeChannel({
-      generated_name_final: "X", mode_effective: "DMR",
-      rx_frequency: 145.6, duplex: "-", offset: 0.6,
+      generated_name_final: "X",
+      mode_effective: "DMR",
+      rx_frequency: 145.6,
+      duplex: "-",
+      offset: 0.6,
     });
     const { warnings } = exportRtSystemsYaesuCsv([ch], S);
     expect(warnings.some((w) => w.code === "rt_unsupported_mode")).toBe(true);
@@ -70,7 +82,10 @@ describe("RT Systems Yaesu — offset / simplex", () => {
     const ch = makeChannel({
       generated_name_final: "S20",
       mode_effective: "FM",
-      rx_frequency: 145.5, duplex: "", offset: 0, tx_shift: 0,
+      rx_frequency: 145.5,
+      duplex: "",
+      offset: 0,
+      tx_shift: 0,
     });
     const { fields } = toRtSystemsYaesuRow(ch, 1, S);
     expect(fields[3]).toBe(""); // Offset Frequency
@@ -81,8 +96,12 @@ describe("RT Systems Yaesu — offset / simplex", () => {
 
   it("plus-shift renders 'Plus' direction", () => {
     const ch = makeChannel({
-      generated_name_final: "X", mode_effective: "FM",
-      rx_frequency: 433.0, duplex: "+", offset: 1.6, tx_shift: 1.6,
+      generated_name_final: "X",
+      mode_effective: "FM",
+      rx_frequency: 433.0,
+      duplex: "+",
+      offset: 1.6,
+      tx_shift: 1.6,
     });
     const { fields } = toRtSystemsYaesuRow(ch, 1, S);
     expect(fields[4]).toBe("Plus");
@@ -93,8 +112,12 @@ describe("RT Systems Yaesu — offset / simplex", () => {
 describe("RT Systems Yaesu — Tone Mode", () => {
   it("CTCSS-TX → Tone Mode='Tone' and CTCSS value", () => {
     const ch = makeChannel({
-      generated_name_final: "X", mode_effective: "FM",
-      rx_frequency: 145.6, duplex: "-", offset: 0.6, ctcss_tx: 88.5,
+      generated_name_final: "X",
+      mode_effective: "FM",
+      rx_frequency: 145.6,
+      duplex: "-",
+      offset: 0.6,
+      ctcss_tx: 88.5,
     });
     const { fields } = toRtSystemsYaesuRow(ch, 1, S);
     expect(fields[8]).toBe("Tone");
@@ -103,9 +126,13 @@ describe("RT Systems Yaesu — Tone Mode", () => {
 
   it("DCS code → Tone Mode='DCS' and 3-digit DCS", () => {
     const ch = makeChannel({
-      generated_name_final: "X", mode_effective: "FM",
-      rx_frequency: 145.6, duplex: "-", offset: 0.6,
-      dtcs_code: "25", dtcs_polarity: "NN",
+      generated_name_final: "X",
+      mode_effective: "FM",
+      rx_frequency: 145.6,
+      duplex: "-",
+      offset: 0.6,
+      dtcs_code: "25",
+      dtcs_polarity: "NN",
     });
     const { fields } = toRtSystemsYaesuRow(ch, 1, S);
     expect(fields[8]).toBe("DCS");
@@ -114,8 +141,10 @@ describe("RT Systems Yaesu — Tone Mode", () => {
 
   it("No tone info → Tone Mode='None' with default CTCSS/DCS placeholders", () => {
     const ch = makeChannel({
-      generated_name_final: "X", mode_effective: "FM",
-      rx_frequency: 145.5, duplex: "",
+      generated_name_final: "X",
+      mode_effective: "FM",
+      rx_frequency: 145.5,
+      duplex: "",
     });
     const { fields } = toRtSystemsYaesuRow(ch, 1, S);
     expect(fields[8]).toBe("None");
@@ -129,7 +158,8 @@ describe("RT Systems Yaesu — Name truncation", () => {
     const ch = makeChannel({
       generated_name_final: "THIS_IS_WAY_TOO_LONG_FOR_THE_RADIO",
       mode_effective: "FM",
-      rx_frequency: 145.5, duplex: "",
+      rx_frequency: 145.5,
+      duplex: "",
     });
     const { csv, warnings } = exportRtSystemsYaesuCsv([ch], S);
     expect(warnings.some((w) => w.code === "rt_name_truncated")).toBe(true);
@@ -143,8 +173,10 @@ describe("RT Systems Yaesu — Name truncation", () => {
 describe("RT Systems Yaesu — Skip column", () => {
   it("scans by default", () => {
     const ch = makeChannel({
-      generated_name_final: "X", mode_effective: "FM",
-      rx_frequency: 145.5, duplex: "",
+      generated_name_final: "X",
+      mode_effective: "FM",
+      rx_frequency: 145.5,
+      duplex: "",
     });
     const { fields } = toRtSystemsYaesuRow(ch, 1, S);
     expect(fields[15]).toBe("Scan");
@@ -152,8 +184,11 @@ describe("RT Systems Yaesu — Skip column", () => {
 
   it("skipLinks=true marks Link rows as Skip", () => {
     const ch = makeChannel({
-      generated_name_final: "X", type: "Link", mode_effective: "FM",
-      rx_frequency: 145.5, duplex: "",
+      generated_name_final: "X",
+      type: "Link",
+      mode_effective: "FM",
+      rx_frequency: 145.5,
+      duplex: "",
     });
     const { fields } = toRtSystemsYaesuRow(ch, 1, { ...S, skipLinks: true });
     expect(fields[15]).toBe("Skip");
@@ -165,7 +200,10 @@ describe("RT Systems Yaesu — DN never carries analog tone", () => {
     const ch = makeChannel({
       generated_name_final: "C4FMTONE",
       mode_effective: "C4FM",
-      rx_frequency: 145.675, duplex: "-", offset: 0.6, tx_shift: -0.6,
+      rx_frequency: 145.675,
+      duplex: "-",
+      offset: 0.6,
+      tx_shift: -0.6,
       ctcss_tx: 114.8,
     });
     const { fields } = toRtSystemsYaesuRow(ch, 1, S);
@@ -177,8 +215,12 @@ describe("RT Systems Yaesu — DN never carries analog tone", () => {
 
   it("FM channel with CTCSS source still emits Tone Mode='Tone' (regression)", () => {
     const ch = makeChannel({
-      generated_name_final: "FMTONE", mode_effective: "FM",
-      rx_frequency: 145.6, duplex: "-", offset: 0.6, tx_shift: -0.6,
+      generated_name_final: "FMTONE",
+      mode_effective: "FM",
+      rx_frequency: 145.6,
+      duplex: "-",
+      offset: 0.6,
+      tx_shift: -0.6,
       ctcss_tx: 114.8,
     });
     const { fields } = toRtSystemsYaesuRow(ch, 1, S);
@@ -191,8 +233,12 @@ describe("RT Systems Yaesu — DN never carries analog tone", () => {
 describe("RT Systems Yaesu — MHz offset formatting", () => {
   it("2 MHz shift → '2.00000 MHz'", () => {
     const ch = makeChannel({
-      generated_name_final: "X", mode_effective: "FM",
-      rx_frequency: 434.6, duplex: "-", offset: 2, tx_shift: -2,
+      generated_name_final: "X",
+      mode_effective: "FM",
+      rx_frequency: 434.6,
+      duplex: "-",
+      offset: 2,
+      tx_shift: -2,
     });
     const { fields } = toRtSystemsYaesuRow(ch, 1, S);
     expect(fields[3]).toBe("2.00000 MHz");
@@ -200,8 +246,12 @@ describe("RT Systems Yaesu — MHz offset formatting", () => {
 
   it("5 MHz shift → '5.00000 MHz'", () => {
     const ch = makeChannel({
-      generated_name_final: "X", mode_effective: "FM",
-      rx_frequency: 438.0, duplex: "-", offset: 5, tx_shift: -5,
+      generated_name_final: "X",
+      mode_effective: "FM",
+      rx_frequency: 438.0,
+      duplex: "-",
+      offset: 5,
+      tx_shift: -5,
     });
     const { fields } = toRtSystemsYaesuRow(ch, 1, S);
     expect(fields[3]).toBe("5.00000 MHz");
@@ -209,8 +259,12 @@ describe("RT Systems Yaesu — MHz offset formatting", () => {
 
   it("0.6 MHz shift stays '600 kHz' (regression)", () => {
     const ch = makeChannel({
-      generated_name_final: "X", mode_effective: "FM",
-      rx_frequency: 145.6, duplex: "-", offset: 0.6, tx_shift: -0.6,
+      generated_name_final: "X",
+      mode_effective: "FM",
+      rx_frequency: 145.6,
+      duplex: "-",
+      offset: 0.6,
+      tx_shift: -0.6,
     });
     const { fields } = toRtSystemsYaesuRow(ch, 1, S);
     expect(fields[3]).toBe("600 kHz");
@@ -220,8 +274,10 @@ describe("RT Systems Yaesu — MHz offset formatting", () => {
 describe("RT Systems Yaesu — padding", () => {
   it("pads short channel lists with empty rows up to padToRows", () => {
     const ch = makeChannel({
-      generated_name_final: "ONE", mode_effective: "FM",
-      rx_frequency: 145.5, duplex: "",
+      generated_name_final: "ONE",
+      mode_effective: "FM",
+      rx_frequency: 145.5,
+      duplex: "",
     });
     const { csv } = exportRtSystemsYaesuCsv([ch, ch, ch], { ...S, padToRows: 999 });
     const lines = csv.split("\r\n");
@@ -238,8 +294,10 @@ describe("RT Systems Yaesu — padding", () => {
 
   it("padToRows: 0 disables padding", () => {
     const ch = makeChannel({
-      generated_name_final: "ONE", mode_effective: "FM",
-      rx_frequency: 145.5, duplex: "",
+      generated_name_final: "ONE",
+      mode_effective: "FM",
+      rx_frequency: 145.5,
+      duplex: "",
     });
     const { csv } = exportRtSystemsYaesuCsv([ch], { ...S, padToRows: 0 });
     const lines = csv.split("\r\n");
@@ -253,16 +311,23 @@ describe("RT Systems Yaesu — padding", () => {
   });
 });
 
-
 describe("RT Systems Yaesu — RX-only", () => {
   it("excludes rx_only channels from CSV and emits rt_rx_only_excluded warning", () => {
     const rxOnly = makeChannel({
-      generated_name_final: "MARINE16", mode_effective: "FM",
-      rx_frequency: 156.8, duplex: "", rx_only: true, tx_allowed: false,
+      generated_name_final: "MARINE16",
+      mode_effective: "FM",
+      rx_frequency: 156.8,
+      duplex: "",
+      rx_only: true,
+      tx_allowed: false,
     });
     const normal = makeChannel({
-      generated_name_final: "RV48", mode_effective: "FM",
-      rx_frequency: 145.6, duplex: "-", offset: 0.6, tx_shift: -0.6,
+      generated_name_final: "RV48",
+      mode_effective: "FM",
+      rx_frequency: 145.6,
+      duplex: "-",
+      offset: 0.6,
+      tx_shift: -0.6,
     });
     const { csv, warnings } = exportRtSystemsYaesuCsv([rxOnly, normal], { ...S, padToRows: 0 });
     const lines = csv.split("\r\n");
@@ -275,5 +340,3 @@ describe("RT Systems Yaesu — RX-only", () => {
     expect(w!.message).toContain("1 kanal");
   });
 });
-
-
