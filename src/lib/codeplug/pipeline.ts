@@ -75,8 +75,8 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
 
     const access = parseAccess(r.access);
     const digital = parseDigitalAccess(r.access);
-    // missing_access_tone och ctcss_and_dcs är mode-beroende och appliceras
-    // efter expandModes (se applyPostExpansionAccessWarnings nedan).
+    // ctcss_and_dcs är mode-beroende och appliceras efter expandModes
+    // (se applyPostExpansionAccessWarnings nedan).
 
     const lat = parseNumberLoose(r.lat);
     const lng = parseNumberLoose(r.lng);
