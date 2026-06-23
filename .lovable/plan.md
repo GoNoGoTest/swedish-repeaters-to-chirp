@@ -89,15 +89,17 @@ Pack-warnings har idag ingen UI. Lägg `<ParseWarningsPanel ... />` i panelens h
 Konkret: lägg en sektion ovanför pack-listan:
 
 ```tsx
-{mergedPacks
-  .filter((p) => p.parseWarnings.length > 0)
-  .map((p) => (
-    <ParseWarningsPanel
-      key={p.packId}
-      title={`Parse-varningar i kanalpaket ${p.packId}`}
-      warnings={p.parseWarnings}
-    />
-  ))}
+{
+  mergedPacks
+    .filter((p) => p.parseWarnings.length > 0)
+    .map((p) => (
+      <ParseWarningsPanel
+        key={p.packId}
+        title={`Parse-varningar i kanalpaket ${p.packId}`}
+        warnings={p.parseWarnings}
+      />
+    ));
+}
 ```
 
 ## Tester
