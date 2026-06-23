@@ -96,4 +96,23 @@ describe("runPipeline mode-medveten access-subset", () => {
     expect(r.channels[0].ctcss_tx).toBeNull();
     expect(r.channels[0].dmr_color_code).toBe(1);
   });
+
+  it("analog channel-pack-rad utan tone får INTE missing_access_tone", () => {
+    const pack = makeChannel({
+      source_type: "channel_pack",
+      mode_pack: "FM",
+      mode_effective: "FM",
+      pack_id: "p1",
+      access_raw: "",
+      ctcss_tx: null,
+    });
+    const r = runPipeline({
+      sk6baRows: [],
+      packChannels: [pack],
+      settings: baseSettings,
+    });
+    const codes = r.channels.flatMap((c) => c.warnings.map((w) => w.code));
+    expect(codes).not.toContain("missing_access_tone");
+    expect(codes).not.toContain("ctcss_and_dcs");
+  });
 });
