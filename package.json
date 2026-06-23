@@ -8,11 +8,13 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
-    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify": "bun run test && bun run build"
+    "verify": "bun run typecheck && bun run lint && bun run format:check && bun run test && bun run build"
   },
   "dependencies": {
     "@radix-ui/react-switch": "^1.2.6",

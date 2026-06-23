@@ -1,41 +1,55 @@
 ## Mål
 
-1. Default för `rxOnlyPolicy`:
-   - För target `rt-systems-yaesu-generic`: `"skip"` (Hoppa över helt) — vi saknar verifierat RX-only-beteende.
-   - Övriga target (chirp-generic, vgc-n76, nicsure-rt880): `"block_tx"` (Spärra TX i radion) som idag.
-2. Target-specifik hjälptext under "RX-only-kanaler"-dropdownen.
-3. Banner-varning (amber, samma stil som "CHIRP Generic CSV kan bära…") i både **Sortering & export** och **Förhandsgranska & exportera** så fort RX-only-kanaler faktiskt går vidare till exporten:
-   > "Du exporterar kanaler som är RX-only — verifiera i din radio att du inte kan sända på dessa kanaler."
+Skärpa CI/verifiering så att lokala `bun run verify` och GitHub Actions kör samma fyra steg: typecheck, lint, test, build. ESLint blir strikt på oanvända variabler med `_`-prefix som escape hatch.
 
 ## Ändringar
 
-### Default-policy per target
-- Globala `DEFAULT_SETTINGS.packs.rxOnlyPolicy` i `src/lib/codeplug/defaults.ts` lämnas på `"block_tx"`.
-- I `src/routes/index.tsx` (där target byts) tvinga `rxOnlyPolicy = "skip"` när användaren väljer `rt-systems-yaesu-generic` och nuvarande värde är default-stilen (eller om det inte är något användaren själv ändrat). Enklast: när `settings.export.targetId` ändras till rt-systems, sätt `settings.packs.rxOnlyPolicy = "skip"`; när det ändras från rt-systems till ett target med fungerande RX-only, sätt tillbaka till `"block_tx"`.
-- Hittar vi en befintlig "on target change"-effekt återanvänder vi den; annars läggs en liten `useEffect` på `settings.export.targetId` i `index.tsx`.
+### `package.json` — scripts
+```json
+"typecheck": "tsc --noEmit",
+"lint": "eslint . --max-warnings=0",
+"format": "prettier --write .",
+"format:check": "prettier --check .",
+"test": "vitest run",
+"verify": "bun run typecheck && bun run lint && bun run format:check && bun run test && bun run build"
+```
+- `verify` kör allt i ordningen som ger snabbast feedback (typecheck/lint/format först, build sist).
+- `build:dev`, `dev`, `preview`, `test:watch` lämnas orörda.
 
-### `src/components/codeplug/ExportPanel.tsx`
-- Ersätt det statiska `hint` på "RX-only-kanaler"-fältet med target-specifik `<Hint>` under selecten:
-  - `chirp-generic`: "'Spärra TX' sätter Duplex=off i CHIRP."
-  - `vgc-n76`: "'Spärra TX' sätter tx_dis=1 i VGC-CSV:n."
-  - `nicsure-rt880`: "'Spärra TX' sätter TX_Power=N/T och TX=RX i RT-880-CSV:n."
-  - `rt-systems-yaesu-generic`: "RT Systems Yaesu: RX-only-kanaler exkluderas alltid ur exporten — vi saknar dokumentation om hur RT Systems markerar RX-only i CSV:n. Valet ovan ignoreras."
-  - fallback: kort generisk text.
-- Ny `RxOnlyExportNote`-komponent (amber-border, samma stil som `ChirpDigitalNote` i `RepeaterFilterPanel.tsx`) renderas direkt under fältet när:
-  - `channels` (post-pipeline) innehåller minst en `c.rx_only || !c.tx_allowed`, **och**
-  - target inte är `rt-systems-yaesu-generic` (det target:et exkluderar alltid → ingen "du exporterar RX-only").
-  - Text: "Du exporterar kanaler som är RX-only — verifiera i din radio att du inte kan sända på dessa kanaler."
+### `eslint.config.js`
+- Ta bort `"@typescript-eslint/no-unused-vars": "off"`.
+- Lägg till regeln explicit med `_`-escape så avsiktligt oanvända argument/variabler kan prefixas med `_`:
+  ```js
+  "@typescript-eslint/no-unused-vars": ["error", {
+    argsIgnorePattern: "^_",
+    varsIgnorePattern: "^_",
+    caughtErrorsIgnorePattern: "^_",
+    destructuredArrayIgnorePattern: "^_",
+    ignoreRestSiblings: true,
+  }],
+  ```
 
-### `src/routes/index.tsx`
-- I "Förhandsgranska & exportera"-sektionen, mellan `duplicateStop`-alerten och `Stat`-griden, rendera samma `RxOnlyExportNote` baserat på `exportChannels` och `settings.export.targetId`.
-- Lägg in target-change-effekten ovan (skip vid rt-systems, block_tx annars).
+### `tsconfig.json`
+- Lämnas orörd för nu. ESLint-regeln täcker samma yta med smidigare escape hatch; vi slipper en andra mekanism som rapporterar samma sak. (Om vi senare hittar fall som TS fångar men ESLint missar lägger vi på `noUnusedLocals`/`noUnusedParameters` då.)
 
-### Lämnas orört
-- `applyRxOnlyPolicy` i `pipeline.ts`, warning-koder, target-exporters. Existerande `rt_rx_only_excluded`-warning fortsätter synas i vanliga varningslistan.
+### `.github/workflows/ci.yml`
+Ersätt två steg med ett:
+```yaml
+- run: bun install --frozen-lockfile
+- run: bun run verify
+```
+
+### Fallout-fix
+1. Kör `bun run typecheck` och åtgärda eventuella typfel som idag tystas av Vite-only-builden.
+2. Kör `bun run lint` och fixa fallout från den nya regeln:
+   - Avsiktligt oanvända argument: byt namn till `_argname`.
+   - Oanvända imports/variabler: ta bort eller prefixa med `_`.
+3. Kör `bun run format:check` och kör `bun run format` om något inte är prettier-formaterat. Lägga sedan om koden så `format:check` blir grön.
+4. Slutligen `bun run verify` lokalt — måste vara grön innan ändringen är klar.
 
 ## Acceptanskriterier
 
-- Byt target till rt-systems-yaesu-generic: dropdownen hoppar till "Hoppa över helt" och hjälptexten förklarar att valet ignoreras + att vi saknar dokumentation.
-- Byt target tillbaka till chirp/vgc/nicsure: dropdownen återgår till "Spärra TX i radion".
-- Med ett RX-only-paket aktiverat och policy=block_tx/mark på chirp/vgc/nicsure: amber-banner i både exportpanelen och förhandsgranskningen.
-- Med rt-systems-yaesu-generic: ingen "du exporterar RX-only"-banner (inga RX-only-kanaler exporteras).
+- `bun run verify` kör typecheck → lint (0 warnings) → format:check → test → build, alla gröna.
+- CI-jobbet kör `bun install --frozen-lockfile` följt av enbart `bun run verify`.
+- ESLint accepterar `_`-prefixade oanvända argument; alla andra oanvända symboler är fel.
+- Inga regressioner i testsviten (262 tester gröna).
