@@ -29,7 +29,8 @@ export function PreviewTable({ channels, excludedKeys, onToggleExclude, chirpMod
             const isPack = c.source_type === "channel_pack";
             const key = channelKey(c);
             const excluded = excludedKeys.has(key);
-            const baseRowClass = c.warnings.length ? "bg-destructive/5" : isPack ? "bg-primary/5" : "";
+            const realWarnings = c.warnings.filter((w) => w.code !== "name_collision");
+            const baseRowClass = realWarnings.length ? "bg-destructive/5" : isPack ? "bg-primary/5" : "";
             const rowClass = excluded ? "opacity-40 line-through decoration-muted-foreground/50" : baseRowClass;
             const mode = isPack && c.mode_pack ? c.mode_pack : chirpMode;
             const loc = excluded ? "—" : String(locCounter++);
@@ -68,7 +69,8 @@ export function PreviewTable({ channels, excludedKeys, onToggleExclude, chirpMod
                 </td>
                 <td className="px-2 py-1 truncate max-w-[10rem] text-muted-foreground">{c.tags.join(", ")}</td>
                 <td className="px-2 py-1 truncate max-w-[14rem] text-muted-foreground" title={c.license_note || c.comment}>{c.comment}</td>
-                <td className="px-2 py-1">{c.warnings.length ? <span title={c.warnings.map((w) => w.message).join("; ")} className="text-amber-500">!{c.warnings.length}</span> : ""}</td>
+                <td className="px-2 py-1">{realWarnings.length ? <span title={realWarnings.map((w) => w.message).join("; ")} className="text-amber-500">!{realWarnings.length}</span> : ""}</td>
+
               </tr>
             );
           })}
