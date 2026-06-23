@@ -1,56 +1,45 @@
 ## Mål
 
-Behandla `type = "uW QTH"` som utanför appens scope: de filtreras bort tidigt, syns inte i Typ-filtret, och redovisas separat i tooltipen för "Bortfiltrerade".
+Snygga till statistikpanelen i "Förhandsgranska & exportera". Ta bort brus, byt etiketter och dela upp den kombinerade varnings-räknaren i fyra separata rutor med egen tooltip.
 
-## Ändringar
+## Ny stat-rad
 
-### 1. `src/lib/codeplug/pipeline.ts`
+Sex rutor i grid (`md:grid-cols-3 lg:grid-cols-6`):
 
-- Lägg till exporterad konstant:
-  ```ts
-  export const OUT_OF_SCOPE_TYPES = new Set(["uW QTH"]);
-  ```
-- I `runPipeline`, direkt efter `normalize(sk6baRows)`:
-  ```ts
-  const inScope = normalized.filter((c) => !OUT_OF_SCOPE_TYPES.has(c.type));
-  const outOfScopeCount = normalized.length - inScope.length;
-  ```
-  Resten av flödet (`exportable`, `expandModes`, …) körs på `inScope` istället för `normalized`. `withRx` räknas från `inScope.filter(...)` så uW QTH inte längre dyker upp i "Saknar RX-frekvens".
-- Utöka `PipelineResult` med `outOfScope: number` och returnera den.
-
-Matchningen sker case-sensitive på exakt strängen `"uW QTH"`. Om fler liknande kategorier dyker upp senare läggs de till i `OUT_OF_SCOPE_TYPES`.
-
-### 2. `src/components/codeplug/RepeaterFilterPanel.tsx`
-
-```ts
-const allTypes = Object.keys(summary.uniqueCounts.type)
-  .filter((t) => !OUT_OF_SCOPE_TYPES.has(t));
 ```
-Då försvinner "uW QTH" som alternativ i Typ-multiselectet. Om användaren har en gammal sparad inställning med "uW QTH" i `filter.types` är det harmlöst — de raderna är redan borttagna innan filter körs.
+Från SK6BA · Från kanalpaket · Varningar · Namnkollisioner · Frekvensdubbletter · RX-only
+```
 
-### 3. `src/routes/index.tsx` — tooltip-uppdatering
+- Borttagna: **Input totalt** och **Filtrerade bort** (de finns redan i Repeater-sektionens stat-rad ovanför).
+- Omdöpt:
+  - `SK6BA` → **Från SK6BA**
+  - `Kanalpaket` → **Från kanalpaket**
+- Den gamla rutan `Varn/Koll/Dupes/RX` (t.ex. "27/23/0/0") delas upp i fyra rutor, var och en med egen tooltip som förklarar vad siffran betyder och var den kommer ifrån.
 
-I beräkningen som bygger tooltipen för "Bortfiltrerade":
+## Tooltips per varningsruta
 
-- Lägg till `outOfScope = pipeline?.outOfScope ?? 0`.
-- Justera `droppedByFilter`-uträkningen så `outOfScope` inte hamnar i "Bortfiltrerade av filter":
-  ```ts
-  const droppedByFilter = Math.max(
-    0,
-    droppedOut - missingRx - droppedByDedupe - manuallyExcluded - outOfScope,
-  );
-  ```
-- Lägg in raden `• uW QTH: N` (när > 0) i tooltipens lista, t.ex. överst bland orsakerna.
+Tooltips återanvänder befintlig `tooltip?`-prop på `Stat`-komponenten (HTML-`title`, redan implementerad).
 
-### 4. Test (`src/lib/codeplug/__tests__/pipeline.test.ts`)
+- **Varningar** (`stats.warned`):
+  > Antal exportkanaler som har minst en varning (t.ex. RX-only-policy, otydlig access, namnsaknad). Kanalerna exporteras ändå, men kolla preview-tabellen för detaljer.
 
-Lägg till ett kort test som matar in en `uW QTH`-rad och en vanlig FM-repeaterrad och verifierar att:
-- `outOfScope === 1`
-- den uW QTH-raden inte räknas i `withRx` och inte finns kvar i `channels`.
+- **Namnkollisioner** (`stats.collided`):
+  > Kanaler där det genererade namnet krockar med ett annat. Suffixsystemet har försökt göra dem unika — justera namnmallen om något fortfarande är otydligt.
+
+- **Frekvensdubbletter** (`stats.dupes`):
+  > Kanaler som delar RX-frekvens med en annan kanal (oftast pack-vs-SK6BA). Påverkar inte exporten om policy är "behåll båda", men kan duplicera kanalplatser i radion.
+
+- **RX-only** (`stats.rxOnly`):
+  > Kanaler från kanalpaket som är mottagningsbara men inte sändningsbara. Hur de exporteras beror på den valda RX-only-policyn (markerad i comment, TX spärrad eller stoppar export).
+
+Tooltips visas bara via `title`-attributet (native browser tooltip) — samma mekanism som vi använder för "Bortfiltrerade" i Repeater-sektionen, så ingen ny komponent behövs.
 
 ## Filer som ändras
 
-- `src/lib/codeplug/pipeline.ts` — `OUT_OF_SCOPE_TYPES`, tidig filtrering, ny räknare.
-- `src/components/codeplug/RepeaterFilterPanel.tsx` — döljer uW QTH i Typ-filtret.
-- `src/routes/index.tsx` — visar "uW QTH" i tooltipen.
-- `src/lib/codeplug/__tests__/pipeline.test.ts` — ett nytt test.
+- `src/routes/index.tsx` — bygg om grid-blocket på rad 306–312:
+  - Ta bort `Input totalt` och `Filtrerade bort`.
+  - Byt label på SK6BA och Kanalpaket.
+  - Ersätt den kombinerade `Varn/Koll/Dupes/RX`-rutan med fyra separata `<Stat …tooltip={…} />`.
+  - Justera grid-klasser till `md:grid-cols-3 lg:grid-cols-6` (6 lika breda kolumner på desktop, 3 på mellanstorlek, 2 på mobil — matchar nuvarande proportioner).
+
+Inga andra filer behöver röras. Inga nya tester (rena UI-textetiketter och tooltips).
