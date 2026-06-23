@@ -14,6 +14,38 @@ import { requireTarget } from "@/lib/codeplug/targets";
 import { isValidMaidenhead } from "@/lib/codeplug/maidenhead";
 import { Field, Hint, NumberField, SectionLabel } from "./common";
 
+export function rxOnlyHintForTarget(targetId: string): string {
+  switch (targetId) {
+    case "chirp-generic":
+      return "'Spärra TX' sätter Duplex=off i CHIRP. 'Markera' lägger till RX-ONLY i Comment och exporterar som vanlig frekvens.";
+    case "vgc-n76":
+      return "'Spärra TX' sätter tx_dis=1 i VGC-CSV:n. 'Markera' lägger RX-ONLY i Comment.";
+    case "nicsure-rt880":
+      return "'Spärra TX' sätter TX_Power=N/T och TX=RX i RT-880-CSV:n. 'Markera' lägger RX-ONLY i Comment.";
+    case "rt-systems-yaesu-generic":
+      return "RT Systems Yaesu: RX-only-kanaler exkluderas alltid ur exporten — vi saknar dokumentation om hur RT Systems markerar RX-only i CSV:n. Valet ovan ignoreras.";
+    default:
+      return "Hur ska kanaler markerade som mottagning-bara hanteras vid export?";
+  }
+}
+
+export function RxOnlyExportNote({ channels, targetId }: {
+  channels: NormalizedChannel[];
+  targetId: string;
+}) {
+  // RT Systems excludes RX-only channels regardless of policy → no "you are
+  // exporting RX-only channels" banner there. The standard rt_rx_only_excluded
+  // warning still shows up in the warnings list for that case.
+  if (targetId === "rt-systems-yaesu-generic") return null;
+  const hasRxOnly = channels.some((c) => c.rx_only || !c.tx_allowed);
+  if (!hasRxOnly) return null;
+  return (
+    <p className="mt-2 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+      Du exporterar kanaler som är RX-only — verifiera i din radio att du inte kan sända på dessa kanaler.
+    </p>
+  );
+}
+
 function VgcN76Panel({ settings, update }: {
   settings: VgcN76Settings;
   update: (patch: Record<string, unknown>) => void;
