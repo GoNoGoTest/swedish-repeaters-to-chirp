@@ -1,0 +1,19 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`target snapshot regression (blandad FM/DMR/C4FM) > NiCSURE RT-880 CSV is byte-stable 1`] = `
+"Channel_Num,Active,Name,RX,TX,RX_Tone,TX_Tone,TX_Power,Slot1,Slot2,Slot3,Slot4,Bandwidth,Modulation,BusyLock,Reversed,PTTID,Clarifier,Scrambler
+1,True,D6-2M-,145.60000,145.00000,None,123.0,Very High,A,B,C," ",Wide,Auto,False,False,Off,0.00,Off"
+`;
+
+exports[`target snapshot regression (blandad FM/DMR/C4FM) > RT Systems Yaesu CSV is byte-stable 1`] = `
+",Receive Frequency,Transmit Frequency,Offset Frequency,Offset Direction,Operating Mode,AMS,Name,Tone Mode,CTCSS,DCS,RX DGID,TX DGID,User CTCSS,Tx Power,Skip,Step,Clock Shift,Memory Group,Comment,
+1,434.60000,432.60000,2.00000 MHz,Minus,FM,N,D6-701,None,100.0,023,0,0,12,Medium,Scan,12.5 kHz,N,N,SK6RR | RU368 | Skene | D6 | Repeater | access=CC 1,
+2,145.60000,145.00000,600 kHz,Minus,FM,N,D6-2M-,Tone,123.0,023,0,0,12,Medium,Scan,12.5 kHz,N,N,SK6BA | RV48 | Borås | D6 | Repeater | access=123.0,
+3,434.70000,432.70000,2.00000 MHz,Minus,DN,N,D6-702,None,100.0,023,0,0,12,Medium,Scan,12.5 kHz,N,N,SK6RD | RU369 | Bredared | D6 | Repeater | access=TX00 RX00,
+"
+`;
+
+exports[`target snapshot regression (blandad FM/DMR/C4FM) > VGC N76 CSV is byte-stable 1`] = `
+"title,tx_freq,rx_freq,tx_sub_audio(CTCSS=freq/DCS=number),rx_sub_audio(CTCSS=freq/DCS=number),tx_power(H/M/L),bandwidth(12500/25000),scan(0=OFF/1=ON),talk around(0=OFF/1=ON),pre_de_emph_bypass(0=OFF/1=ON),sign(0=OFF/1=ON),tx_dis(0=OFF/1=ON),bclo(0=OFF/1=ON),mute(0=OFF/1=ON),rx_modulation(0=FM/1=AM),tx_modulation(0=FM/1=AM)
+D6-2M-,145000000,145600000,12300,0,H,12500,1,0,0,1,0,0,0,0,0"
+`;

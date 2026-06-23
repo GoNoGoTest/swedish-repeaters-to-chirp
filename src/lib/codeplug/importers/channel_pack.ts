@@ -1,6 +1,7 @@
 import Papa from "papaparse";
 import type { NormalizedChannel, Warning } from "../models";
 import { parseNumberLoose } from "./sk6ba";
+import { parseDigitalAccess } from "../tones";
 import { UNKNOWN_REGION } from "../region";
 import { packRowSchema, papaErrorToWarning, zodIssueToWarning, type ParseWarning } from "./schemas";
 
@@ -140,7 +141,24 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
     }
 
     const mode = (r.mode ?? "").trim().toUpperCase();
-    const knownModes = ["NFM", "FM", "USB", "LSB", "CW", "AM", "DV", "DIG"];
+    // Utökad lista: digital pack-rader (DMR/C4FM/P25/DV) får finnas så att
+    // digital access kan kopplas till en pack-kanal utan att kasta
+    // pack_unsupported_mode-varning.
+    const knownModes = [
+      "NFM",
+      "FM",
+      "USB",
+      "LSB",
+      "CW",
+      "AM",
+      "DV",
+      "DIG",
+      "DMR",
+      "DMRPLUS",
+      "DMR+",
+      "C4FM",
+      "P25",
+    ];
     if (mode && !knownModes.includes(mode)) {
       warnings.push({ code: "pack_unsupported_mode", message: `Okänt mode: ${r.mode}` });
     }
@@ -168,6 +186,15 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
     const licenseNote = (r.license_note ?? "").trim();
     const comment = (r.comment ?? "").trim();
 
+    // Konservativ digital-access-parsning: vi rör inte de etablerade analoga
+    // pack-kolumnerna (tone/rtone_freq/ctone_freq/dtcs_*). parseDigitalAccess
+    // körs ENDAST om tone-strängen tydligt innehåller digitala tokens —
+    // annars hamnar TSQL/Tone/DTCS som unknownTokens, vilket vore brus.
+    const toneRaw = (r.tone ?? "").trim();
+    const DIGITAL_TONE_RE =
+      /(?:\bCC\s*=?\s*\d{1,2}\b|\bTS\s*=?\s*[12]\b|\bTG\s*=?\s*[\w-]+\b|\bNAC\s*=?\s*[0-9A-F]{3}\b|\b(?:TX|RX)\s*=?\s*\d{2}\b)/i;
+    const digital = DIGITAL_TONE_RE.test(toneRaw) ? parseDigitalAccess(toneRaw) : null;
+
     const ch: ParsedPackChannel = {
       source_type: "channel_pack",
       source_row: idx + 2,
@@ -185,7 +212,7 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
       channel: channelCode,
       network: "",
       network_id: "",
-      access_raw: "",
+      access_raw: toneRaw,
       rx_frequency: rx,
       tx_shift_raw: "",
       tx_shift: null,
@@ -194,6 +221,15 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
       offset,
       ctcss_tx: parseNumberLoose(r.rtone_freq),
       uses_1750: false,
+      analog_carrier_open: false,
+      dmr_color_code: digital?.dmr.colorCode ?? null,
+      dmr_timeslot: digital?.dmr.timeSlot ?? null,
+      dmr_talkgroup: digital?.dmr.talkGroup ?? "",
+      c4fm_dg_id_tx: digital?.c4fm.dgIdTx ?? null,
+      c4fm_dg_id_rx: digital?.c4fm.dgIdRx ?? null,
+      p25_nac: digital?.p25.nac ?? "",
+      digital_access_raw: digital ? toneRaw : "",
+      access_unknown_tokens: digital?.unknownTokens ?? [],
       lat: null,
       lng: null,
       locator: "",

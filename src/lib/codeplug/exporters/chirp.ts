@@ -2,6 +2,8 @@ import Papa from "papaparse";
 import type { ChirpSettings, NormalizedChannel, Warning } from "../models";
 import { formatFrequency } from "../frequency";
 import { channelSignalMode } from "../modes";
+import { isAnalogToneMode, classifyChannel } from "../accessModes";
+import { parseAccess } from "../tones";
 
 export const CHIRP_COLUMNS = [
   "Location",
@@ -110,15 +112,46 @@ function resolveDuplexAndOffset(c: NormalizedChannel): { duplex: string; offset:
   return { duplex: c.duplex, offset: c.offset.toFixed(6) };
 }
 
-function resolveComment(c: NormalizedChannel): string {
-  if (c.source_type === "channel_pack") {
-    const parts: string[] = [];
-    if (c.comment) parts.push(c.comment);
-    if (c.license_note) parts.push(c.license_note);
-    if (c.source) parts.push(`src=${c.source}`);
-    return parts.join(" | ");
+function digitalMetadataComment(c: NormalizedChannel): string {
+  const cls = classifyChannel(c);
+  const parts: string[] = [];
+  if (cls === "dmr") {
+    const dmr: string[] = [];
+    if (c.dmr_color_code != null) dmr.push(`CC=${c.dmr_color_code}`);
+    if (c.dmr_timeslot != null) dmr.push(`TS=${c.dmr_timeslot}`);
+    if (c.dmr_talkgroup) dmr.push(`TG=${c.dmr_talkgroup}`);
+    if (dmr.length) parts.push(`DMR ${dmr.join(" ")}`);
+  } else if (cls === "c4fm") {
+    const c4: string[] = [];
+    if (c.c4fm_dg_id_tx != null) c4.push(`TX=${String(c.c4fm_dg_id_tx).padStart(2, "0")}`);
+    if (c.c4fm_dg_id_rx != null) c4.push(`RX=${String(c.c4fm_dg_id_rx).padStart(2, "0")}`);
+    if (c4.length) parts.push(`C4FM ${c4.join(" ")}`);
+  } else if (cls === "p25") {
+    if (c.p25_nac) parts.push(`P25 NAC=${c.p25_nac}`);
   }
-  return c.comment;
+  // "analog tone ignored for <MODE>" — när digital kanal hade analog tone i
+  // den råa accessen som vi nu slänger.
+  if (cls !== "analog" && cls !== "none") {
+    const a = parseAccess(c.digital_access_raw);
+    if (a.ctcss != null || a.uses1750 || a.carrier || a.dcs != null) {
+      parts.push(`analog tone ignored for ${(c.mode_effective || "").toUpperCase()}`);
+    }
+  }
+  return parts.join(" | ");
+}
+
+function resolveComment(c: NormalizedChannel): string {
+  const base: string[] = [];
+  if (c.source_type === "channel_pack") {
+    if (c.comment) base.push(c.comment);
+    if (c.license_note) base.push(c.license_note);
+    if (c.source) base.push(`src=${c.source}`);
+  } else if (c.comment) {
+    base.push(c.comment);
+  }
+  const digital = digitalMetadataComment(c);
+  if (digital) base.push(digital);
+  return base.join(" | ");
 }
 
 interface ToneFields {
@@ -142,6 +175,12 @@ const DEFAULT_TONE_FIELDS: ToneFields = {
 };
 
 function resolveToneFields(c: NormalizedChannel): ToneFields {
+  // Digital kanaler får aldrig bära analog tone i Tone-kolumnen.
+  // resolveComment lägger till strukturerad digital metadata + en
+  // "analog tone ignored" not när källraden hade en analog access.
+  if (!isAnalogToneMode(c)) {
+    return { ...DEFAULT_TONE_FIELDS };
+  }
   if (c.source_type === "channel_pack") {
     const t = (c.tone_raw || "").trim().toUpperCase();
     if (t === "TSQL") {

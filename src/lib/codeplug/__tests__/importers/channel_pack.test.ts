@@ -83,3 +83,50 @@ describe("selectPackChannels", () => {
     expect(picked[0].source_id).toBe(id);
   });
 });
+
+describe("channel pack — digital access in tone column", () => {
+  it("tone=TSQL with rtone_freq does not fill digital fields", () => {
+    const csv = [
+      "pack_id,source_id,enabled_default,rx_frequency,label,mode,tone,rtone_freq",
+      "p1,r1,true,144.000,A,FM,TSQL,88.5",
+    ].join("\n");
+    const r = parseChannelPackCsv(csv, "x.csv");
+    const ch = r.channels[0];
+    expect(ch.dmr_color_code).toBeNull();
+    expect(ch.access_unknown_tokens).toEqual([]);
+    expect(ch.digital_access_raw).toBe("");
+  });
+
+  it("tone=CC1 on DMR pack fills dmr_color_code, no pack_unsupported_mode", () => {
+    const csv = [
+      "pack_id,source_id,enabled_default,rx_frequency,label,mode,tone",
+      "p1,r1,true,433.475,A,DMR,CC1",
+    ].join("\n");
+    const r = parseChannelPackCsv(csv, "x.csv");
+    const ch = r.channels[0];
+    expect(ch.dmr_color_code).toBe(1);
+    expect(ch.digital_access_raw).toBe("CC1");
+    expect(ch.warnings.map((w) => w.code)).not.toContain("pack_unsupported_mode");
+  });
+
+  it("mode=DMR+ alone produces no pack_unsupported_mode warning", () => {
+    const csv = [
+      "pack_id,source_id,enabled_default,rx_frequency,label,mode",
+      "p1,r1,true,433.475,A,DMR+",
+    ].join("\n");
+    const r = parseChannelPackCsv(csv, "x.csv");
+    expect(r.channels[0].warnings.map((w) => w.code)).not.toContain("pack_unsupported_mode");
+  });
+
+  it("mode=C4FM and mode=P25 also accepted without warning", () => {
+    const csv = [
+      "pack_id,source_id,enabled_default,rx_frequency,label,mode",
+      "p1,r1,true,433.475,A,C4FM",
+      "p1,r2,true,433.500,B,P25",
+    ].join("\n");
+    const r = parseChannelPackCsv(csv, "x.csv");
+    for (const ch of r.channels) {
+      expect(ch.warnings.map((w) => w.code)).not.toContain("pack_unsupported_mode");
+    }
+  });
+});

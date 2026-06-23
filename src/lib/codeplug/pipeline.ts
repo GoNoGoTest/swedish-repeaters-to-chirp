@@ -1,6 +1,6 @@
 import type { NormalizedChannel, RawRow, Settings, Warning, NamingSettings } from "./models";
 import { parseNumberLoose } from "./importers/sk6ba";
-import { parseAccess } from "./tones";
+import { parseAccess, parseDigitalAccess } from "./tones";
 import { parseShift } from "./frequency";
 import { applyFilters } from "./filters";
 import { buildName, resolveCollisions } from "./naming";
@@ -9,6 +9,7 @@ import { applyFreqDedupe } from "./dedupe";
 import { DEFAULT_PACK_NAMING } from "./defaults";
 import { deriveRegion } from "./region";
 import { parseModes } from "./modes";
+import { applyModeAccessSubset, classifyChannel } from "./accessModes";
 
 /**
  * Type-värden i SK6BA-exporten som ligger utanför appens scope
@@ -43,6 +44,22 @@ function emptyPackFields() {
   };
 }
 
+/** Defaults för analog/digital access. Skrivs alltid i normalize() innan
+ *  subset körs. Plockas ut i en helper så `normalize` förblir kort. */
+function emptyAccessFields() {
+  return {
+    analog_carrier_open: false,
+    dmr_color_code: null as number | null,
+    dmr_timeslot: null as number | null,
+    dmr_talkgroup: "",
+    c4fm_dg_id_tx: null as number | null,
+    c4fm_dg_id_rx: null as number | null,
+    p25_nac: "",
+    digital_access_raw: "",
+    access_unknown_tokens: [] as string[],
+  };
+}
+
 export function normalize(rows: RawRow[]): NormalizedChannel[] {
   return rows.map((r, idx) => {
     const warnings: Warning[] = [];
@@ -57,15 +74,9 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
       warnings.push({ code: "unclear_shift", message: `Oklar tx_shift: ${r.tx_shift}` });
 
     const access = parseAccess(r.access);
-    if (!access.ctcss && !access.uses1750 && !access.carrier && !access.dcs && r.access) {
-      warnings.push({ code: "missing_access_tone", message: `Otydlig access: ${r.access}` });
-    }
-    if (access.ctcss != null && access.dcs) {
-      warnings.push({
-        code: "ctcss_and_dcs",
-        message: `Både CTCSS och DCS hittades; CTCSS valdes för analog CHIRP-export.`,
-      });
-    }
+    const digital = parseDigitalAccess(r.access);
+    // missing_access_tone och ctcss_and_dcs är mode-beroende och appliceras
+    // efter expandModes (se applyPostExpansionAccessWarnings nedan).
 
     const lat = parseNumberLoose(r.lat);
     const lng = parseNumberLoose(r.lng);
@@ -125,10 +136,19 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
       locator,
       comment: commentParts.join(" | "),
       ...emptyPackFields(),
+      ...emptyAccessFields(),
       // Re-apply DCS over the empty pack defaults so SK6BA rows with
       // access=DCS xxx export as Tone=Cross in the CHIRP exporter.
       dtcs_code: access.dcs ?? "",
       dtcs_polarity: access.dcs ? "NN" : "",
+      analog_carrier_open: access.carrier,
+      dmr_color_code: digital.dmr.colorCode,
+      dmr_timeslot: digital.dmr.timeSlot,
+      dmr_talkgroup: digital.dmr.talkGroup,
+      c4fm_dg_id_tx: digital.c4fm.dgIdTx,
+      c4fm_dg_id_rx: digital.c4fm.dgIdRx,
+      p25_nac: digital.p25.nac,
+      access_unknown_tokens: digital.unknownTokens,
       generated_name_full: "",
       generated_name_final: "",
       collided: false,
@@ -250,6 +270,35 @@ function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): N
   return out;
 }
 
+/**
+ * Lägger till `missing_access_tone` och `ctcss_and_dcs` på rader där
+ * mode-klassen är analog och de analoga fälten saknar/innehåller motsägelse.
+ * Kallas efter `applyModeAccessSubset` så digitala rader (där analog access
+ * redan nollats) aldrig får dessa varningar.
+ */
+function applyPostExpansionAccessWarnings(channels: NormalizedChannel[]): NormalizedChannel[] {
+  return channels.map((c) => {
+    if (classifyChannel(c) !== "analog") return c;
+    const newWarnings: Warning[] = [];
+    const hasAnalog =
+      c.ctcss_tx != null || c.uses_1750 || c.analog_carrier_open || c.dtcs_code !== "";
+    if (!hasAnalog) {
+      newWarnings.push({
+        code: "missing_access_tone",
+        message: "FM-kanalen saknar explicit analog accessinformation",
+      });
+    }
+    if (c.ctcss_tx != null && c.dtcs_code !== "") {
+      newWarnings.push({
+        code: "ctcss_and_dcs",
+        message: "Både CTCSS och DCS hittades; CTCSS valdes för analog CHIRP-export.",
+      });
+    }
+    if (newWarnings.length === 0) return c;
+    return { ...c, warnings: [...c.warnings, ...newWarnings] };
+  });
+}
+
 export function runPipeline(input: PipelineInput): PipelineResult {
   const { sk6baRows, packChannels = [], settings, maxNameLength = 6 } = input;
   const totalInput = sk6baRows.length + packChannels.length;
@@ -295,6 +344,16 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   } else {
     combined = [...sk6baSorted, ...packValidated];
   }
+
+  // Mode-medveten subset: nolla analog access på digitala kanaler och vice
+  // versa. Körs på alla kanaler (även packs) så invarianten "DMR-kanal har
+  // inte ctcss_tx" alltid håller, oavsett källa.
+  combined = combined.map(applyModeAccessSubset);
+
+  // Mode-beroende access-varningar appliceras efter subset. Tidigare lades
+  // dessa i normalize() innan mode-expansion, vilket gjorde att en DMR-rad
+  // med "CC 1" felaktigt varnades för "saknad analog access".
+  combined = applyPostExpansionAccessWarnings(combined);
 
   // Freq dedupe across the whole set
   const dedupe = applyFreqDedupe(combined, settings.packs.freqDupePolicy);

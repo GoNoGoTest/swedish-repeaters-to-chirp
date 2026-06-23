@@ -246,3 +246,80 @@ describe("CHIRP exporter", () => {
     expect(rows[0].DVCODE).toBe("");
   });
 });
+
+describe("CHIRP digital mode handling", () => {
+  it("DMR without analog token: Tone defaults, Comment carries DMR CC, no 'analog tone ignored'", () => {
+    const c = makeChannel({
+      generated_name_final: "X",
+      mode_effective: "DMR",
+      dmr_color_code: 1,
+      digital_access_raw: "CC 1",
+    });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Tone).toBe("");
+    expect(rows[0].rToneFreq).toBe("88.5");
+    expect(rows[0].Comment).toContain("DMR CC=1");
+    expect(rows[0].Comment).not.toContain("analog tone ignored");
+  });
+
+  it("DMR with raw 123.0/CC 1: comment notes analog tone ignored", () => {
+    const c = makeChannel({
+      generated_name_final: "X",
+      mode_effective: "DMR",
+      dmr_color_code: 1,
+      digital_access_raw: "123.0 / CC 1",
+    });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Tone).toBe("");
+    expect(rows[0].Comment).toContain("DMR CC=1");
+    expect(rows[0].Comment).toContain("analog tone ignored for DMR");
+  });
+
+  it("DMR with DCS in raw access: also triggers 'analog tone ignored'", () => {
+    const c = makeChannel({
+      generated_name_final: "X",
+      mode_effective: "DMR",
+      dmr_color_code: 1,
+      digital_access_raw: "DCS023 / CC 1",
+    });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Comment).toContain("analog tone ignored for DMR");
+  });
+
+  it("DMR with 1750 in raw access: also triggers 'analog tone ignored'", () => {
+    const c = makeChannel({
+      generated_name_final: "X",
+      mode_effective: "DMR",
+      dmr_color_code: 1,
+      digital_access_raw: "1750 / CC 1",
+    });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Comment).toContain("analog tone ignored for DMR");
+  });
+
+  it("C4FM carries TX/RX in comment, no analog tone in Tone column", () => {
+    const c = makeChannel({
+      generated_name_final: "X",
+      mode_effective: "C4FM",
+      c4fm_dg_id_tx: 0,
+      c4fm_dg_id_rx: 0,
+    });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Tone).toBe("");
+    expect(rows[0].Comment).toContain("C4FM TX=00 RX=00");
+  });
+
+  it("P25 carries NAC in comment", () => {
+    const c = makeChannel({ generated_name_final: "X", mode_effective: "P25", p25_nac: "293" });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Tone).toBe("");
+    expect(rows[0].Comment).toContain("P25 NAC=293");
+  });
+
+  it("FM unchanged when there is CTCSS", () => {
+    const c = makeChannel({ generated_name_final: "X", mode_effective: "FM", ctcss_tx: 88.5 });
+    const rows = toChirpRows([c], chirp);
+    expect(rows[0].Tone).toBe("Tone");
+    expect(rows[0].rToneFreq).toBe("88.5");
+  });
+});
