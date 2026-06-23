@@ -155,8 +155,7 @@ export function PreviewTable({
       </table>
       <div className="px-3 py-2 text-xs text-muted-foreground border-t border-border sticky bottom-0 bg-card">
         {channels.length} rader visas ·{" "}
-        {exportCount ?? channels.filter((c) => !excludedKeys.has(channelKey(c))).length}{" "}
-        exporteras
+        {exportCount ?? channels.filter((c) => !excludedKeys.has(channelKey(c))).length} exporteras
       </div>
     </div>
   );
