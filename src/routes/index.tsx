@@ -587,7 +587,7 @@ function Index() {
                     excludedKeys={excludedKeys}
                     onToggleExclude={toggleExclude}
                     getExportMode={getExportMode}
-                    startLoc={target.id === "chirp-generic" ? chirpSettings.startLocation : 1}
+                    getExportLocation={(c) => locationByKey.get(channelKey(c)) ?? null}
                     exportCount={exportChannels.length}
                   />
                 </Section>
