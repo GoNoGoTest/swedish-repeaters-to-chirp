@@ -2,7 +2,12 @@ import Papa from "papaparse";
 import type { NormalizedChannel, Warning } from "../models";
 import { parseNumberLoose } from "./sk6ba";
 import { UNKNOWN_REGION } from "../region";
-import { packRowSchema, formatPapaError } from "./schemas";
+import {
+  packRowSchema,
+  papaErrorToWarning,
+  zodIssueToWarning,
+  type ParseWarning,
+} from "./schemas";
 
 export const PACK_COLUMNS = [
   "pack_id",
