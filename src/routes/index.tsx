@@ -258,7 +258,13 @@ function Index() {
 
   const doExport = async () => {
     if (!pipeline || pipeline.duplicateStop) return;
-    await exportFiles();
+    const warnings = await exportFiles();
+    if (warnings.length) {
+      console.info(
+        `Export klar — ${warnings.length} target-varning(ar):`,
+        warnings.map((w) => `[${w.code}] ${w.message}`),
+      );
+    }
   };
 
   return (

@@ -138,7 +138,7 @@ describe("vgc-n76 exportMany", () => {
         tx_frequency: 446.0,
       }),
     ];
-    const files = VGC_N76_TARGET.exportMany!(channels, VGC_N76_DEFAULTS, split);
+    const { files } = VGC_N76_TARGET.exportMany!(channels, VGC_N76_DEFAULTS, split);
     expect(files.map((f) => f.filename)).toEqual([
       "vgc-n76_se_sm3.csv",
       "vgc-n76_se_sm6.csv",
@@ -155,7 +155,7 @@ describe("vgc-n76 exportMany", () => {
         rx_frequency: 145.0 + i * 0.025,
       }),
     );
-    const files = VGC_N76_TARGET.exportMany!(channels, VGC_N76_DEFAULTS, {
+    const { files } = VGC_N76_TARGET.exportMany!(channels, VGC_N76_DEFAULTS, {
       mode: "per_district_chunked",
       chunkSize: 2,
     });
@@ -167,7 +167,7 @@ describe("vgc-n76 exportMany", () => {
   });
 
   it("split=single returns one file with the standard name", () => {
-    const files = VGC_N76_TARGET.exportMany!(
+    const { files } = VGC_N76_TARGET.exportMany!(
       [makeChannel({ generated_name_final: "X" })],
       VGC_N76_DEFAULTS,
       { mode: "single", chunkSize: 32 },
@@ -188,7 +188,7 @@ describe("vgc-n76 exportMany", () => {
         tx_frequency: 446.0,
       }),
     );
-    const files = VGC_N76_TARGET.exportMany!([...repeaters, ...packs], VGC_N76_DEFAULTS, {
+    const { files } = VGC_N76_TARGET.exportMany!([...repeaters, ...packs], VGC_N76_DEFAULTS, {
       mode: "per_district",
       chunkSize: 32,
     });
@@ -211,7 +211,7 @@ describe("vgc-n76 exportMany", () => {
         tx_frequency: 446.0,
       }),
     );
-    const files = VGC_N76_TARGET.exportMany!(packs, VGC_N76_DEFAULTS, {
+    const { files } = VGC_N76_TARGET.exportMany!(packs, VGC_N76_DEFAULTS, {
       mode: "per_district_chunked",
       chunkSize: 50,
     });
@@ -235,7 +235,7 @@ describe("vgc-n76 exportMany", () => {
         tx_frequency: 446.0,
       }),
     );
-    const files = VGC_N76_TARGET.exportMany!(packs, VGC_N76_DEFAULTS, {
+    const { files } = VGC_N76_TARGET.exportMany!(packs, VGC_N76_DEFAULTS, {
       mode: "per_district_chunked",
       chunkSize: 10,
     });
@@ -257,7 +257,7 @@ describe("chirp-generic packs not capped", () => {
         tx_frequency: 446.0,
       }),
     );
-    const files = CHIRP_GENERIC_TARGET.exportMany!(packs, CHIRP_GENERIC_DEFAULTS, {
+    const { files } = CHIRP_GENERIC_TARGET.exportMany!(packs, CHIRP_GENERIC_DEFAULTS, {
       mode: "per_district",
       chunkSize: 32,
     });
@@ -271,7 +271,7 @@ describe("chirp-generic exportMany", () => {
       makeChannel({ district: "6", generated_name_final: "A", rx_frequency: 145.6 }),
       makeChannel({ district: "3", generated_name_final: "B", rx_frequency: 145.7 }),
     ];
-    const files = CHIRP_GENERIC_TARGET.exportMany!(channels, CHIRP_GENERIC_DEFAULTS, {
+    const { files } = CHIRP_GENERIC_TARGET.exportMany!(channels, CHIRP_GENERIC_DEFAULTS, {
       mode: "per_district",
       chunkSize: 32,
     });

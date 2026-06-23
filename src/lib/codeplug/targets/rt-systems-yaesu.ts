@@ -310,12 +310,14 @@ export const RT_SYSTEMS_YAESU_TARGET: ExportTarget<RtSystemsYaesuSettings> = {
     const { csv, warnings } = exportRtSystemsYaesuCsv(channels, s);
     return { filename: "rt-systems-yaesu.csv", content: csv, warnings };
   },
-  exportMany: (channels: NormalizedChannel[], s: RtSystemsYaesuSettings, split: SplitSettings) =>
-    buildSplitFiles(channels, split, {
+  exportMany: (channels: NormalizedChannel[], s: RtSystemsYaesuSettings, split: SplitSettings) => ({
+    files: buildSplitFiles(channels, split, {
       filenameBase: "rt-systems-yaesu",
       extension: "csv",
       renderChunk: (chunk) => exportRtSystemsYaesuCsv(chunk, s).csv,
     }),
+    warnings: exportRtSystemsYaesuCsv(channels, s).warnings,
+  }),
 };
 
 registerTarget(RT_SYSTEMS_YAESU_TARGET);

@@ -1,63 +1,53 @@
 ## Problem
 
-`PreviewTable` har en enda `Mode`-kolumn vars värde beräknas som `isPack && c.mode_pack ? c.mode_pack : chirpMode`. För RT Systems, VGC och Nicsure har den nollkoppling till vad targeten faktiskt skriver — en C4FM-rad visas som "NFM" trots att RT Systems exporterar `DN`. Det blir missvisande och dolda buggar slinker förbi.
+`ExportTarget.exportMany` returnerar `ExportFile[]` — bara filer, inga varningar. När exporten splittras till flera filer går target-warnings (trunkering, digitala mode, RX-only-markerade m.fl.) förlorade i nedladdningsflödet. Single-file-pathen returnerar redan `ExportResult { filename, content, warnings }`, så API:t är inkonsekvent och beroende av att `target.validate(...)` också körs separat i previewen.
 
 ## Lösning
 
-Varje target ansvarar för sin egen "preview-adapter" som returnerar det mode-token targeten faktiskt skriver i CSV:n. Previewen visar både kanalens signalmode och targetens exportmode.
+Lyft `exportMany` till en `ExportManyResult` som speglar `ExportResult`:
+
+```ts
+export interface ExportManyResult {
+  files: ExportFile[];
+  warnings: Warning[];
+}
+```
 
 ### 1. `src/lib/codeplug/targets/types.ts`
 
-Lägg till en valfri metod på `ExportTarget`:
+- Lägg till `ExportManyResult`.
+- Ändra `ExportTarget.exportMany` signatur till returnera `ExportManyResult`.
+- `ExportFile` lämnas oförändrad (filename + content) — varningarna aggregeras på resultatnivå, inte per fil. Per-fil-warnings ger en sämre UX (samma "5 kanaler trunkerades" upprepas i varje chunk).
 
-```ts
-/** Mode-token som targeten faktiskt skulle skriva för den här kanalen. */
-previewMode?: (c: NormalizedChannel, settings: TSettings) => string;
-```
+### 2. Uppdatera varje target
 
-### 2. Implementera per target
+`buildSplitFiles` lämnas oförändrad (returnerar `ExportFile[]`). Varje target wrappar:
 
-- **chirp-generic**: exportera (eller flytta upp) `resolveMode(c, settings.mode)` och delegera till den.
-- **vgc-n76**: återanvänd logiken som redan finns i exportern — pack-läge `AM/FM/NFM` enligt `mode_pack`, annars `FM`/`NFM` enligt `defaultBandwidth`. Digitala SK6BA-rader (som annars droppas) → returnera `mode_effective` så previewen visar att raden inte kommer ut.
-- **nicsure-rt880**: motsvarande FM/NFM/AM-mappning.
-- **rt-systems-yaesu**: använd befintliga `operatingMode(c).mode` → `FM`/`DN`/(framtid).
+- **chirp-generic**: `{ files: buildSplitFiles(...), warnings: chirpDigitalWarnings(channels) }`.
+- **vgc-n76**: `{ files: buildSplitFiles(...), warnings: toVgcN76Rows(channels, s).warnings }` (samma källa som `validate`).
+- **rt-systems-yaesu**: `{ files: buildSplitFiles(...), warnings: exportRtSystemsYaesuCsv(channels, s).warnings }`.
+- **nicsure-rt880**: har ingen exportMany, ingen åtgärd.
 
-Ingen ändring i `validate`/`export` — preview-adaptern delar logik via en intern helper i target-modulen, men ändrar inte exportbeteendet.
+Varningar aggregeras över hela kanalsetet (inte per chunk) så användaren ser samma sammanfattning som i preview/single-export.
 
-### 3. `src/components/codeplug/PreviewTable.tsx`
+### 3. `src/hooks/useCodeplugDownload.ts`
 
-- Ersätt `Mode`-kolumnen med två: **`Signal`** och **`Export`**.
-  - Signal: `c.mode_pack || c.mode_effective || "—"` (pack-rader visar deras `mode_pack`, SK6BA visar kanonisk signal).
-  - Export: från ny prop `getExportMode(c)`; fallback till `chirpMode` om callbacken saknas (bakåtkompatibelt för enkla testfall).
-- Byt prop `chirpMode: string` till `getExportMode: (c: NormalizedChannel) => string` (obligatorisk).
-- Headerrad: ersätt `"Mode"` med `"Signal"` och `"Export"`.
+- `invokeTarget` returnerar `{ one: ExportResult } | { many: ExportManyResult }`.
+- `exportFiles()` returnerar `Promise<Warning[]>` istället för `Promise<void>` — anroparen kan logga/visa varningar. Behåll signaturen `async` så den fortfarande väntar på ZIP-genereringen.
+- I single-file-grenen plockar vi `out.one.warnings`, i ZIP-grenen `out.many.warnings`.
 
 ### 4. `src/routes/index.tsx`
 
-Bygg `getExportMode` från aktiv target. Pseudokod:
-
-```ts
-const settingsForTarget = /* befintlig resolveTargetSettings-uppslag */;
-const getExportMode = (c: NormalizedChannel) =>
-  target.previewMode?.(c, settingsForTarget) ?? "—";
-```
-
-Ta bort `chirpMode`-prop:en till `<PreviewTable>` (chirp-targetens `previewMode` ger nu samma värde).
+- `doExport` tar emot varningar från `exportFiles()` och loggar via `console.info` ("Export klar — N varningar"). I denna iteration ändrar vi inte UI för att visa dem — `target.validate(...)`-blocket i preview-panelen ger redan användaren samma information före exporten. Anledningen att skicka dem genom hooken är att stänga API-läckan, inte att duplicera UI.
 
 ### 5. Tester
 
-- `src/lib/codeplug/__tests__/targets/rt-systems-yaesu.test.ts`: verifiera `previewMode(c4fmRow) === "DN"` och `previewMode(fmRow) === "FM"`.
-- `chirp-generic.test.ts`: verifiera att en C4FM-rad ger `"DN"` och en FM-rad ger settings.mode (NFM/FM).
-- `vgc-n76.test.ts` och `nicsure-rt880.test.ts`: verifiera att pack-rader med `mode_pack=AM` ger `"AM"`, och att SK6BA FM-rader ger `"FM"`/`"NFM"` enligt `defaultBandwidth`.
-
-## Tekniska detaljer
-
-- `previewMode` är rent presentationsbeteende — den anropas inte från exportpipen och kan därför inte påverka filinnehåll. Den ska dock spegla exportlogiken, så vi extraherar mode-mappningen till en delad helper i samma fil och anropar den från både `previewMode` och `export`.
-- För targets utan `previewMode` (framtida) visar UI `"—"` i Export-kolumnen. `assertNever`-mönstret tvingar ändå utvecklare att uppdatera schemat per target-id där det redan används.
+- Uppdatera 9 testcalls i `__tests__/targets/split.test.ts` och `vgc-n76.test.ts` som idag gör `const files = TARGET.exportMany!(...)` — byt till `const { files } = TARGET.exportMany!(...)`.
+- Nytt test i `rt-systems-yaesu.test.ts` (eller `split.test.ts`): kör `exportMany` på ett kanalset där minst ett namn är längre än `maxLength`, verifiera `result.warnings` innehåller `rt_name_truncated`.
 
 ## Acceptanskriterier
 
-- Med RT Systems Yaesu-target och en C4FM-SK6BA-rad: Signal=`C4FM`, Export=`DN`.
-- Med CHIRP-target och samma rad: Signal=`C4FM`, Export=`DN`. Med ren FM-rad: Signal=`FM`, Export=`NFM` eller `FM` beroende på `chirpSettings.mode`.
-- Med VGC N76 och pack-rad `mode_pack=AM`: Signal=`AM`, Export=`AM`. SK6BA C4FM-rad (som droppas) visar Signal=`C4FM`, Export=`C4FM` (eller markerat som "skippas" — behåll som `mode_effective` i denna iteration).
+- `exportMany` har typen `(channels, settings, split) => ExportManyResult`.
+- ZIP-export från `useCodeplugDownload` exponerar samma varningar som single-file-export gör för motsvarande kanalset.
+- Befintliga tester (9 st) uppdaterade och nytt warnings-test gått igenom.
 - `bun run verify` grön.
