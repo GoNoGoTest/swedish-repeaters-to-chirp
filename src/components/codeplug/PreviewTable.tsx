@@ -1,4 +1,5 @@
 import type { NormalizedChannel } from "@/lib/codeplug/models";
+import { channelSignalMode } from "@/lib/codeplug/modes";
 import { Switch } from "@/components/ui/switch";
 
 // eslint-disable-next-line react-refresh/only-export-components
