@@ -202,7 +202,7 @@ export function toChirpRows(channels: NormalizedChannel[], s: ChirpSettings) {
       DtcsPolarity: tone.DtcsPolarity,
       RxDtcsCode: tone.RxDtcsCode,
       CrossMode: tone.CrossMode,
-      Mode: resolveMode(c, s.mode),
+      Mode: resolveChirpMode(c, s.mode),
       TStep: resolveTStep(c, s.tStep).toFixed(2),
       Skip: skip,
       Power: DEFAULT_POWER,
