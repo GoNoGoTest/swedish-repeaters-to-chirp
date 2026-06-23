@@ -417,6 +417,7 @@ export function ExportPanel({ settings, setSettings, hasPacks, chirpSettings, ta
               <Hint>{rxOnlyHintForTarget(settings.export.targetId)}</Hint>
             </Field>
           </div>
+          <RxOnlyExportNote channels={channels} targetId={settings.export.targetId} />
         </div>
       )}
 
