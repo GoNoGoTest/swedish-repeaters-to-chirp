@@ -35,6 +35,11 @@ function Index() {
 
   const [loadState, setLoadState] = useState<Sk6baLoadState>({ status: "empty" });
   const [excludedKeys, setExcludedKeys] = useState<Set<string>>(new Set());
+  type StatFilter = "warned" | "collided" | "dupes" | "rxOnly";
+  const [statFilter, setStatFilter] = useState<StatFilter | null>(null);
+  const toggleStatFilter = useCallback((f: StatFilter) => {
+    setStatFilter((prev) => (prev === f ? null : f));
+  }, []);
 
   const toggleExclude = useCallback((key: string) => {
     setExcludedKeys((prev) => {
@@ -114,6 +119,26 @@ function Index() {
     }
     return { warned, collided, rxOnly, dupes };
   }, [pipeline, exportChannels]);
+
+  const previewChannels = useMemo(() => {
+    if (!pipeline) return [] as NormalizedChannel[];
+    if (!statFilter) return pipeline.channels;
+    return pipeline.channels.filter((c) => {
+      switch (statFilter) {
+        case "warned": return c.warnings.length > 0;
+        case "collided": return c.collided;
+        case "dupes": return c.warnings.some((w) => w.code === "freq_duplicate");
+        case "rxOnly": return c.rx_only;
+      }
+    });
+  }, [pipeline, statFilter]);
+
+  const statFilterLabel: Record<StatFilter, string> = {
+    warned: "Varningar",
+    collided: "Namnkollisioner",
+    dupes: "Frekvensdubbletter",
+    rxOnly: "RX-only",
+  };
 
   const { exportFiles, exportWarnings } = useCodeplugDownload({ settings, exportChannels });
 
@@ -309,22 +334,30 @@ function Index() {
                     <Stat
                       label="Varningar"
                       value={stats?.warned ?? 0}
-                      tooltip="Exportkanaler som har minst en varning (t.ex. RX-only-policy, otydlig access, namnsaknad). Kanalerna exporteras ändå — se preview-tabellen för detaljer."
+                      tooltip="Exportkanaler som har minst en varning (t.ex. RX-only-policy, otydlig access, namnsaknad). Klicka för att filtrera previewn — exporten påverkas inte."
+                      onClick={() => toggleStatFilter("warned")}
+                      active={statFilter === "warned"}
                     />
                     <Stat
                       label="Namnkollisioner"
                       value={stats?.collided ?? 0}
-                      tooltip="Kanaler där det genererade namnet krockar med ett annat. Suffix-systemet har försökt göra dem unika — justera namnmallen om något fortfarande är otydligt."
+                      tooltip="Kanaler där det genererade namnet krockar med ett annat. Klicka för att filtrera previewn — exporten påverkas inte."
+                      onClick={() => toggleStatFilter("collided")}
+                      active={statFilter === "collided"}
                     />
                     <Stat
                       label="Frekvensdubbletter"
                       value={stats?.dupes ?? 0}
-                      tooltip="Kanaler som delar RX-frekvens med en annan kanal (oftast pack-vs-SK6BA). Påverkar inte exporten om policyn är 'behåll båda', men kan duplicera kanalplatser i radion."
+                      tooltip="Kanaler som delar RX-frekvens med en annan kanal (oftast pack-vs-SK6BA). Klicka för att filtrera previewn — exporten påverkas inte."
+                      onClick={() => toggleStatFilter("dupes")}
+                      active={statFilter === "dupes"}
                     />
                     <Stat
                       label="RX-only"
                       value={stats?.rxOnly ?? 0}
-                      tooltip="Kanaler från kanalpaket som är mottagningsbara men inte sändningsbara. Hur de exporteras beror på vald RX-only-policy (markerad i comment, TX spärrad, eller stoppar export)."
+                      tooltip="Kanaler från kanalpaket som är mottagningsbara men inte sändningsbara. Klicka för att filtrera previewn — exporten påverkas inte."
+                      onClick={() => toggleStatFilter("rxOnly")}
+                      active={statFilter === "rxOnly"}
                     />
                   </div>
                   {excludedKeys.size > 0 && (
@@ -354,12 +387,22 @@ function Index() {
                       </ul>
                     );
                   })()}
+                  {statFilter && (
+                    <div className="mb-3 flex items-center justify-between rounded border border-primary/40 bg-primary/5 px-3 py-2 text-xs">
+                      <span>
+                        Previewen är filtrerad: <strong>{statFilterLabel[statFilter]}</strong>
+                        {" "}({previewChannels.length} rader) · exporten innehåller fortfarande alla {exportChannels.length} rader.
+                      </span>
+                      <button onClick={() => setStatFilter(null)} className="rounded border border-border px-2 py-1">Visa alla</button>
+                    </div>
+                  )}
                   <PreviewTable
-                    channels={pipeline.channels}
+                    channels={previewChannels}
                     excludedKeys={excludedKeys}
                     onToggleExclude={toggleExclude}
                     chirpMode={target.id === "chirp-generic" ? chirpSettings.mode : "NFM"}
                     startLoc={target.id === "chirp-generic" ? chirpSettings.startLocation : 1}
+                    exportCount={exportChannels.length}
                   />
                 </Section>
               </div>

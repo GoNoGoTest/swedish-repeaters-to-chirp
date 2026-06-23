@@ -1,45 +1,75 @@
 ## Mål
 
-Snygga till statistikpanelen i "Förhandsgranska & exportera". Ta bort brus, byt etiketter och dela upp den kombinerade varnings-räknaren i fyra separata rutor med egen tooltip.
+Två justeringar av statistikpanelen i Förhandsgranska & exportera:
 
-## Ny stat-rad
+1. Långa etiketter ("Namnkollisioner", "Frekvensdubbletter") bryter inte radigt och blir avhuggna. Fixa radbrytning.
+2. Klick på en stat-ruta filtrerar preview-tabellen till bara de raderna. **Exporten påverkas inte** — den jobbar fortfarande mot hela `exportChannels`.
 
-Sex rutor i grid (`md:grid-cols-3 lg:grid-cols-6`):
+## 1. Radbrytning i Stat-rutorna
+
+`src/components/codeplug/common.tsx` — i `Stat`-komponenten lägger jag till `break-words leading-tight` på label-`div`:en. Det tvingar långa ord att brytas inom rutans bredd istället för att overflowa (det är ingen `truncate`/`overflow-hidden` — orden bryts helt enkelt inte i default-CSS utan `overflow-wrap: anywhere`/`break-words`).
+
+## 2. Klickbara stat-rutor som filtrerar previewn
+
+### State
+
+I `src/routes/index.tsx`:
+
+```ts
+type StatFilter = "warned" | "collided" | "dupes" | "rxOnly" | null;
+const [statFilter, setStatFilter] = useState<StatFilter>(null);
+```
+
+Klick på en ruta växlar — klick igen rensar.
+
+### Filtrera previewn
+
+`PreviewTable` får en härledd lista baserat på `statFilter`. Predikat:
+
+- `warned`: `c.warnings.length > 0`
+- `collided`: `c.collided`
+- `dupes`: `c.warnings.some(w => w.code === "freq_duplicate")` (samma logik som i `stats`-räknaren)
+- `rxOnly`: `c.rx_only`
+
+```ts
+const previewChannels = useMemo(() => {
+  if (!pipeline) return [] as NormalizedChannel[];
+  if (!statFilter) return pipeline.channels;
+  return pipeline.channels.filter(predicate[statFilter]);
+}, [pipeline, statFilter]);
+```
+
+`PreviewTable channels={previewChannels}` istället för `pipeline.channels`. **`exportChannels` rörs inte** — exporten och knappen "Exportera (N)" fortsätter använda hela filtrerade settet.
+
+### Gör Stat klickbar
+
+`Stat` i `common.tsx` får två nya valfria props:
+- `onClick?: () => void`
+- `active?: boolean`
+
+När `onClick` finns:
+- rendera som `<button>` istället för `<div>`, med samma klasser
+- `active=true` → kantfärg `border-primary` + svag bakgrundsacccent (`bg-primary/5`)
+- hover: `hover:border-primary/60`
+
+Det bevarar tooltip (`title`) och layout. Befintliga icke-klickbara anrop påverkas inte.
+
+### Banner när filter är aktivt
+
+Direkt ovanför `PreviewTable`, när `statFilter != null`, en liten rad:
 
 ```
-Från SK6BA · Från kanalpaket · Varningar · Namnkollisioner · Frekvensdubbletter · RX-only
+Visar bara <label> (<antal>) · [Visa alla]
 ```
 
-- Borttagna: **Input totalt** och **Filtrerade bort** (de finns redan i Repeater-sektionens stat-rad ovanför).
-- Omdöpt:
-  - `SK6BA` → **Från SK6BA**
-  - `Kanalpaket` → **Från kanalpaket**
-- Den gamla rutan `Varn/Koll/Dupes/RX` (t.ex. "27/23/0/0") delas upp i fyra rutor, var och en med egen tooltip som förklarar vad siffran betyder och var den kommer ifrån.
+`[Visa alla]` rensar `statFilter`. Klart att exporten ändå skickar med alla, inte bara dessa.
 
-## Tooltips per varningsruta
-
-Tooltips återanvänder befintlig `tooltip?`-prop på `Stat`-komponenten (HTML-`title`, redan implementerad).
-
-- **Varningar** (`stats.warned`):
-  > Antal exportkanaler som har minst en varning (t.ex. RX-only-policy, otydlig access, namnsaknad). Kanalerna exporteras ändå, men kolla preview-tabellen för detaljer.
-
-- **Namnkollisioner** (`stats.collided`):
-  > Kanaler där det genererade namnet krockar med ett annat. Suffixsystemet har försökt göra dem unika — justera namnmallen om något fortfarande är otydligt.
-
-- **Frekvensdubbletter** (`stats.dupes`):
-  > Kanaler som delar RX-frekvens med en annan kanal (oftast pack-vs-SK6BA). Påverkar inte exporten om policy är "behåll båda", men kan duplicera kanalplatser i radion.
-
-- **RX-only** (`stats.rxOnly`):
-  > Kanaler från kanalpaket som är mottagningsbara men inte sändningsbara. Hur de exporteras beror på den valda RX-only-policyn (markerad i comment, TX spärrad eller stoppar export).
-
-Tooltips visas bara via `title`-attributet (native browser tooltip) — samma mekanism som vi använder för "Bortfiltrerade" i Repeater-sektionen, så ingen ny komponent behövs.
+Fotraden i `PreviewTable` ("Totalt N rader · M exporteras") visar då filtrerade siffran för "Totalt", men "exporteras"-räknaren ska fortsätta visa det riktiga export-antalet. Enklast: skicka in `exportCount={exportChannels.length}` som ny prop till `PreviewTable` och visa "{channels.length} rader visas · {exportCount} exporteras" — så blir det entydigt att exporten inte är filtrerad.
 
 ## Filer som ändras
 
-- `src/routes/index.tsx` — bygg om grid-blocket på rad 306–312:
-  - Ta bort `Input totalt` och `Filtrerade bort`.
-  - Byt label på SK6BA och Kanalpaket.
-  - Ersätt den kombinerade `Varn/Koll/Dupes/RX`-rutan med fyra separata `<Stat …tooltip={…} />`.
-  - Justera grid-klasser till `md:grid-cols-3 lg:grid-cols-6` (6 lika breda kolumner på desktop, 3 på mellanstorlek, 2 på mobil — matchar nuvarande proportioner).
+- `src/components/codeplug/common.tsx` — `Stat` får `break-words leading-tight`, valfria `onClick`/`active`.
+- `src/routes/index.tsx` — `statFilter`-state, klickhandlers på de fyra varnings-rutorna, härledd `previewChannels`, banner.
+- `src/components/codeplug/PreviewTable.tsx` — accepterar `exportCount` och uppdaterar fotraden så det är tydligt att exporten är frikopplad från visningsfiltret.
 
-Inga andra filer behöver röras. Inga nya tester (rena UI-textetiketter och tooltips).
+Inga nya tester (rena UI-tillägg). Befintliga tester rör inte den här koden.

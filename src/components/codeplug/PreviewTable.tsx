@@ -5,12 +5,13 @@ export function channelKey(c: NormalizedChannel): string {
   return `${c.source_type}:${c.pack_id ?? ""}:${c.source_id}:${c.source_row}`;
 }
 
-export function PreviewTable({ channels, excludedKeys, onToggleExclude, chirpMode, startLoc }: {
+export function PreviewTable({ channels, excludedKeys, onToggleExclude, chirpMode, startLoc, exportCount }: {
   channels: NormalizedChannel[];
   excludedKeys: Set<string>;
   onToggleExclude: (key: string) => void;
   chirpMode: string;
   startLoc: number;
+  exportCount?: number;
 }) {
   let locCounter = startLoc;
   return (
@@ -74,7 +75,7 @@ export function PreviewTable({ channels, excludedKeys, onToggleExclude, chirpMod
         </tbody>
       </table>
       <div className="px-3 py-2 text-xs text-muted-foreground border-t border-border sticky bottom-0 bg-card">
-        Totalt {channels.length} rader · {channels.length - excludedKeys.size} exporteras
+        {channels.length} rader visas · {exportCount ?? (channels.length - excludedKeys.size)} exporteras
       </div>
     </div>
   );
