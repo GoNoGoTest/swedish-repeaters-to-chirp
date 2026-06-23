@@ -50,7 +50,7 @@ describe("PreviewTable", () => {
       />,
     );
 
-    await user.click(screen.getByLabelText("Exkludera rad 2 från export"));
+    await user.click(screen.getAllByLabelText("Exkludera rad 2 från export")[0]);
     expect(onToggleExclude).toHaveBeenCalledTimes(1);
     expect(onToggleExclude).toHaveBeenCalledWith(channelKey(channels[0]));
   });
