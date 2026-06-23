@@ -97,8 +97,8 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
   for (const req of REQUIRED_COLUMNS) {
     if (!columns.includes(req)) headerWarnings.push(`Saknad obligatorisk kolumn: ${req}`);
   }
-  const parseWarnings: string[] = (result.errors ?? []).map((e) =>
-    formatPapaError({ row: e.row, code: e.code ?? e.type, message: e.message }),
+  const parseWarnings: ParseWarning[] = (result.errors ?? []).map((e) =>
+    papaErrorToWarning({ row: e.row, code: e.code ?? e.type, message: e.message }),
   );
   const seenIds = new Set<string>();
   const channels: ParsedPackChannel[] = [];
@@ -108,13 +108,8 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
     const warnings: Warning[] = [];
     const check = packRowSchema.safeParse(r);
     if (!check.success) {
-      parseWarnings.push(
-        formatPapaError({
-          row: idx,
-          code: "schema_invalid",
-          message: check.error.issues[0]?.message ?? "Ogiltig rad",
-        }),
-      );
+      const issue = check.error.issues[0];
+      if (issue) parseWarnings.push(zodIssueToWarning(idx, issue));
     }
     const rowPackId = (r.pack_id ?? "").trim();
     if (rowPackId && !packId) packId = rowPackId;
