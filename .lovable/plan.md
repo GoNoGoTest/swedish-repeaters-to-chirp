@@ -1,21 +1,70 @@
-Just nu visas banden i den ordning de dyker upp i källfilen. Vi ska istället sortera dem efter riktig amatörbandsfrekvens, lägst först, med tomt band sist.
+## Mål
 
-### Ändringar
+Ersätt de fyra varnings-räknarna i Repeater-sektionens stat-rad med tre handlingsbara siffror som speglar vad användaren faktiskt får ut av exporten.
 
-1. **Sorteringshjälp i `src/lib/codeplug/bands.ts`**
-   - Lägg till en frekvensbaserad sorteringsordning för alla kända bandkoder.
-   - Exportera `sortBands(bands: string[]): string[]` som:
-     - Sorterar kända band enligt frekvens (10m, 6m, 4m, 2m, 70cm, 23cm, 13cm, 9cm, 6cm, 3cm, 1,25cm).
-     - Lägger okända koder i alfabetisk ordning efter kända band.
-     - Lägger tom sträng `""` (visas som "(tom)") sist.
+## Ny stat-rad
 
-2. **Uppdatera `src/components/codeplug/RepeaterFilterPanel.tsx`**
-   - Ersätt `const allBands = Object.keys(summary.uniqueCounts.band);` med sorterad variant: `const allBands = sortBands(Object.keys(summary.uniqueCounts.band));`.
-   - Resten av flervalstrukturen för "Band" behöver inte ändras eftersom den redan använder `formatBandLabel` / `parseBandLabel`.
+I `src/routes/index.tsx` (rad 203–210), ersätt nuvarande grid med tre rutor:
 
-3. **Tester i `src/lib/codeplug/__tests__/bands.test.ts`**
-   - Lägg till testfall som verifierar sorteringen, inklusive att `(tom)` hamnar sist och att okända koder inte stör ordningen.
+```
+Rader i import · Kanaler i export · Bortfiltrerade (med tooltip)
+```
 
-### Noteringar
-- Detta är en ren presentationsändring; filtervärdet sparas fortfarande som rå bandkod.
-- Inga ändringar i exportlogik eller datamodeller.
+- **Rader i import** = `summary.totalRows` — antal rader i CSV:n.
+- **Kanaler i export** = `pipeline.channels.length` (eller `exportChannels.length`, se nedan) — det som faktiskt skrivs till radion efter filter, mode-expansion, dedupe och ev. manuell exkludering i previewn.
+- **Bortfiltrerade** = `Rader i import − Kanaler i export`, med tooltip som visar övergripande kategorier.
+
+Distrikt-räknaren tas också bort eftersom den inte var en av de tre du valde.
+
+Gridden ändras från `lg:grid-cols-6` till `lg:grid-cols-3`.
+
+## Vilken siffra används för "Kanaler i export"
+
+Två rimliga tolkningar:
+
+- **`pipeline.channels.length`** — antal kanaler efter filter/dedupe/namngivning, oberoende av om användaren manuellt klickat bort rader i previewn.
+- **`exportChannels.length`** — efter manuell exkludering också (det som faktiskt hamnar i den nedladdade filen).
+
+Jag använder `exportChannels.length`, så siffran följer med när användaren bockar av rader i previewn. Det matchar vad knappen "Ladda ner" producerar. Bortfiltrerade = `summary.totalRows − exportChannels.length` blir då sant för "allt som inte är med i nedladdningen".
+
+## Tooltip för "Bortfiltrerade"
+
+Övergripande kategorier baserat på pipelinens räknare och tillgänglig data:
+
+- **Saknar RX-frekvens** — antal rader där `rx_frequency == null` (kan inte programmeras alls).
+- **Bortfiltrerade av filter** — rader som föll bort i `applyFilters` / mode-expansion. Beräknas som mellanskillnaden: `(rader med RX) − (kanaler efter filter och mode-expansion)`. Slår samman band/status/distrikt/läge i en enda post — matchar ditt val "övergripande kategorier".
+- **Frekvensdubbletter borttagna** — `pipeline.totalInput − pipeline.channels.length − övriga`-bidraget från `applyFreqDedupe` (rader som droppats av drop_pack/drop_sk6ba-policy).
+- **Manuellt exkluderade** — `excludedKeys.size`, om > 0.
+
+Bara icke-noll-rader visas i tooltipen. Den första raden är en kort sammanfattning, t.ex.:
+
+```
+124 av 312 rader hamnar inte i exporten
+
+• Saknar RX-frekvens: 4
+• Bortfiltrerade av filter: 108
+• Frekvensdubbletter: 9
+• Manuellt exkluderade: 3
+```
+
+## Tekniska detaljer
+
+1. **Stat-komponenten** (`src/components/codeplug/common.tsx`) får en valfri `tooltip?: ReactNode`-prop. När den sätts wrappas rutan med shadcn `Tooltip` + `TooltipTrigger`/`TooltipContent`. Befintliga anrop påverkas inte.
+
+2. **Beräkning** sker i `src/routes/index.tsx` i en `useMemo` som tar `summary`, `pipeline` och `exportChannels`. För att räkna "bortfiltrerade av filter" behöver vi veta hur många som hade RX innan filter. Jag exponerar det enklast genom att utöka `PipelineResult` med ett par fält:
+
+   - `withRx: number` — `normalized.filter(c => c.rx_frequency != null).length` (SK6BA, innan filter/mode-expansion).
+   - `droppedByDedupe: number` — `dedupe.dropped.length`.
+
+   Det är två rena tilläggsfält i `pipeline.ts`; inga befintliga konsumenter rörs.
+
+3. **Tester** (`src/lib/codeplug/__tests__/pipeline.test.ts`) — lägg till ett litet test som verifierar att `withRx` och `droppedByDedupe` rapporteras korrekt för en fixture med en saknad RX och en pack-vs-sk6ba-dubblett under `drop_pack`-policy.
+
+4. **Ingen ändring** i `pipeline.ts`-logik utöver de två räknarna, och inga tester som rör befintliga räknare ändras.
+
+## Filer som ändras
+
+- `src/routes/index.tsx` — ny stat-rad, beräkning av tooltip-data.
+- `src/components/codeplug/common.tsx` — `Stat` accepterar `tooltip`.
+- `src/lib/codeplug/pipeline.ts` — `withRx`, `droppedByDedupe` läggs till `PipelineResult`.
+- `src/lib/codeplug/__tests__/pipeline.test.ts` — ett nytt test för räknarna.
