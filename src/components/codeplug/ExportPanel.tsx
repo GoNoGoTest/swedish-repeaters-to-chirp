@@ -35,7 +35,7 @@ export function rxOnlyHintForTarget(targetId: string): string {
     case "nicsure-rt880":
       return "'Spärra TX' sätter TX_Power=N/T och TX=RX i RT-880-CSV:n. 'Markera' lägger RX-ONLY i Comment.";
     case "rt-systems-yaesu-generic":
-      return "RT Systems Yaesu: RX-only-kanaler exkluderas alltid ur exporten — vi saknar dokumentation om hur RT Systems markerar RX-only i CSV:n. Valet ovan ignoreras.";
+      return "RT Systems Yaesu: vi saknar dokumentation om hur RT Systems markerar RX-only i CSV:n. Default är att hoppa över RX-only-kanaler. 'Markera' exporterar dem som vanlig frekvens med RX-ONLY i Comment — kontrollera då i radion att TX är spärrad.";
     default:
       return "Hur ska kanaler markerade som mottagning-bara hanteras vid export?";
   }
@@ -44,16 +44,25 @@ export function rxOnlyHintForTarget(targetId: string): string {
 export function RxOnlyExportNote({
   channels,
   targetId,
+  rxOnlyPolicy,
 }: {
   channels: NormalizedChannel[];
   targetId: string;
+  rxOnlyPolicy: RxOnlyPolicy;
 }) {
-  // RT Systems excludes RX-only channels regardless of policy → no "you are
-  // exporting RX-only channels" banner there. The standard rt_rx_only_excluded
-  // warning still shows up in the warnings list for that case.
-  if (targetId === "rt-systems-yaesu-generic") return null;
   const hasRxOnly = channels.some((c) => c.rx_only || !c.tx_allowed);
   if (!hasRxOnly) return null;
+  // RT-systems: när policy=skip har raderna redan filtrerats bort i pipelinen,
+  // men de finns kvar i `channels` (vi får hela exportlistan här). Visa då en
+  // informationsruta som förklarar att de hoppas över. Vid policy=mark visas
+  // den vanliga RX-only-varningen.
+  if (targetId === "rt-systems-yaesu-generic" && rxOnlyPolicy === "skip") {
+    return (
+      <p className="mt-2 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+        Appen vet inte hur RX-only ska sättas i RT-systems — RX-only-kanaler hoppas över.
+      </p>
+    );
+  }
   return (
     <p className="mt-2 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
       Du exporterar kanaler som är RX-only — verifiera i din radio att du inte kan sända på dessa
