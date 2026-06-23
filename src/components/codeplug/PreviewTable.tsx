@@ -75,7 +75,7 @@ export function PreviewTable({ channels, excludedKeys, onToggleExclude, chirpMod
         </tbody>
       </table>
       <div className="px-3 py-2 text-xs text-muted-foreground border-t border-border sticky bottom-0 bg-card">
-        Totalt {channels.length} rader · {channels.length - excludedKeys.size} exporteras
+        {channels.length} rader visas · {exportCount ?? (channels.length - excludedKeys.size)} exporteras
       </div>
     </div>
   );
