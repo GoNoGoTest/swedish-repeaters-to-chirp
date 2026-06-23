@@ -7,6 +7,7 @@
 **`src/lib/codeplug/models.ts`** — ta bort `"missing_access_tone"` ur `WarningCode`-unionen. Eventuella switch/branches som matchar koden (UI-text, ikoner) tas också bort. Snabb sökning visar bara unionen — verifierar resten under implementation.
 
 **Tester** — i `__tests__/pipeline.modeSubset.test.ts`:
+
 - "FM utan access → missing_access_tone" → ändras till "FM utan access ger ingen missing_access_tone".
 - "FM access=carrier → ingen missing_access_tone" → behåll (fortfarande korrekt).
 - "FM access='no tone' → ingen missing_access_tone" → behåll.
@@ -25,6 +26,7 @@ const n = parseNumberLoose(numericInput);
 ```
 
 **Tester** — i befintlig `frequency.test.ts`, lägg till:
+
 - `parseShift("Duplex 0")` → `{ duplex: "", offset: 0, shift: 0, unclear: false }`.
 - `parseShift("Duplex -2")` → `{ duplex: "-", offset: 2, shift: -2, unclear: false }`.
 - `parseShift("Duplex +0.6")` → `{ duplex: "+", offset: 0.6, shift: 0.6, unclear: false }`.
