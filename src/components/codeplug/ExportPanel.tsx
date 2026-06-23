@@ -67,7 +67,6 @@ export function RxOnlyExportNote({
   );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function RtSystemsRxOnlySkippedNote({
   sourceHasRxOnly,
   targetId,
@@ -588,7 +587,6 @@ export function ExportPanel({
           />
         </div>
       )}
-
 
       <div className="border-t border-border pt-4">
         <QthHomeDistrictPanel settings={settings} updSort={updSort} />

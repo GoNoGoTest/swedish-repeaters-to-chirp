@@ -5,6 +5,7 @@ Gör RX-only-beteendet på RT-systems-Yaesu-targetet konsekvent och rensa bort "
 ## Beteende efter ändringen
 
 **RT-systems-Yaesu (rt-systems-yaesu-generic)**
+
 - Dropdown visar bara två val: "Hoppa över helt" (default) och "Exportera normalt + markera RX-ONLY i Comment". "Spärra TX i radion" är inte valbart.
 - När det finns RX-only-kanaler i exporten OCH policy=skip → varningsbox i "Förhandsgranska & exportera":
   > "Appen vet inte hur RX-only ska sättas i RT-systems — RX-only-kanaler hoppas över."
@@ -13,11 +14,13 @@ Gör RX-only-beteendet på RT-systems-Yaesu-targetet konsekvent och rensa bort "
 - När policy=mark exporteras RX-only-rader faktiskt (med RX-ONLY i Comment) — den hårdkodade exklusionen i `exportRtSystemsYaesuCsv` tas bort så att pipelinens policy får styra. `rt_rx_only_excluded`-varningen försvinner (ersätts av nya banners).
 
 **Övriga targets (chirp-generic, vgc-n76, nicsure-rt880)**
+
 - Default är fortsatt "Spärra TX i radion".
 - Dropdown visar "Spärra TX", "Markera i Comment", "Hoppa över helt". Inget "Stoppa export".
 - Existerande gul "Du exporterar kanaler som är RX-only…"-banner oförändrad.
 
 **"Stoppa export"-valet tas bort helt**
+
 - Tas bort ur `RxOnlyPolicy`-typen, ur dropdownen och ur `applyRxOnlyPolicy` i pipeline.ts. Påverkar inte freq-dupe-policyn (den behåller sitt "stop").
 
 ## Ändringar
