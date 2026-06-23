@@ -165,6 +165,22 @@ function Index() {
     return pipeline.channels.filter((c) => !excludedKeys.has(channelKey(c)));
   }, [pipeline, excludedKeys]);
 
+  // Loc i preview måste spegla verklig exportposition — inte raden inom den
+  // ev. filtrerade tabellvyn. Räkna positioner från hela exportordningen
+  // (pipeline.channels minus exkluderade) och slå upp per channelKey.
+  const locationByKey = useMemo(() => {
+    const start = target.id === "chirp-generic" ? chirpSettings.startLocation : 1;
+    const map = new Map<string, number>();
+    if (!pipeline) return map;
+    let loc = start;
+    for (const c of pipeline.channels) {
+      const key = channelKey(c);
+      if (excludedKeys.has(key)) continue;
+      map.set(key, loc++);
+    }
+    return map;
+  }, [pipeline, excludedKeys, target.id, chirpSettings.startLocation]);
+
   // Bygg en target-specifik previewMode-callback. Switchen narrowar
   // `target` så att settings-typen blir exakt; assertNever tvingar fram
   // uppdatering om ett nytt target läggs till.
