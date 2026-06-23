@@ -552,15 +552,27 @@ export function ExportPanel({
                 onChange={(e) => updPacks({ rxOnlyPolicy: e.target.value as RxOnlyPolicy })}
                 className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
               >
-                <option value="block_tx">Spärra TX i radion (rekommenderas)</option>
+                {settings.export.targetId !== "rt-systems-yaesu-generic" && (
+                  <option value="block_tx">Spärra TX i radion (rekommenderas)</option>
+                )}
                 <option value="mark">Exportera normalt + markera RX-ONLY i Comment</option>
-                <option value="skip">Hoppa över helt</option>
-                <option value="stop">Stoppa export</option>
+                <option value="skip">
+                  Hoppa över helt
+                  {settings.export.targetId === "rt-systems-yaesu-generic"
+                    ? " (rekommenderas)"
+                    : ""}
+                </option>
               </select>
               <Hint>{rxOnlyHintForTarget(settings.export.targetId)}</Hint>
             </Field>
           </div>
-          <RxOnlyExportNote channels={channels} targetId={settings.export.targetId} />
+          <RxOnlyExportNote
+            channels={channels}
+            targetId={settings.export.targetId}
+            rxOnlyPolicy={settings.packs.rxOnlyPolicy}
+          />
+        </div>
+      )}
         </div>
       )}
 
