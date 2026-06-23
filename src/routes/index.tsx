@@ -200,14 +200,35 @@ function Index() {
                       className="text-xs text-muted-foreground underline">Byt fil</button>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6 text-sm">
-                    <Stat label="Rader" value={summary.totalRows} />
-                    <Stat label="Saknad output" value={summary.missingOutput} />
-                    <Stat label="Saknade koord." value={summary.missingCoords} />
-                    <Stat label="Oklar tx_shift" value={summary.unclearShift} />
-                    <Stat label="Saknar CTCSS" value={summary.missingTone} />
-                    <Stat label="Distrikt" value={Object.keys(summary.uniqueCounts.district).length} />
-                  </div>
+                  {(() => {
+                    const totalRows = summary.totalRows;
+                    const inExport = exportChannels.length;
+                    const droppedOut = Math.max(0, totalRows - inExport);
+                    const missingRx = Math.max(0, totalRows - (pipeline?.withRx ?? totalRows));
+                    const droppedByDedupe = pipeline?.droppedByDedupe ?? 0;
+                    const manuallyExcluded = excludedKeys.size;
+                    // Allt övrigt (band/status/distrikt/läge-filter, namnlöshet, m.m.)
+                    const droppedByFilter = Math.max(
+                      0,
+                      droppedOut - missingRx - droppedByDedupe - manuallyExcluded,
+                    );
+                    const lines: string[] = [
+                      `${droppedOut} av ${totalRows} rader hamnar inte i exporten`,
+                      "",
+                    ];
+                    if (missingRx) lines.push(`• Saknar RX-frekvens: ${missingRx}`);
+                    if (droppedByFilter) lines.push(`• Bortfiltrerade av filter: ${droppedByFilter}`);
+                    if (droppedByDedupe) lines.push(`• Frekvensdubbletter: ${droppedByDedupe}`);
+                    if (manuallyExcluded) lines.push(`• Manuellt exkluderade: ${manuallyExcluded}`);
+                    const tooltip = droppedOut > 0 ? lines.join("\n") : undefined;
+                    return (
+                      <div className="grid gap-3 sm:grid-cols-3 text-sm">
+                        <Stat label="Rader i import" value={totalRows} />
+                        <Stat label="Kanaler i export" value={inExport} />
+                        <Stat label="Bortfiltrerade" value={droppedOut} tooltip={tooltip} />
+                      </div>
+                    );
+                  })()}
 
                   <RepeaterFilterPanel summary={summary} settings={settings} setSettings={setSettings} />
 
