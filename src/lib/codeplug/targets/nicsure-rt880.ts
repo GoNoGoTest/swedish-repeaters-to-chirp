@@ -385,13 +385,13 @@ export function toNicsureRows(
 
   if (truncCount > 0) {
     warnings.push({
-      code: "vgc_title_truncated",
+      code: "nicsure_name_truncated",
       message: `${truncCount} kanalnamn trunkerades till ${s.maxLength} tecken (Nicsure Name-fält).`,
     });
   }
   if (unsupported > 0) {
     warnings.push({
-      code: "vgc_unsupported_mode",
+      code: "nicsure_unsupported_mode",
       message: `${unsupported} kanal(er) har mode (USB/LSB/CW/DV) som RT-880 inte stöder; exporterade som Auto/${s.defaultBandwidth}.`,
     });
   }
