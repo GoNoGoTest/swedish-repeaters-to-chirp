@@ -1,34 +1,46 @@
-## Mål
+## Problem
 
-Fixa att RT-systems-Yaesu inte renderar `validate()`-varningar i "Förhandsgranska & exportera", och gör switchen exhaustive så framtida target inte kan glömmas.
+`channelKey()` i `src/components/codeplug/PreviewTable.tsx` bygger nyckeln av `source_type:pack_id:source_id:source_row`. När pipelinen expanderar en SK6BA-rad med flera moder (t.ex. FM + C4FM) till flera `NormalizedChannel` får varianterna identisk nyckel. Konsekvenser:
 
-## Ändringar
+- Att toggla exkludering på FM-raden exkluderar även C4FM-varianten (och tvärtom).
+- `exportChannels`-filtret i `src/routes/index.tsx` (rad 165) tar bort båda samtidigt.
+- Footern i `PreviewTable` (rad 150) använder fallback `channels.length - excludedKeys.size`, vilket blir matematiskt fel när en nyckel motsvarar flera kanaler.
 
-**`src/routes/index.tsx`** — switchen runt `target.validate?.(...)`:
+## Åtgärd
 
-1. Lägg till `case "rt-systems-yaesu-generic":` som anropar `target.validate?.(exportChannels, resolveTargetSettings(target, storedPatch))` precis som de övriga tre.
-2. Lägg till en `default`-gren som anropar en delad `assertNever(target)`-helper så att kompilatorn flaggar om ett nytt target läggs till i registret utan att hanteras här.
+### 1. `src/components/codeplug/PreviewTable.tsx`
 
-**`src/lib/codeplug/assertNever.ts`** (ny, liten hjälpfil):
+Utvidga `channelKey` så den även diskriminerar på mode och RX-frekvens:
 
 ```ts
-// Tvingar TypeScript att verifiera exhaustivitet i switch/if-kedjor över
-// diskriminerade unioner. Anropas i default-grenen — om en variant glöms
-// kvar blir argumentet inte `never` och bygget fel.
-export function assertNever(x: never): never {
-  throw new Error(`Unhandled variant: ${JSON.stringify(x)}`);
+export function channelKey(c: NormalizedChannel): string {
+  return [
+    c.source_type,
+    c.pack_id ?? "",
+    c.source_id,
+    c.source_row,
+    c.mode_effective,
+    c.rx_frequency?.toFixed(6) ?? "",
+  ].join(":");
 }
 ```
 
-3. Samma exhaustivitets-mönster appliceras på den parallella `resolveMaxNameLength`-switchen längre upp i samma fil (idag täcker den alla fyra men har ingen `default`, så nästa nya target slipper igenom där också).
+Ändra också footern (rad 150) så fallback inte används när det är missvisande — använd alltid `exportCount` när det finns, annars räkna faktiskt antal icke-exkluderade kanaler via `channels.filter((c) => !excludedKeys.has(channelKey(c))).length` istället för subtraktion. Det blir korrekt även om gamla nycklar råkar ligga kvar i `excludedKeys`.
+
+### 2. Inga ändringar krävs i `src/routes/index.tsx`
+
+`exportChannels` använder redan `channelKey(c)` så filtret blir automatiskt korrekt när nyckeln blir mer specifik. `excludedKeys.size`-visningen på rad 487 är fortfarande sann (antal nycklar användaren togglat).
+
+### 3. Tester
+
+Lägg till ett enhetstest under `src/lib/codeplug/__tests__/` (eller bredvid `PreviewTable`) som verifierar att två kanaler från samma SK6BA-rad med olika `mode_effective` får olika `channelKey`. Befintliga test ska fortsätta gå igenom.
+
+### Edge case: stale excluded keys
+
+När användaren ändrar inställningar så att multi-mode expansionen ändras kan gamla nycklar bli "dangling" i `excludedKeys`. Det är inte värre än tidigare och kräver ingen separat städning i denna fix — `Set.has()` returnerar bara `false` för dem.
 
 ## Acceptanskriterier
 
-- När `targetId === "rt-systems-yaesu-generic"` och `exportChannels` triggar t.ex. namn-trunkering syns varningarna i den gula listan ovanför preview-tabellen, identiskt med CHIRP/VGC/Nicsure.
-- Att lägga till ett nytt target-id i `targets/registry.ts` ger ett tsc-fel i `src/routes/index.tsx` tills båda switcharna utökas.
-- `bun run verify` är grön.
-
-## Out of scope
-
-- Inga ändringar i target-registret eller i `rt-systems-yaesu.ts` `validate()`-implementationen.
-- Inga UI-ändringar utöver att RT-systems-varningar nu renderas i samma ruta.
+- Toggla exkludering på FM-varianten av en multi-mode SK6BA-rad påverkar inte C4FM-varianten i previewen eller i export.
+- Footern visar korrekt antal exporterade kanaler även när multi-mode-rader är delvis exkluderade.
+- `bun run verify` grön.
