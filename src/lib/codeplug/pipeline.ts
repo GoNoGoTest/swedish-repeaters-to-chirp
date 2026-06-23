@@ -218,13 +218,6 @@ function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): N
     switch (settings.packs.rxOnlyPolicy) {
       case "skip":
         continue;
-      case "stop":
-        ch.warnings.push({
-          code: "rx_only_no_policy",
-          message: "RX-only stoppar export (policy=stop)",
-        });
-        out.push(ch);
-        break;
       case "block_tx":
         ch.duplex = "off";
         ch.warnings.push({
