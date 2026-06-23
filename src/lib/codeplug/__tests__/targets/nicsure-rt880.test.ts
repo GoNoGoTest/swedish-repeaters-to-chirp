@@ -85,7 +85,7 @@ describe("targets/nicsure-rt880", () => {
   it("warns on unsupported modes (USB/LSB/CW)", () => {
     const ch = makeChannel({ rx_frequency: 14.2, mode_pack: "USB", duplex: "" });
     const { warnings } = toNicsureRows([ch], NICSURE_RT880_DEFAULTS);
-    expect(warnings.some((w) => w.code === "vgc_unsupported_mode")).toBe(true);
+    expect(warnings.some((w) => w.code === "nicsure_unsupported_mode")).toBe(true);
   });
 
   it("Channel_Num honors startLocation and increments", () => {
@@ -107,7 +107,7 @@ describe("targets/nicsure-rt880", () => {
     );
     expect(rows[1][2]).toBe("ABCDEF");
     const { warnings } = toNicsureRows([ch], { ...NICSURE_RT880_DEFAULTS, maxLength: 6 });
-    expect(warnings.some((w) => w.code === "vgc_title_truncated")).toBe(true);
+    expect(warnings.some((w) => w.code === "nicsure_name_truncated")).toBe(true);
   });
 
   it("assigns A–Z per dimension from a shared global pool, alphabetically", () => {
