@@ -9,8 +9,11 @@ export interface DedupeResult {
 /**
  * Detect frequency duplicates between SK6BA-imported rows and channel-pack rows
  * (and pack-vs-pack). Frequencies are compared by rounded RX (5 decimals).
- * Default policy keeps both when source_type or category differs, but always
- * tags both rows with a `freq_duplicate` warning so they show up in preview.
+ *
+ * Pure: never mutates the input array or any input channel object. Rows that
+ * need a `freq_duplicate` warning are replaced with a shallow clone whose
+ * `warnings` is a fresh array. Channel-pack rows may come from cache, so
+ * mutation would let warnings accumulate across renders.
  */
 export function applyFreqDedupe(
   channels: NormalizedChannel[],
@@ -26,6 +29,7 @@ export function applyFreqDedupe(
   }
 
   const dropIds = new Set<NormalizedChannel>();
+  const warnFor = new Map<NormalizedChannel, string>();
   let stopped = false;
 
   for (const [, arr] of groups) {
@@ -37,14 +41,13 @@ export function applyFreqDedupe(
     // when a channel-pack row collides (pack-vs-sk6ba or pack-vs-pack).
     const shouldWarn = (hasSk6ba && hasPack) || packCount >= 2;
     if (shouldWarn) {
+      const message = `Frekvensdubblett: ${arr.length} rader på ${arr[0].rx_frequency?.toFixed(5)} MHz`;
       for (const ch of arr) {
         // SK6BA repeater rows are authoritative — never warn on them.
-        // Only flag pack rows that collide.
         if (ch.source_type === "sk6ba") continue;
-        ch.warnings.push({
-          code: "freq_duplicate",
-          message: `Frekvensdubblett: ${arr.length} rader på ${arr[0].rx_frequency?.toFixed(5)} MHz`,
-        });
+        // Idempotent: skip rows that already carry a freq_duplicate warning.
+        if (ch.warnings.some((w) => w.code === "freq_duplicate")) continue;
+        warnFor.set(ch, message);
       }
     }
 
@@ -61,12 +64,21 @@ export function applyFreqDedupe(
   }
 
   const dropped: NormalizedChannel[] = [];
-  const kept = channels.filter((c) => {
+  const kept: NormalizedChannel[] = [];
+  for (const c of channels) {
     if (dropIds.has(c)) {
       dropped.push(c);
-      return false;
+      continue;
     }
-    return true;
-  });
+    const msg = warnFor.get(c);
+    if (msg) {
+      kept.push({
+        ...c,
+        warnings: [...c.warnings, { code: "freq_duplicate", message: msg }],
+      });
+    } else {
+      kept.push(c);
+    }
+  }
   return { channels: kept, stopped, dropped };
 }

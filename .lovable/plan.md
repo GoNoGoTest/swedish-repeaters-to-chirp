@@ -1,46 +1,62 @@
-# Plan: synka kommentarer och UI-text med implementationen
-
 ## Mål
 
-Eliminera de glidningar du pekade på, utan att ändra beteende. Tre konkreta strängar/kommentarer är felaktiga idag.
+Två små disciplinfixar i `swedish-repeaters-to-codeplug`, plus regressionstester.
 
-## Ändringar
+---
 
-### 1. VGC-panelens hjälptext (`src/components/codeplug/ExportPanel.tsx:145`)
+### 1. Gör `applyFreqDedupe()` immutabel
 
-Idag: `"N76 grupperar i klumpar om 32. Överskrids gränsen visas en varning — uppdelning sker manuellt i v1."`
+**Fil:** `src/lib/codeplug/dedupe.ts`
 
-Nytt: tydliggör att split-panelen nedan kan göra uppdelningen automatiskt via `per_district_chunked`, och att varningen bara gäller om man behåller `single`.
+Idag muteras input via `ch.warnings.push(...)`. Eftersom pack-kanaler kan komma från cache kan varningar ackumuleras mellan rerenders.
 
-Förslag: `"N76 grupperar i klumpar om 32. Vid 'En enda fil' visas bara en varning om gränsen överskrids — välj 'Per distrikt + chunka' nedan för att dela upp filen automatiskt."`
+**Ändring:**
+- Bygg grupper som idag.
+- Bestäm vilka pack-rader som ska få `freq_duplicate` (samma villkor som nu: pack-vs-sk6ba eller pack-vs-pack).
+- Bygg en `Set<NormalizedChannel>` `warnSet` för rader att flagga.
+- Returnera ny `channels`-array. För rader i `warnSet` returneras en grund-kopia `{ ...c, warnings: [...c.warnings, { code: "freq_duplicate", message }] }`. Hoppa över om kanalen redan har en `freq_duplicate`-warning (idempotent).
+- För `dropIds`: filtrera mot identiteten på den ursprungliga `c` (innan ev. kopiering) — alltså bestäm drop på originalreferenser, bygg sedan kept-arrayen och kopiera de som ska få ny warning, så att `dropped` fortsatt pekar på originalobjekt.
+- Inga `.push()` på `ch.warnings` någonstans i filen.
+- Behåll semantik för `keep_both`, `drop_pack`, `drop_sk6ba`, `stop`.
 
-### 2. VGC validate-varning (`src/lib/codeplug/targets/vgc-n76.ts:309`)
+**Test:** utöka `src/lib/codeplug/__tests__/dedupe.test.ts`:
+- Två kanaler (sk6ba + pack) på samma RX. Spara `originalPackWarnings = pack.warnings`, `originalSk6baWarnings = sk6ba.warnings`. Kör `applyFreqDedupe([sk6ba, pack], "keep_both")`. Asserta:
+  - `pack.warnings === originalPackWarnings` (oförändrat, samma referens).
+  - `sk6ba.warnings === originalSk6baWarnings`.
+  - I resultatet: pack-raden har `freq_duplicate`, sk6ba-raden inte.
+- Kör funktionen två gånger på samma input och asserta att antalet `freq_duplicate`-warnings i andra körningens resultat fortfarande är 1 (ackumuleras inte) — och att originalobjektens warnings.length är 0.
+- Lägg test för `drop_pack`: `dropped`-arrayen innehåller originalreferensen till pack-raden.
 
-Idag: `"… — dela manuellt i flera filer/grupper."`
+---
 
-Nytt: peka på split-läget istället för "manuellt".
+### 2. Korrekt `Loc` i filtrerad preview
 
-Förslag: `"${n} kanaler överstiger N76:s ${cap}/grupp — välj split-läget 'Per distrikt + chunka' i exportpanelen, eller dela upp manuellt innan import."`
+**Problem:** `PreviewTable` räknar Loc lokalt från `startLoc` över bara de rader den får. När `statFilter` aktiveras visas en delmängd och Loc börjar om från 1.
 
-### 3. Split-panelens beskrivningar (`src/components/codeplug/ExportPanel.tsx:343-355`)
+**Ändring i `src/routes/index.tsx`:**
+- Bygg `locationByKey: Map<string, number>` via `useMemo` över `pipeline.channels` i exportordning:
+  - Startvärde = `target.id === "chirp-generic" ? chirpSettings.startLocation : 1`.
+  - Hoppa över exkluderade nycklar (`excludedKeys.has(key)`).
+  - Sätt `map.set(channelKey(c), loc++)`.
+- Skicka in en `getExportLocation: (c) => number | null`-callback till `PreviewTable` istället för `startLoc`.
 
-Idag säger texterna "distriktssiffra", men `groupChannelsForSplit` bucketar på `region` (country + districtLabel) — SE/SM6, NO/LA, DK/OZ, FI/OH6, etc.
+**Ändring i `src/components/codeplug/PreviewTable.tsx`:**
+- Ersätt prop `startLoc: number` med `getExportLocation: (c: NormalizedChannel) => number | null`.
+- I rad-render: `const locNum = getExportLocation(c); const loc = excluded || locNum == null ? "—" : String(locNum);`
+- Ta bort lokal `locCounter`.
 
-Förslag:
+**Test:** uppdatera `src/components/codeplug/__tests__/PreviewTable.test.tsx`:
+- Befintliga tester: byt `startLoc={1}` mot `getExportLocation={() => null}` eller en passande stub (de testar inte Loc — null/—).
+- Nytt test: tre kanaler A, B, C. Preview visar bara C. Skicka `getExportLocation`-map där A=1, B=2, C=3. Asserta att enda dataradens Loc-cell (kolumnindex 2) innehåller `"3"`, inte `"1"`.
+- Nytt test: exkluderad rad → Loc visas som `"—"` även om callback skulle returnera nummer (den nuvarande `loc === "—"` när exkluderad bevaras).
 
-- `per_district` label oförändrad (`"En fil per distrikt"`), beskrivning →
-  `"Repeatrar grupperas per region (SM0–SM7, LA, OZ, OH0–OH9, …). Kanalpaket hamnar i egna filer."`
-- `per_district_chunked` beskrivning →
-  `` `Som ovan men varje fil delas vidare när den når kanaltaket${groupCap ? ` (default ${groupCap})` : ""}.` `` (oförändrad — den beskriver bara chunkning).
+---
 
-Övervägd men avstådd: byta select-värden från `per_district` → `per_region`. Det kräver migration av persisterad `SplitSettings.mode` och berör typer/registry. Utanför scope.
+### Verifiering
 
-## Utanför scope
+`bun run verify` ska vara grön (lint, typecheck, test, format, build).
 
-- Ingen funktionalitetsändring i `vgc-n76` eller `split`.
-- Ingen omdöpning av `SplitMode`-värden.
-- Inga övriga UI-strängar revideras i denna pass (om du vill ha en bredare språkgenomgång, säg till så öppnar jag det separat).
+### Utanför scope
 
-## Verifiering
-
-`bun run verify`. Inga nya tester behövs — det här är ren textsync.
+- Ingen ändring av `channelKey`, exportformat, statistikfilterlogik eller modeller.
+- Ingen omarbetning av övriga targets eller pipeline.
