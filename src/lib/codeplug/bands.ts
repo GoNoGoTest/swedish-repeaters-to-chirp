@@ -38,13 +38,13 @@ const BAND_FREQUENCY_ORDER: Record<string, number> = {
   "6": 50,
   "4": 70,
   "2": 144,
-  "1.5": 222,
   "70": 430,
   "23": 1240,
   "13": 2300,
   "9": 3400,
   "6cm": 5650,
   "3": 10000,
+  "1.5": 24000,
 };
 
 export function sortBands(bands: string[]): string[] {
