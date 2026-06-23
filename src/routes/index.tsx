@@ -109,6 +109,8 @@ function Index() {
           target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ??
           target.limits.maxNameLength
         );
+      default:
+        return assertNever(target);
     }
   })();
 
