@@ -228,7 +228,7 @@ describe("CHIRP exporter", () => {
       expect(rows[0].Mode).toBe("NFM");
     });
 
-    it("channel_pack mode_pack overrides effective-mode mapping", () => {
+    it("channel_pack analog mode_pack passes through (USB)", () => {
       const c = makeChannel({
         source_type: "channel_pack",
         generated_name_final: "X",
@@ -237,6 +237,31 @@ describe("CHIRP exporter", () => {
       });
       const rows = toChirpRows([c], { ...chirp, mode: "NFM" });
       expect(rows[0].Mode).toBe("USB");
+    });
+
+    describe("channel_pack digital mode_pack maps through CHIRP tokens", () => {
+      const cases: Array<[string, string]> = [
+        ["C4FM", "DN"],
+        ["DN", "DN"],
+        ["DMRPLUS", "DMR"],
+        ["DMR+", "DMR"],
+        ["DMRplus", "DMR"],
+        ["DV", "DV"],
+        ["DSTAR", "DV"],
+        ["D-Star", "DV"],
+        ["P25", "P25"],
+      ];
+      for (const [pack, expected] of cases) {
+        it(`mode_pack="${pack}" → Mode="${expected}"`, () => {
+          const c = makeChannel({
+            source_type: "channel_pack",
+            generated_name_final: "X",
+            mode_pack: pack,
+          });
+          const rows = toChirpRows([c], { ...chirp, mode: "NFM" });
+          expect(rows[0].Mode).toBe(expected);
+        });
+      }
     });
   });
 
