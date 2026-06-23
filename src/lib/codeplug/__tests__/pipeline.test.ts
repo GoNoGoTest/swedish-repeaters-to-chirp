@@ -33,6 +33,25 @@ describe("runPipeline (sk6ba only)", () => {
     expect(r.droppedByDedupe).toBe(0);
   });
 
+  it("excludes type=uW QTH rows from scope and reports outOfScope", () => {
+    const uwRow: Record<string, string> = {
+      id: "777", type: "uW QTH", status: "QRV", mode: "FM",
+      output: "10368.000", tx_shift: "0",
+      band: "3", district: "6", city: "Test", call: "SK6TST",
+      channel: "uW1", lat: "57.7", lng: "12.9",
+    };
+    const fmRow: Record<string, string> = {
+      id: "778", type: "Repeater", status: "QRV", mode: "FM",
+      output: "145.6000", tx_shift: "-0.6",
+      band: "2", district: "6", city: "Test", call: "SK6TST",
+      channel: "RV48", lat: "57.7", lng: "12.9",
+    };
+    const r = runPipeline({ sk6baRows: [uwRow, fmRow], settings: baseSettings });
+    expect(r.outOfScope).toBe(1);
+    expect(r.withRx).toBe(1);
+    expect(r.channels.every((c) => c.type !== "uW QTH")).toBe(true);
+  });
+
   it("assigns final names and resolves collisions", () => {
     const { rows } = parseSk6baCsv(sk6baCsv);
     const r = runPipeline({ sk6baRows: rows, settings: baseSettings });
