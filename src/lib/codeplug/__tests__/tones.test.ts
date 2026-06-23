@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseAccess } from "../tones";
+import { parseAccess, parseDigitalAccess } from "../tones";
 
 describe("parseAccess", () => {
   it("returns null/false for empty", () => {
@@ -63,6 +63,13 @@ describe("parseAccess", () => {
     expect(parseAccess("none").carrier).toBe(true);
     expect(parseAccess("ingen").carrier).toBe(true);
   });
+
+  it("recognises 'no tone' (whitespace-separated) as carrier", () => {
+    expect(parseAccess("no tone").carrier).toBe(true);
+    expect(parseAccess("NO TONE").carrier).toBe(true);
+    expect(parseAccess("notone").carrier).toBe(true);
+  });
+
 
   describe("DCS/DTCS", () => {
     it("parses 'DCS 025' as dcs=025", () => {
