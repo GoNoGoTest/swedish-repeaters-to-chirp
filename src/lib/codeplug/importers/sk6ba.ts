@@ -1,7 +1,12 @@
 import Papa from "papaparse";
 import type { RawRow } from "../models";
 import { deriveRegion, type RegionCountryCode } from "../region";
-import { sk6baRowSchema, formatPapaError } from "./schemas";
+import {
+  sk6baRowSchema,
+  papaErrorToWarning,
+  zodIssueToWarning,
+  type ParseWarning,
+} from "./schemas";
 
 const EXPECTED_COLS = [
   "id",
@@ -30,33 +35,13 @@ const EXPECTED_COLS = [
   "backup",
 ];
 
-/** En enskild parse-warning, härstammar antingen från PapaParse eller från radschemat. */
-export interface ParseIssue {
-  row: number | null;
-  code: string;
-  message: string;
-}
-
 export interface ImportResult {
   rows: RawRow[];
   columns: string[];
   missingColumns: string[];
   delimiter: string;
   /** PapaParse-fel och schema-fel som inte är fatala. */
-  parseErrors: ParseIssue[];
-}
-
-const MAX_PARSE_WARNINGS = 20;
-
-function summarizeParseIssues(issues: ParseIssue[]): string[] {
-  if (issues.length === 0) return [];
-  const head = issues
-    .slice(0, MAX_PARSE_WARNINGS)
-    .map((e) => formatPapaError({ row: e.row ?? undefined, code: e.code, message: e.message }));
-  if (issues.length > MAX_PARSE_WARNINGS) {
-    head.push(`…och ${issues.length - MAX_PARSE_WARNINGS} till`);
-  }
-  return head;
+  parseErrors: ParseWarning[];
 }
 
 export function parseSk6baCsv(text: string): ImportResult {
@@ -73,11 +58,9 @@ export function parseSk6baCsv(text: string): ImportResult {
   const columns = result.meta.fields ?? [];
   const missingColumns = EXPECTED_COLS.filter((c) => !columns.includes(c));
 
-  const parseErrors: ParseIssue[] = (result.errors ?? []).map((e) => ({
-    row: typeof e.row === "number" ? e.row : null,
-    code: e.code ?? e.type ?? "PapaError",
-    message: e.message ?? "Okänt parse-fel",
-  }));
+  const parseErrors: ParseWarning[] = (result.errors ?? []).map((e) =>
+    papaErrorToWarning({ row: e.row, code: e.code ?? e.type, message: e.message }),
+  );
 
   // Lättviktsvalidering per rad. SK6BA-radschemat är `.passthrough()` så
   // en korrekt CSV med okända extrakolumner går igenom utan warning.
@@ -86,11 +69,8 @@ export function parseSk6baCsv(text: string): ImportResult {
   result.data.forEach((r, idx) => {
     const check = sk6baRowSchema.safeParse(r);
     if (!check.success) {
-      parseErrors.push({
-        row: idx,
-        code: "schema_invalid",
-        message: check.error.issues[0]?.message ?? "Ogiltig rad",
-      });
+      const issue = check.error.issues[0];
+      if (issue) parseErrors.push(zodIssueToWarning(idx, issue));
     }
   });
 
@@ -118,7 +98,7 @@ export type Sk6baLoadState =
       rowCount: number;
       summary: Summary;
       /** Icke-fatala parse-warnings (PapaParse + schema). Tom om allt OK. */
-      parseWarnings: string[];
+      parseWarnings: ParseWarning[];
     }
   | { status: "error"; message: string; missingColumns?: string[] };
 
@@ -148,7 +128,7 @@ export function loadSk6baCsv(text: string): Sk6baLoadState {
     columns: parsed.columns,
     rowCount: parsed.rows.length,
     summary: summarize(parsed.rows, parsed.columns),
-    parseWarnings: summarizeParseIssues(parsed.parseErrors),
+    parseWarnings: parsed.parseErrors,
   };
 }
 
