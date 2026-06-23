@@ -5,12 +5,13 @@ export function channelKey(c: NormalizedChannel): string {
   return `${c.source_type}:${c.pack_id ?? ""}:${c.source_id}:${c.source_row}`;
 }
 
-export function PreviewTable({ channels, excludedKeys, onToggleExclude, chirpMode, startLoc }: {
+export function PreviewTable({ channels, excludedKeys, onToggleExclude, chirpMode, startLoc, exportCount }: {
   channels: NormalizedChannel[];
   excludedKeys: Set<string>;
   onToggleExclude: (key: string) => void;
   chirpMode: string;
   startLoc: number;
+  exportCount?: number;
 }) {
   let locCounter = startLoc;
   return (
