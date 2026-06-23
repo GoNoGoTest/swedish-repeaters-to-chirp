@@ -271,13 +271,16 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   const validPacks = packChannels.filter((c) => c.rx_frequency != null);
   const packWithPolicy = applyRxOnlyPolicy(validPacks, settings);
   // Validate split: needs tx_frequency or it can't export properly
-  const packValidated = packWithPolicy.map((ch) =>
+  const packValidated: NormalizedChannel[] = packWithPolicy.map((ch) =>
     ch.duplex === "split" && ch.tx_frequency == null
       ? {
           ...ch,
           warnings: [
             ...ch.warnings,
-            { code: "pack_split_unsupported", message: "Split-kanal saknar tx_frequency" },
+            {
+              code: "pack_split_unsupported",
+              message: "Split-kanal saknar tx_frequency",
+            } satisfies Warning,
           ],
         }
       : ch,
