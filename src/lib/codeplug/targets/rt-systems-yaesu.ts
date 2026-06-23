@@ -126,7 +126,7 @@ function mobileTxMhz(c: NormalizedChannel): number | null {
 }
 
 function formatOffsetFrequency(c: NormalizedChannel): string {
-  if (c.duplex === "" || c.duplex === "off") return "";
+  if (c.duplex === "") return "";
   if (c.duplex === "split") {
     if (c.tx_frequency != null && c.rx_frequency != null) {
       const diff = Math.abs(c.tx_frequency - c.rx_frequency);
@@ -254,8 +254,21 @@ export function exportRtSystemsYaesuCsv(
   let truncCount = 0;
   let unsupportedCount = 0;
 
+  // RX-only channels are excluded entirely: we don't have documentation for
+  // how RT Systems marks an RX-only memory in the CSV. Surface a warning so
+  // the user knows these channels won't reach the radio.
+  const exportable: NormalizedChannel[] = [];
+  let rxOnlyExcluded = 0;
+  for (const c of channels) {
+    if (c.rx_only || !c.tx_allowed) {
+      rxOnlyExcluded++;
+      continue;
+    }
+    exportable.push(c);
+  }
+
   const lines: string[] = [joinRow(RT_SYSTEMS_YAESU_HEADER_FIELDS)];
-  channels.forEach((c, i) => {
+  exportable.forEach((c, i) => {
     const { fields, truncated, unsupportedMode } = toRtSystemsYaesuRow(
       c,
       s.startNumber + i,
@@ -270,9 +283,9 @@ export function exportRtSystemsYaesuCsv(
   // leading row-index and all 21 columns so the radio software accepts
   // the file verbatim.
   const padTarget = Math.max(0, s.padToRows | 0);
-  if (channels.length < padTarget) {
+  if (exportable.length < padTarget) {
     const emptyTail = new Array(RT_SYSTEMS_YAESU_HEADER_FIELDS.length - 1).fill("");
-    for (let i = channels.length; i < padTarget; i++) {
+    for (let i = exportable.length; i < padTarget; i++) {
       lines.push(joinRow([String(s.startNumber + i), ...emptyTail]));
     }
   }
@@ -290,6 +303,12 @@ export function exportRtSystemsYaesuCsv(
     warnings.push({
       code: "rt_unsupported_mode",
       message: `${unsupportedCount} kanal(er) har mode som Yaesu inte stöder (D-Star/DMR/…); exporterade som Operating Mode=FM.`,
+    });
+  }
+  if (rxOnlyExcluded > 0) {
+    warnings.push({
+      code: "rt_rx_only_excluded",
+      message: `${rxOnlyExcluded} kanal(er) är RX-only och exkluderades — vi saknar information om hur RT Systems markerar RX-only i CSV:n.`,
     });
   }
   return { csv, warnings };

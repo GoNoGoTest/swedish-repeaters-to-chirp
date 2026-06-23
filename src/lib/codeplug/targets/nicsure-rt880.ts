@@ -19,7 +19,7 @@ import type { ExportTarget, HardwareLimits } from "./types";
  * legend so the user knows which letter to label what in RMS.
  */
 
-export type NicsurePower = "Very High" | "High" | "Medium" | "Low";
+export type NicsurePower = "Very High" | "High" | "Medium" | "Low" | "N/T";
 export type NicsureBandwidth = "Wide" | "Narrow";
 
 export type NicsureZoneDimensionId = "country" | "district" | "type" | "category";
@@ -97,12 +97,11 @@ function truncateName(raw: string, maxLen: number): { name: string; truncated: b
   return { name: chars.slice(0, maxLen).join(""), truncated: true };
 }
 
-/** Mobile-side TX frequency in MHz, or null. Returns 0 when TX is blocked. */
+/** Mobile-side TX frequency in MHz, or null. */
 function mobileTxMhz(c: NormalizedChannel): number | null {
-  // RT-880 CSV has no TX-disable column; the portable "no TX" signal is
-  // duplex=off (set by the rx-only policy upstream). Write TX=0 so the radio
-  // does not transmit on the RX frequency by default.
-  if (c.duplex === "off") return 0;
+  // RX-only channels: TX_Power column carries the "N/T" signal; TX frequency
+  // mirrors RX (radio convention — no offset, no zero-frequency placeholder).
+  if (c.rx_only || !c.tx_allowed) return c.rx_frequency;
   if (c.tx_frequency != null) return c.tx_frequency;
   if (c.rx_frequency == null) return null;
   if (c.duplex === "+" || c.duplex === "-") {
@@ -321,7 +320,7 @@ export function toNicsureRows(
   const warnings: Warning[] = [];
   let truncCount = 0;
   let unsupported = 0;
-  let txBlocked = 0;
+  let rxOnlyCount = 0;
 
   const { kept, droppedCount: digitalSk6baDropped } = filterAnalogFmSk6ba(channels);
   if (digitalSk6baDropped > 0) {
@@ -357,7 +356,8 @@ export function toNicsureRows(
 
     const { mod, unsupported: modUnsupported } = encodeModulation(c);
     if (modUnsupported) unsupported++;
-    if (c.duplex === "off") txBlocked++;
+    const isRxOnly = c.rx_only || !c.tx_allowed;
+    if (isRxOnly) rxOnlyCount++;
 
     return {
       Channel_Num: String(s.startLocation + i),
@@ -367,7 +367,7 @@ export function toNicsureRows(
       TX: formatMhz5(mobileTxMhz(c)),
       RX_Tone: encodeTone("rx", c),
       TX_Tone: encodeTone("tx", c),
-      TX_Power: s.defaultPower,
+      TX_Power: isRxOnly ? "N/T" : s.defaultPower,
       Slot1: slotFor(c, 0),
       Slot2: slotFor(c, 1),
       Slot3: slotFor(c, 2),
@@ -394,10 +394,10 @@ export function toNicsureRows(
       message: `${unsupported} kanal(er) har mode (USB/LSB/CW/DV) som RT-880 inte stöder; exporterade som Auto/${s.defaultBandwidth}.`,
     });
   }
-  if (txBlocked > 0) {
+  if (rxOnlyCount > 0) {
     warnings.push({
-      code: "nicsure_tx_block_unsupported",
-      message: `${txBlocked} kanal(er) har TX spärrad (RX-only). RT-880-CSV saknar TX-disable-kolumn — TX skrivs som 0.00000. Lås kanalen manuellt i Nicsure RMS om radion ändå försöker sända.`,
+      code: "nicsure_rx_only_marked",
+      message: `${rxOnlyCount} kanal(er) är RX-only: TX_Power satt till N/T, TX=RX.`,
     });
   }
   return { rows, warnings, legend };
