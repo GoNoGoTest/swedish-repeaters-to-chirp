@@ -1,5 +1,6 @@
 import Papa from "papaparse";
 import type { NormalizedChannel, SplitSettings, Warning } from "../models";
+import { channelSignalMode } from "../modes";
 import { registerTarget } from "./registry";
 import { buildSplitFiles } from "./split";
 import type { ExportTarget, HardwareLimits } from "./types";
@@ -405,8 +406,9 @@ export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
   previewMode: (c, s) => {
     // Digitala SK6BA-rader filtreras bort vid export — visa kanonisk signal
     // i previewen så det är tydligt att de inte hamnar i filen.
-    if (c.source_type === "sk6ba" && c.mode_effective && c.mode_effective !== "FM") {
-      return c.mode_effective;
+    const sig = channelSignalMode(c);
+    if (c.source_type === "sk6ba" && sig && sig !== "FM") {
+      return sig;
     }
     if (isAm(c)) return "AM";
     return encodeBandwidth(c, s) === 12500 ? "NFM" : "FM";

@@ -121,31 +121,44 @@ describe("resolveCollisions", () => {
     const a = makeChannel({ generated_name_final: "BORAS" });
     const b = makeChannel({ generated_name_final: "BORAS" });
     const c = makeChannel({ generated_name_final: "BORAS" });
-    const { unresolved } = resolveCollisions(
+    const { channels, unresolved } = resolveCollisions(
       [a, b, c],
       { ...naming, collisionPolicy: "numeric_suffix" },
       6,
     );
     expect(unresolved).toBe(0);
-    expect(a.generated_name_final).toBe("BORAS1");
-    expect(b.generated_name_final).toBe("BORAS2");
-    expect(c.generated_name_final).toBe("BORAS3");
-    expect(a.collided).toBe(true);
-    expect(b.collided).toBe(true);
+    expect(channels[0].generated_name_final).toBe("BORAS1");
+    expect(channels[1].generated_name_final).toBe("BORAS2");
+    expect(channels[2].generated_name_final).toBe("BORAS3");
+    expect(channels[0].collided).toBe(true);
+    expect(channels[1].collided).toBe(true);
+    // Inputs must not be mutated.
+    expect(a.generated_name_final).toBe("BORAS");
+    expect(a.collided).toBe(false);
   });
 
   it("leaves unique names untouched", () => {
     const a = makeChannel({ generated_name_final: "LUND" });
     const b = makeChannel({ generated_name_final: "MALMO" });
-    resolveCollisions([a, b], { ...naming, collisionPolicy: "numeric_suffix" }, 6);
-    expect(a.generated_name_final).toBe("LUND");
-    expect(b.generated_name_final).toBe("MALMO");
+    const { channels } = resolveCollisions(
+      [a, b],
+      { ...naming, collisionPolicy: "numeric_suffix" },
+      6,
+    );
+    expect(channels[0].generated_name_final).toBe("LUND");
+    expect(channels[1].generated_name_final).toBe("MALMO");
   });
 
   it("policy=stop leaves collisions unresolved", () => {
     const a = makeChannel({ generated_name_final: "X" });
     const b = makeChannel({ generated_name_final: "X" });
-    const { unresolved } = resolveCollisions([a, b], { ...naming, collisionPolicy: "stop" }, 6);
+    const { channels, unresolved } = resolveCollisions(
+      [a, b],
+      { ...naming, collisionPolicy: "stop" },
+      6,
+    );
     expect(unresolved).toBe(1);
+    expect(channels[1].collided).toBe(true);
+    expect(a.collided).toBe(false);
   });
 });

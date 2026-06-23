@@ -1,4 +1,5 @@
 import type { NormalizedChannel } from "@/lib/codeplug/models";
+import { channelSignalMode } from "@/lib/codeplug/modes";
 import { Switch } from "@/components/ui/switch";
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -73,7 +74,7 @@ export function PreviewTable({
             const rowClass = excluded
               ? "opacity-40 line-through decoration-muted-foreground/50"
               : baseRowClass;
-            const signalMode = c.mode_pack || c.mode_effective || "—";
+            const signalMode = channelSignalMode(c) || "—";
             const exportMode = getExportMode(c);
             const loc = excluded ? "—" : String(locCounter++);
             return (

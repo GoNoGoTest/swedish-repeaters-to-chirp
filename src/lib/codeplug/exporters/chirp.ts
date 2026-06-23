@@ -1,6 +1,7 @@
 import Papa from "papaparse";
 import type { ChirpSettings, NormalizedChannel, Warning } from "../models";
 import { formatFrequency } from "../frequency";
+import { channelSignalMode } from "../modes";
 
 export const CHIRP_COLUMNS = [
   "Location",
@@ -80,7 +81,7 @@ const DIGITAL_MODES = new Set(["C4FM", "D-Star", "DMR", "DMRplus", "P25"]);
  * not part of the Generic CSV schema.
  */
 export function chirpDigitalWarnings(channels: NormalizedChannel[]): Warning[] {
-  const has = channels.some((c) => DIGITAL_MODES.has(c.mode_effective));
+  const has = channels.some((c) => DIGITAL_MODES.has(channelSignalMode(c)));
   if (!has) return [];
   return [
     {

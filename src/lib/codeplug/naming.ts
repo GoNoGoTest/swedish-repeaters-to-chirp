@@ -117,6 +117,11 @@ export function buildName(
   return { full, clipped };
 }
 
+/**
+ * Pure: returns a new `channels` array with `collided` and
+ * `generated_name_final` updated for any colliding entries. Input is not
+ * mutated.
+ */
 export function resolveCollisions(
   channels: NormalizedChannel[],
   n: NamingSettings,
@@ -136,16 +141,17 @@ export function resolveCollisions(
 
   if (n.collisionPolicy === "stop") {
     const occ = new Map<string, number>();
-    for (const ch of channels) {
+    const out = channels.map((ch) => {
       const name = ch.generated_name_final || "NONAME";
       const seen = occ.get(name) ?? 0;
-      if (seen >= 1) {
-        ch.collided = true;
-        unresolved++;
-      }
       occ.set(name, seen + 1);
-    }
-    return { channels, unresolved };
+      if (seen >= 1) {
+        unresolved++;
+        return { ...ch, collided: true };
+      }
+      return ch;
+    });
+    return { channels: out, unresolved };
   }
 
   const suffixFor = (attempt: number): string =>
@@ -166,13 +172,11 @@ export function resolveCollisions(
   // Per-base counter — assigns 1, 2, 3… in document order to each occurrence
   // of a colliding base name.
   const perBase = new Map<string, number>();
-  for (const ch of channels) {
+  const out = channels.map((ch) => {
     const name = ch.generated_name_final || "NONAME";
     if ((counts.get(name) ?? 0) <= 1) {
-      ch.generated_name_final = name;
-      continue;
+      return ch.generated_name_final === name ? ch : { ...ch, generated_name_final: name };
     }
-    ch.collided = true;
     let attempt = (perBase.get(name) ?? 0) + 1;
     let candidate = "";
     let safety = 0;
@@ -189,7 +193,7 @@ export function resolveCollisions(
     }
     perBase.set(name, attempt);
     taken.add(candidate);
-    ch.generated_name_final = candidate;
-  }
-  return { channels, unresolved };
+    return { ...ch, collided: true, generated_name_final: candidate };
+  });
+  return { channels: out, unresolved };
 }
