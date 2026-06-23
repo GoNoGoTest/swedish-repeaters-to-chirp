@@ -13,7 +13,9 @@ export function chirpDigitalWarnings(channels: NormalizedChannel[]): Warning[] {
     return cls === "dmr" || cls === "c4fm" || cls === "dstar" || cls === "p25";
   });
   if (!has) return [];
-  return [/* oförändrad varning */];
+  return [
+    /* oförändrad varning */
+  ];
 }
 ```
 
