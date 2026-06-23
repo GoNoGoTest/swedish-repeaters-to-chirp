@@ -1,33 +1,39 @@
-## Refaktorisering: `mode_chirp` → `mode_pack`
+## Mål
+Band-multiselecten i RepeaterFilterPanel visar idag råa SK6BA-koder ("2", "70", "23", "6cm", "1.5"). Visa istället amatörbandens vanliga namn på knappetiketten, utan att ändra filtervärden eller importlogik.
 
-Fältet är felnamngett — det används av CHIRP, VGC N76 och NiCSURE RT-880 och representerar pack-radens ursprungliga mode, inte en CHIRP-specifik egenskap.
+## Mapping (label-only)
+Definiera en `BAND_LABELS` i `src/lib/codeplug/modes.ts` (eller bredvid, t.ex. ny `bands.ts` — vi lägger i `modes.ts` om passande, annars liten ny fil `src/lib/codeplug/bands.ts`):
 
-### Ändringar
+| Råkod | Visad etikett |
+|-------|---------------|
+| `2`   | `2m`          |
+| `4`   | `4m`          |
+| `6`   | `6m`          |
+| `10`  | `10m`         |
+| `70`  | `70cm`        |
+| `23`  | `23cm`        |
+| `13`  | `13cm`        |
+| `9`   | `9cm`         |
+| `3`   | `3cm`         |
+| `6cm` | `6cm`         |
+| `1.5` | `1,25cm`      |
+| `""`  | `(tom)`       |
 
-Ren symbolbyte, ingen logikförändring. Sök/ersätt `mode_chirp` → `mode_pack` i:
+Okända koder visas oförändrade.
 
-**Källa**
-- `src/lib/codeplug/models.ts` — fältdefinition + JSDoc-kommentaren på `mode_effective` (uppdatera kommentar: "suggested CHIRP Mode for pack rows" → "pack row's original mode (NFM/FM/AM/USB/CW), used by CHIRP, VGC N76 and NiCSURE RT-880 exports").
-- `src/lib/codeplug/pipeline.ts` — default-init i `emptyPackFields()`.
-- `src/lib/codeplug/importers/channel_pack.ts` — write-site (rad 158).
-- `src/lib/codeplug/exporters/chirp.ts` — `resolveMode()` (rad 41).
-- `src/lib/codeplug/targets/vgc-n76.ts` — `isAm`, `encodeBandwidth`, rad-encoding + dokkommentar.
-- `src/lib/codeplug/targets/nicsure-rt880.ts` — `encodeBandwidth`, `encodeModulation`.
-- `src/components/codeplug/PreviewTable.tsx` — pack-mode fallback.
-- `src/components/codeplug/NamingEditor.tsx` — mock-default.
+Helper: `formatBandLabel(raw: string): string`.
 
-**Tester (uppdatera fältnamn och beskrivande testtitlar)**
-- `src/lib/codeplug/__tests__/helpers.ts`
-- `src/lib/codeplug/__tests__/exporters/chirp.test.ts`
-- `src/lib/codeplug/__tests__/targets/vgc-n76.test.ts`
-- `src/lib/codeplug/__tests__/targets/nicsure-rt880.test.ts`
+## Ändringar
+1. **Ny fil `src/lib/codeplug/bands.ts`** med `BAND_LABELS` och `formatBandLabel()`.
+2. **`src/components/codeplug/RepeaterFilterPanel.tsx`** — byt Band-`MultiSelect` till encode/decode på samma sätt som Land:
+   - `options={allBands.map(formatBandLabel)}`
+   - `value={settings.filter.bands.map(formatBandLabel)}`
+   - `onChange`: mappa tillbaka label → råkod via reverse-lookup; okända label = label själv.
+3. **Liten test** i `src/lib/codeplug/__tests__/` (ny `bands.test.ts`) som verifierar mappningen för kända + okända koder.
 
-### Inte i scope
+## Ej i scope
+- Ingen ändring av `band`-fältet i `NormalizedChannel`, filterlogik, eller export.
+- Preview-tabell och andra UI-ställen lämnas oförändrade i denna PR (kan följa upp om önskat).
 
-- Inga ändringar i pack-CSV:ns kolumnnamn (`mode` förblir `mode`).
-- Ingen ändring av fallback-logiken eller varningar.
-- Inga UI-strängar (svenska texter) påverkas.
-
-### Verifiering
-
-Kör `bunx vitest run` — alla befintliga tester ska passera med endast namnbytet.
+## Öppen fråga
+Bekräfta `1.5` → `1,25cm` (svensk decimal) eller hellre `1.25cm` / lämna som `1.5`?
