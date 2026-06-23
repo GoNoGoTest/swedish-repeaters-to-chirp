@@ -103,3 +103,72 @@ describe("parseAccess", () => {
     });
   });
 });
+
+describe("parseDigitalAccess", () => {
+  it("returns empty for empty input", () => {
+    const r = parseDigitalAccess("");
+    expect(r.dmr.colorCode).toBeNull();
+    expect(r.dmr.timeSlot).toBeNull();
+    expect(r.dmr.talkGroup).toBe("");
+    expect(r.c4fm.dgIdTx).toBeNull();
+    expect(r.c4fm.dgIdRx).toBeNull();
+    expect(r.p25.nac).toBe("");
+    expect(r.unknownTokens).toEqual([]);
+  });
+
+  describe("DMR", () => {
+    it("parses CC variants (CC6, CC 1, CC=1, CC06)", () => {
+      expect(parseDigitalAccess("CC6").dmr.colorCode).toBe(6);
+      expect(parseDigitalAccess("CC 1").dmr.colorCode).toBe(1);
+      expect(parseDigitalAccess("CC=1").dmr.colorCode).toBe(1);
+      expect(parseDigitalAccess("CC06").dmr.colorCode).toBe(6);
+    });
+    it("parses TS variants", () => {
+      expect(parseDigitalAccess("TS2").dmr.timeSlot).toBe(2);
+      expect(parseDigitalAccess("TS=2").dmr.timeSlot).toBe(2);
+    });
+    it("parses TG variants", () => {
+      expect(parseDigitalAccess("TG91").dmr.talkGroup).toBe("91");
+      expect(parseDigitalAccess("TG=240").dmr.talkGroup).toBe("240");
+    });
+  });
+
+  describe("C4FM", () => {
+    it("parses TX/RX in three forms", () => {
+      expect(parseDigitalAccess("TX00").c4fm.dgIdTx).toBe(0);
+      expect(parseDigitalAccess("TX 00").c4fm.dgIdTx).toBe(0);
+      expect(parseDigitalAccess("TX=00").c4fm.dgIdTx).toBe(0);
+      expect(parseDigitalAccess("RX12").c4fm.dgIdRx).toBe(12);
+      expect(parseDigitalAccess("RX 12").c4fm.dgIdRx).toBe(12);
+      expect(parseDigitalAccess("RX=12").c4fm.dgIdRx).toBe(12);
+    });
+  });
+
+  describe("P25", () => {
+    it("parses NAC in three forms (hex 3 digits)", () => {
+      expect(parseDigitalAccess("NAC293").p25.nac).toBe("293");
+      expect(parseDigitalAccess("NAC 293").p25.nac).toBe("293");
+      expect(parseDigitalAccess("NAC=293").p25.nac).toBe("293");
+      expect(parseDigitalAccess("nacABC").p25.nac).toBe("ABC");
+    });
+  });
+
+  it("mixed analog + digital: 123.0 / CC 1 → CC=1, no unknowns", () => {
+    const r = parseDigitalAccess("123.0 / CC 1");
+    expect(r.dmr.colorCode).toBe(1);
+    expect(r.unknownTokens).toEqual([]);
+  });
+
+  it("does not flag analog-consumable tokens as unknown", () => {
+    const cases = ["123.0", "1750", "DCS023", "DTCS 025", "D025", "carrier", "open", "none", "ingen", "no tone"];
+    for (const s of cases) {
+      const r = parseDigitalAccess(s);
+      expect(r.unknownTokens, `case=${s}`).toEqual([]);
+    }
+  });
+
+  it("flags truly unknown fragments", () => {
+    const r = parseDigitalAccess("XYZ42");
+    expect(r.unknownTokens).toEqual(["XYZ42"]);
+  });
+});
