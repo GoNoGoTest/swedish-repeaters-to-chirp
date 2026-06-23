@@ -165,6 +165,32 @@ function Index() {
     return pipeline.channels.filter((c) => !excludedKeys.has(channelKey(c)));
   }, [pipeline, excludedKeys]);
 
+  // Bygg en target-specifik previewMode-callback. Switchen narrowar
+  // `target` så att settings-typen blir exakt; assertNever tvingar fram
+  // uppdatering om ett nytt target läggs till.
+  const getExportMode = useMemo(() => {
+    switch (target.id) {
+      case "chirp-generic": {
+        const s = resolveTargetSettings(target, storedPatch);
+        return (c: NormalizedChannel) => target.previewMode?.(c, s) ?? "—";
+      }
+      case "vgc-n76": {
+        const s = resolveTargetSettings(target, storedPatch);
+        return (c: NormalizedChannel) => target.previewMode?.(c, s) ?? "—";
+      }
+      case "nicsure-rt880": {
+        const s = resolveTargetSettings(target, storedPatch);
+        return (c: NormalizedChannel) => target.previewMode?.(c, s) ?? "—";
+      }
+      case "rt-systems-yaesu-generic": {
+        const s = resolveTargetSettings(target, storedPatch);
+        return (c: NormalizedChannel) => target.previewMode?.(c, s) ?? "—";
+      }
+      default:
+        return assertNever(target);
+    }
+  }, [target, storedPatch]);
+
   const stats = useMemo(() => {
     if (!pipeline) return null;
     let warned = 0,
