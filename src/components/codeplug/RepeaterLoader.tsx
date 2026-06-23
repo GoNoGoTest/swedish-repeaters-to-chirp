@@ -149,6 +149,22 @@ export function RepeaterLoader({
           )}
         </div>
       )}
+      {loadState.status === "loaded" && loadState.parseWarnings.length > 0 && (
+        <div
+          role="status"
+          className="mt-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
+        >
+          <div className="font-medium">
+            CSV:n innehåller {loadState.parseWarnings.length} parse-varning
+            {loadState.parseWarnings.length === 1 ? "" : "ar"} (laddad ändå)
+          </div>
+          <ul className="mt-1 list-disc pl-5 font-mono">
+            {loadState.parseWarnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </>
   );
 }

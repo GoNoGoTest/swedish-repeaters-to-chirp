@@ -2,6 +2,7 @@ import Papa from "papaparse";
 import type { NormalizedChannel, Warning } from "../models";
 import { parseNumberLoose } from "./sk6ba";
 import { UNKNOWN_REGION } from "../region";
+import { packRowSchema, formatPapaError } from "./schemas";
 
 export const PACK_COLUMNS = [
   "pack_id",
@@ -47,6 +48,8 @@ export interface PackParseResult {
   channels: ParsedPackChannel[];
   fileName: string;
   headerWarnings: string[];
+  /** Icke-fatala PapaParse-fel och schema-warnings för enskilda rader. */
+  parseWarnings: string[];
 }
 
 function parseBool(v: string | undefined, fieldName: string, warnings: Warning[]): boolean {
@@ -89,12 +92,25 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
   for (const req of REQUIRED_COLUMNS) {
     if (!columns.includes(req)) headerWarnings.push(`Saknad obligatorisk kolumn: ${req}`);
   }
+  const parseWarnings: string[] = (result.errors ?? []).map((e) =>
+    formatPapaError({ row: e.row, code: e.code ?? e.type, message: e.message }),
+  );
   const seenIds = new Set<string>();
   const channels: ParsedPackChannel[] = [];
   let packId = "";
 
   result.data.forEach((r, idx) => {
     const warnings: Warning[] = [];
+    const check = packRowSchema.safeParse(r);
+    if (!check.success) {
+      parseWarnings.push(
+        formatPapaError({
+          row: idx,
+          code: "schema_invalid",
+          message: check.error.issues[0]?.message ?? "Ogiltig rad",
+        }),
+      );
+    }
     const rowPackId = (r.pack_id ?? "").trim();
     if (rowPackId && !packId) packId = rowPackId;
     if (!rowPackId) warnings.push({ code: "pack_missing_required", message: "Saknad pack_id" });
@@ -217,7 +233,7 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
     channels.push(ch);
   });
 
-  return { packId: packId || fileName, channels, fileName, headerWarnings };
+  return { packId: packId || fileName, channels, fileName, headerWarnings, parseWarnings };
 }
 
 export interface PackFilterCriteria {

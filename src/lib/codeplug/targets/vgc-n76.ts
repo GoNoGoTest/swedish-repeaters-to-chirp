@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { z } from "zod";
 import type { NormalizedChannel, SplitSettings, Warning } from "../models";
 import { channelSignalMode } from "../modes";
 import { registerTarget } from "./registry";
@@ -54,6 +55,16 @@ export const VGC_N76_DEFAULTS: VgcN76Settings = {
   skipLinks: false,
   reserveAprsSlot32: false,
 };
+
+export const vgcN76SettingsSchema: z.ZodType<VgcN76Settings> = z.object({
+  maxLength: z.number().int().min(1).max(64),
+  defaultPower: z.enum(["H", "M", "L"]),
+  defaultBandwidth: z.union([z.literal(12500), z.literal(25000)]),
+  channelsPerGroup: z.number().int().min(1).max(32),
+  padToChannels: z.number().int().min(0).nullable(),
+  skipLinks: z.boolean(),
+  reserveAprsSlot32: z.boolean(),
+});
 
 const VGC_N76_CHANNELS_PER_GROUP = 32;
 
@@ -402,6 +413,7 @@ export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
   fileExtension: "csv",
   limits: VGC_N76_LIMITS,
   defaultSettings: VGC_N76_DEFAULTS,
+  settingsSchema: vgcN76SettingsSchema,
   resolveMaxNameLength: (s) => s.maxLength,
   previewMode: (c, s) => {
     // Digitala SK6BA-rader filtreras bort vid export — visa kanonisk signal

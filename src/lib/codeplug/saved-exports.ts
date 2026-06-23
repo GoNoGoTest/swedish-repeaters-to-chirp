@@ -4,6 +4,8 @@
  * skrivs över; samma filnamn med nytt innehåll versioneras (_v2, _v3, …).
  */
 
+import { z } from "zod";
+
 const KEY = "sk6ba:exports:v1";
 const MAX_ENTRIES = 5;
 
@@ -16,6 +18,16 @@ export interface SavedExport {
   content: string; // raw CSV text
 }
 
+const savedExportSchema = z.object({
+  id: z.string().min(1),
+  filename: z.string().min(1),
+  savedAt: z.number(),
+  rowCount: z.number().int().min(0),
+  byteSize: z.number().int().min(0),
+  content: z.string(),
+});
+const savedExportListSchema = z.array(savedExportSchema);
+
 function safeRead(): SavedExport[] {
   if (typeof window === "undefined") return [];
   try {
@@ -23,9 +35,14 @@ function safeRead(): SavedExport[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (x): x is SavedExport => x && typeof x.id === "string" && typeof x.content === "string",
-    );
+    // Filtrera bort entries som inte matchar schemat istället för att kasta hela listan.
+    const valid: SavedExport[] = [];
+    for (const item of parsed) {
+      const check = savedExportSchema.safeParse(item);
+      if (check.success) valid.push(check.data);
+    }
+    const all = savedExportListSchema.safeParse(valid);
+    return all.success ? all.data : [];
   } catch {
     return [];
   }

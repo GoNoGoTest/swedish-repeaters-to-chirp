@@ -60,16 +60,25 @@ export function __resetTargetsForTests(): void {
 
 /**
  * Merge a target's defaults with the user's persisted patch, producing a
- * fully-typed settings object for that specific target. The single internal
- * cast is justified by `TargetSettingsMap` being the source of truth for
- * which id maps to which settings shape.
+ * fully-typed settings object for that specific target. If the target
+ * deklarerar ett `settingsSchema` valideras den sammanslagna payloaden mot
+ * det — vid schemafel faller vi tillbaka på defaults för det target.
  */
 export function resolveTargetSettings<T extends AnyExportTarget>(
   target: T,
   stored: Record<string, unknown> | undefined,
 ): T["defaultSettings"] {
-  return {
+  const merged = {
     ...(target.defaultSettings as object),
     ...(stored ?? {}),
-  } as unknown as T["defaultSettings"];
+  };
+  if (target.settingsSchema) {
+    const parsed = target.settingsSchema.safeParse(merged);
+    if (parsed.success) {
+      return parsed.data as T["defaultSettings"];
+    }
+    // Trasig patch: använd defaults istället för att läcka ut ogiltiga värden.
+    return target.defaultSettings as T["defaultSettings"];
+  }
+  return merged as unknown as T["defaultSettings"];
 }

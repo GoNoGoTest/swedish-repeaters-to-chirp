@@ -6,6 +6,7 @@ const STORAGE_KEY = "sk6ba-chirp-settings-v6";
 
 import { parseModes } from "@/lib/codeplug/modes";
 import { getTarget } from "@/lib/codeplug/targets";
+import { settingsSchema } from "@/lib/codeplug/settings.schema";
 
 function migrateFilter(
   parsedFilter: Record<string, unknown> | undefined | null,
@@ -45,26 +46,60 @@ function migrateFilter(
   return base as unknown as Settings["filter"];
 }
 
+/**
+ * Validera `export.perTarget` mot varje targets eget `settingsSchema`. Ogiltiga
+ * patches ersätts av target-defaults så vi inte läcker ut t.ex. `maxLength: -1`
+ * till exportern. Okända target-id:n droppas tyst (target finns inte längre).
+ */
+function sanitizePerTarget(perTarget: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [id, patch] of Object.entries(perTarget)) {
+    const t = getTarget(id);
+    if (!t) continue;
+    if (t.settingsSchema) {
+      const merged = { ...(t.defaultSettings as object), ...((patch as object) ?? {}) };
+      const parsed = t.settingsSchema.safeParse(merged);
+      out[id] = parsed.success ? parsed.data : t.defaultSettings;
+    } else {
+      out[id] = patch;
+    }
+  }
+  return out;
+}
+
 function loadStoredSettings(): Settings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const migrated = { ...parsed, filter: migrateFilter(parsed?.filter as never) };
+    const check = settingsSchema.safeParse(migrated);
+    if (!check.success) {
+      console.warn("Sparade inställningar ogiltiga, återställer defaults", check.error.format());
+      return DEFAULT_SETTINGS;
+    }
+    const data = check.data as Record<string, unknown>;
+    const exportPatch = (data.export as Record<string, unknown>) ?? {};
+    const perTargetRaw = (exportPatch.perTarget as Record<string, unknown>) ?? {};
+    const perTarget = sanitizePerTarget(perTargetRaw);
+    const targetIdRaw = exportPatch.targetId as string | undefined;
+    const targetId =
+      targetIdRaw && getTarget(targetIdRaw) ? targetIdRaw : DEFAULT_SETTINGS.export.targetId;
     return {
       ...DEFAULT_SETTINGS,
-      ...parsed,
-      filter: migrateFilter(parsed.filter),
-      naming: { ...DEFAULT_SETTINGS.naming, ...(parsed.naming ?? {}) },
-      packs: { ...DEFAULT_SETTINGS.packs, ...(parsed.packs ?? {}) },
-      sort: { ...DEFAULT_SETTINGS.sort, ...(parsed.sort ?? {}) },
+      ...(data as Partial<Settings>),
+      filter: migrated.filter as Settings["filter"],
+      naming: { ...DEFAULT_SETTINGS.naming, ...((data.naming as object) ?? {}) },
+      packs: { ...DEFAULT_SETTINGS.packs, ...((data.packs as object) ?? {}) },
+      sort: { ...DEFAULT_SETTINGS.sort, ...((data.sort as object) ?? {}) },
       export: {
-        targetId:
-          parsed?.export?.targetId && getTarget(parsed.export.targetId)
-            ? parsed.export.targetId
-            : DEFAULT_SETTINGS.export.targetId,
-        perTarget: { ...DEFAULT_SETTINGS.export.perTarget, ...(parsed?.export?.perTarget ?? {}) },
-        split: { ...DEFAULT_SETTINGS.export.split, ...(parsed?.export?.split ?? {}) },
+        targetId,
+        perTarget: { ...DEFAULT_SETTINGS.export.perTarget, ...perTarget },
+        split: {
+          ...DEFAULT_SETTINGS.export.split,
+          ...((exportPatch.split as object) ?? {}),
+        },
       },
     };
   } catch {
