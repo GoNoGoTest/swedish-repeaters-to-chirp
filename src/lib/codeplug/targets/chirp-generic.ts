@@ -52,6 +52,7 @@ export const CHIRP_GENERIC_TARGET: ExportTarget<ChirpSettings> = {
   limits: CHIRP_GENERIC_LIMITS,
   defaultSettings: CHIRP_GENERIC_DEFAULTS,
   resolveMaxNameLength: (s) => s.maxLength,
+  previewMode: (c, s) => resolveChirpMode(c, s.mode),
   validate: (channels) => chirpDigitalWarnings(channels),
   export: (channels: NormalizedChannel[], settings: ChirpSettings) => ({
     filename: "chirp.csv",
