@@ -18,9 +18,9 @@ Ny funktion bredvid:
 
 ```ts
 export interface DigitalAccess {
-  dmr:  { colorCode: number | null; timeSlot: number | null; talkGroup: string };
+  dmr: { colorCode: number | null; timeSlot: number | null; talkGroup: string };
   c4fm: { dgIdTx: number | null; dgIdRx: number | null };
-  p25:  { nac: string };
+  p25: { nac: string };
   unknownTokens: string[];
 }
 export function parseDigitalAccess(raw: string | undefined | null): DigitalAccess;
@@ -52,7 +52,9 @@ export function classifyMode(mode: string): AccessClass {
   return "none"; // CW och övrigt
 }
 
-export function isAnalogToneMode(c: NormalizedChannel): boolean { /* m_effective / m_pack */ }
+export function isAnalogToneMode(c: NormalizedChannel): boolean {
+  /* m_effective / m_pack */
+}
 ```
 
 CW räknas inte som analog tone-mode. Tom mode klassas konservativt som `"analog"`. Synonymer (`DV`, `DN`, `DSTAR`, `DMR+`) klassas till rätt klass.
@@ -80,21 +82,22 @@ Inga nya `WarningCode`-värden.
 ## 4. `pipeline.ts` — mode-medveten subset efter expansion
 
 I `normalize()`:
+
 - `parseAccess(r.access)` fyller `ctcss_tx`, `uses_1750`, `dtcs_code`, `dtcs_polarity`, **och nya `analog_carrier_open = access.carrier`**.
 - `parseDigitalAccess(r.access)` fyller digitala fält + `access_unknown_tokens`.
 - `missing_access_tone` och `ctcss_and_dcs` skapas **inte** här.
 
 `runPipeline` kör efter `expandModes`: `applyModeAccessSubset(c)` för **alla** kanaler (även pack-rader):
 
-| `classifyMode` | Analog fält (`ctcss_tx`, `uses_1750`, `dtcs_code`, `dtcs_polarity`, `analog_carrier_open`) | Digitala fält | `digital_access_raw` |
-| -------------- | ------------------------------------------------------------------------------------------ | ------------- | -------------------- |
-| `analog`       | behåll                                                                                     | nollas        | `""`                 |
-| `dmr`          | nollas                                                                                     | behåll DMR    | `access_raw`         |
-| `c4fm`         | nollas                                                                                     | behåll C4FM   | `access_raw`         |
-| `dstar`        | nollas                                                                                     | (inga strukt.) | `access_raw`        |
-| `p25`          | nollas                                                                                     | behåll `p25_nac` | `access_raw`      |
-| `tetra`        | nollas                                                                                     | (inga strukt.) | `access_raw`        |
-| `none` (CW)    | nollas                                                                                     | nollas         | `""`                |
+| `classifyMode` | Analog fält (`ctcss_tx`, `uses_1750`, `dtcs_code`, `dtcs_polarity`, `analog_carrier_open`) | Digitala fält    | `digital_access_raw` |
+| -------------- | ------------------------------------------------------------------------------------------ | ---------------- | -------------------- |
+| `analog`       | behåll                                                                                     | nollas           | `""`                 |
+| `dmr`          | nollas                                                                                     | behåll DMR       | `access_raw`         |
+| `c4fm`         | nollas                                                                                     | behåll C4FM      | `access_raw`         |
+| `dstar`        | nollas                                                                                     | (inga strukt.)   | `access_raw`         |
+| `p25`          | nollas                                                                                     | behåll `p25_nac` | `access_raw`         |
+| `tetra`        | nollas                                                                                     | (inga strukt.)   | `access_raw`         |
+| `none` (CW)    | nollas                                                                                     | nollas           | `""`                 |
 
 Mode-beroende varningar efter subset:
 
@@ -109,7 +112,21 @@ Behåll all befintlig läsning av `tone`, `rtone_freq`, `ctone_freq`, `dtcs_code
 **Utöka `knownModes`** (inkluderar både `DMRPLUS` och `DMR+`, konsekvent med `classifyMode`):
 
 ```ts
-const knownModes = ["NFM","FM","USB","LSB","CW","AM","DV","DIG","DMR","DMRPLUS","DMR+","C4FM","P25"];
+const knownModes = [
+  "NFM",
+  "FM",
+  "USB",
+  "LSB",
+  "CW",
+  "AM",
+  "DV",
+  "DIG",
+  "DMR",
+  "DMRPLUS",
+  "DMR+",
+  "C4FM",
+  "P25",
+];
 ```
 
 Kör `parseDigitalAccess(r.tone)` endast om strängen matchar:
@@ -135,6 +152,7 @@ function resolveToneFields(c: NormalizedChannel): ToneFields {
 ```
 
 `resolveComment(c)` utökas:
+
 - DMR-kanal: append `DMR CC=<n>` (+ `TS=<n>` / `TG=<id>` om satta).
 - C4FM-kanal: append `C4FM TX=<nn>` / `RX=<nn>` om satta.
 - P25-kanal: append `P25 NAC=<hex>` om satt.
