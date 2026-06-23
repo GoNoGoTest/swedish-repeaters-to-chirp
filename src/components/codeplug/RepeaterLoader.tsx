@@ -5,6 +5,7 @@ import {
   type SavedExport,
 } from "@/lib/codeplug/saved-exports";
 import type { Sk6baLoadState } from "@/lib/codeplug/importers/sk6ba";
+import { ParseWarningsPanel } from "./ParseWarningsPanel";
 
 const FRESHNESS_DOT: Record<"fresh" | "stale" | "old", string> = {
   fresh: "bg-emerald-500",
