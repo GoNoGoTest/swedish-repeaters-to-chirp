@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { runPipeline } from "../pipeline";
 import { DEFAULT_SETTINGS } from "../defaults";
 import type { Settings } from "../models";
+import { makeChannel } from "./helpers";
 
 const baseSettings: Settings = {
   ...DEFAULT_SETTINGS,
