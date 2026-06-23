@@ -24,6 +24,15 @@ describe("runPipeline (sk6ba only)", () => {
     expect(r.packCount).toBe(0);
   });
 
+  it("reports withRx and droppedByDedupe counters", () => {
+    const { rows } = parseSk6baCsv(sk6baCsv);
+    const r = runPipeline({ sk6baRows: rows, settings: baseSettings });
+    // Fixture has 6 rows; all have parseable output -> all 6 have RX.
+    expect(r.withRx).toBe(6);
+    // No packs supplied, so dedupe drops nothing.
+    expect(r.droppedByDedupe).toBe(0);
+  });
+
   it("assigns final names and resolves collisions", () => {
     const { rows } = parseSk6baCsv(sk6baCsv);
     const r = runPipeline({ sk6baRows: rows, settings: baseSettings });
