@@ -1,7 +1,7 @@
 import Papa from "papaparse";
 import type { ChirpSettings, NormalizedChannel, Warning } from "../models";
 import { formatFrequency } from "../frequency";
-import { channelSignalMode } from "../modes";
+
 import { isAnalogToneMode, classifyChannel } from "../accessModes";
 import { parseAccess } from "../tones";
 
