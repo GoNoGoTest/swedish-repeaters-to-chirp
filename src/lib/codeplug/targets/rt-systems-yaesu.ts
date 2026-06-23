@@ -290,12 +290,6 @@ export function exportRtSystemsYaesuCsv(
       message: `${unsupportedCount} kanal(er) har mode som Yaesu inte stöder (D-Star/DMR/…); exporterade som Operating Mode=FM.`,
     });
   }
-  if (rxOnlyExcluded > 0) {
-    warnings.push({
-      code: "rt_rx_only_excluded",
-      message: `${rxOnlyExcluded} kanal(er) är RX-only och exkluderades — vi saknar information om hur RT Systems markerar RX-only i CSV:n.`,
-    });
-  }
   return { csv, warnings };
 }
 
