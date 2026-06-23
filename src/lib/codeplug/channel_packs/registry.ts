@@ -1,4 +1,5 @@
 import { parseChannelPackCsv, type PackParseResult } from "../importers/channel_pack";
+import type { ParseWarning } from "../importers/schemas";
 
 // Auto-discover all CSV files in /channelpacks at build time.
 // New files added to that directory are picked up without code changes.
@@ -33,6 +34,7 @@ export interface MergedPack {
   channels: PackParseResult["channels"];
   fileNames: string[];
   headerWarnings: string[];
+  parseWarnings: ParseWarning[];
 }
 
 /**
@@ -49,12 +51,14 @@ export function loadMergedPacks(): MergedPack[] {
       existing.channels.push(...r.result.channels);
       existing.fileNames.push(r.fileName);
       existing.headerWarnings.push(...r.result.headerWarnings);
+      existing.parseWarnings.push(...r.result.parseWarnings);
     } else {
       map.set(id, {
         packId: id,
         channels: [...r.result.channels],
         fileNames: [r.fileName],
         headerWarnings: [...r.result.headerWarnings],
+        parseWarnings: [...r.result.parseWarnings],
       });
     }
   }
