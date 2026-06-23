@@ -1,39 +1,21 @@
-## Mål
-Band-multiselecten i RepeaterFilterPanel visar idag råa SK6BA-koder ("2", "70", "23", "6cm", "1.5"). Visa istället amatörbandens vanliga namn på knappetiketten, utan att ändra filtervärden eller importlogik.
+Just nu visas banden i den ordning de dyker upp i källfilen. Vi ska istället sortera dem efter riktig amatörbandsfrekvens, lägst först, med tomt band sist.
 
-## Mapping (label-only)
-Definiera en `BAND_LABELS` i `src/lib/codeplug/modes.ts` (eller bredvid, t.ex. ny `bands.ts` — vi lägger i `modes.ts` om passande, annars liten ny fil `src/lib/codeplug/bands.ts`):
+### Ändringar
 
-| Råkod | Visad etikett |
-|-------|---------------|
-| `2`   | `2m`          |
-| `4`   | `4m`          |
-| `6`   | `6m`          |
-| `10`  | `10m`         |
-| `70`  | `70cm`        |
-| `23`  | `23cm`        |
-| `13`  | `13cm`        |
-| `9`   | `9cm`         |
-| `3`   | `3cm`         |
-| `6cm` | `6cm`         |
-| `1.5` | `1,25cm`      |
-| `""`  | `(tom)`       |
+1. **Sorteringshjälp i `src/lib/codeplug/bands.ts`**
+   - Lägg till en frekvensbaserad sorteringsordning för alla kända bandkoder.
+   - Exportera `sortBands(bands: string[]): string[]` som:
+     - Sorterar kända band enligt frekvens (10m, 6m, 4m, 2m, 70cm, 23cm, 13cm, 9cm, 6cm, 3cm, 1,25cm).
+     - Lägger okända koder i alfabetisk ordning efter kända band.
+     - Lägger tom sträng `""` (visas som "(tom)") sist.
 
-Okända koder visas oförändrade.
+2. **Uppdatera `src/components/codeplug/RepeaterFilterPanel.tsx`**
+   - Ersätt `const allBands = Object.keys(summary.uniqueCounts.band);` med sorterad variant: `const allBands = sortBands(Object.keys(summary.uniqueCounts.band));`.
+   - Resten av flervalstrukturen för "Band" behöver inte ändras eftersom den redan använder `formatBandLabel` / `parseBandLabel`.
 
-Helper: `formatBandLabel(raw: string): string`.
+3. **Tester i `src/lib/codeplug/__tests__/bands.test.ts`**
+   - Lägg till testfall som verifierar sorteringen, inklusive att `(tom)` hamnar sist och att okända koder inte stör ordningen.
 
-## Ändringar
-1. **Ny fil `src/lib/codeplug/bands.ts`** med `BAND_LABELS` och `formatBandLabel()`.
-2. **`src/components/codeplug/RepeaterFilterPanel.tsx`** — byt Band-`MultiSelect` till encode/decode på samma sätt som Land:
-   - `options={allBands.map(formatBandLabel)}`
-   - `value={settings.filter.bands.map(formatBandLabel)}`
-   - `onChange`: mappa tillbaka label → råkod via reverse-lookup; okända label = label själv.
-3. **Liten test** i `src/lib/codeplug/__tests__/` (ny `bands.test.ts`) som verifierar mappningen för kända + okända koder.
-
-## Ej i scope
-- Ingen ändring av `band`-fältet i `NormalizedChannel`, filterlogik, eller export.
-- Preview-tabell och andra UI-ställen lämnas oförändrade i denna PR (kan följa upp om önskat).
-
-## Öppen fråga
-Bekräfta `1.5` → `1,25cm` (svensk decimal) eller hellre `1.25cm` / lämna som `1.5`?
+### Noteringar
+- Detta är en ren presentationsändring; filtervärdet sparas fortfarande som rå bandkod.
+- Inga ändringar i exportlogik eller datamodeller.
