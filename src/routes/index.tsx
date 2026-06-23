@@ -14,7 +14,11 @@ import { TargetPickerPanel } from "@/components/codeplug/TargetPickerPanel";
 import { RepeaterFilterPanel } from "@/components/codeplug/RepeaterFilterPanel";
 import { ChannelPacksPanel } from "@/components/codeplug/ChannelPacksPanel";
 import { NamingEditor } from "@/components/codeplug/NamingEditor";
-import { ExportPanel, RxOnlyExportNote } from "@/components/codeplug/ExportPanel";
+import {
+  ExportPanel,
+  RxOnlyExportNote,
+  RtSystemsRxOnlySkippedNote,
+} from "@/components/codeplug/ExportPanel";
 import { PreviewTable, channelKey } from "@/components/codeplug/PreviewTable";
 
 export const Route = createFileRoute("/")({
