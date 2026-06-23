@@ -2,7 +2,6 @@ export type WarningCode =
   | "missing_output"
   | "invalid_output"
   | "unclear_shift"
-  
   | "missing_coords"
   | "empty_name"
   | "name_collision"

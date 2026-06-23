@@ -298,7 +298,6 @@ function applyPostExpansionAccessWarnings(channels: NormalizedChannel[]): Normal
   });
 }
 
-
 export function runPipeline(input: PipelineInput): PipelineResult {
   const { sk6baRows, packChannels = [], settings, maxNameLength = 6 } = input;
   const totalInput = sk6baRows.length + packChannels.length;
