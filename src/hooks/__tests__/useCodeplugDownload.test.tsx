@@ -24,7 +24,7 @@ describe("useCodeplugDownload", () => {
     }) as unknown as typeof URL.createObjectURL;
     URL.revokeObjectURL = vi.fn() as unknown as typeof URL.revokeObjectURL;
     clickSpy = vi.fn();
-    HTMLAnchorElement.prototype.click = clickSpy;
+    HTMLAnchorElement.prototype.click = clickSpy as unknown as () => void;
   });
 
   afterEach(() => {
