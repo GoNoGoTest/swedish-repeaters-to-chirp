@@ -219,21 +219,31 @@ function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): N
       case "skip":
         continue;
       case "block_tx":
-        ch.duplex = "off";
-        ch.warnings.push({
-          code: "rx_only_blocked",
-          message: "RX-only: TX spärrad enligt target-konvention",
+        out.push({
+          ...ch,
+          duplex: "off",
+          warnings: [
+            ...ch.warnings,
+            {
+              code: "rx_only_blocked",
+              message: "RX-only: TX spärrad enligt target-konvention",
+            },
+          ],
         });
-        out.push(ch);
         break;
       case "mark":
       default:
-        ch.comment = ch.comment ? `RX-ONLY | ${ch.comment}` : "RX-ONLY";
-        ch.warnings.push({
-          code: "rx_only_marked",
-          message: "RX-only: markerad i Comment, exporteras som vanlig frekvens",
+        out.push({
+          ...ch,
+          comment: ch.comment ? `RX-ONLY | ${ch.comment}` : "RX-ONLY",
+          warnings: [
+            ...ch.warnings,
+            {
+              code: "rx_only_marked",
+              message: "RX-only: markerad i Comment, exporteras som vanlig frekvens",
+            },
+          ],
         });
-        out.push(ch);
         break;
     }
   }
@@ -255,36 +265,32 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   const sk6baSorted = sortChannels(sk6baFiltered, settings.sort);
 
   // Channel-pack rows come from a module-level cache and are reused across
-  // renders. Clone them and reset per-run state so warnings/duplex/comment
-  // mutations below don't accumulate on every re-render.
-  const validPacks = packChannels
-    .filter((c) => c.rx_frequency != null)
-    .map((c) => ({
-      ...c,
-      warnings: [],
-      collided: false,
-      generated_name_full: "",
-      generated_name_final: "",
-    }));
+  // renders. The pipeline below is pure — every stage returns new channel
+  // objects rather than mutating in place — so no defensive cloning or
+  // per-run reset of warnings/name fields is needed.
+  const validPacks = packChannels.filter((c) => c.rx_frequency != null);
   const packWithPolicy = applyRxOnlyPolicy(validPacks, settings);
   // Validate split: needs tx_frequency or it can't export properly
-  for (const ch of packWithPolicy) {
-    if (ch.duplex === "split" && ch.tx_frequency == null) {
-      ch.warnings.push({
-        code: "pack_split_unsupported",
-        message: "Split-kanal saknar tx_frequency",
-      });
-    }
-  }
+  const packValidated = packWithPolicy.map((ch) =>
+    ch.duplex === "split" && ch.tx_frequency == null
+      ? {
+          ...ch,
+          warnings: [
+            ...ch.warnings,
+            { code: "pack_split_unsupported", message: "Split-kanal saknar tx_frequency" },
+          ],
+        }
+      : ch,
+  );
 
   // Combine according to placement
   let combined: NormalizedChannel[];
-  if (settings.packs.placement === "off" || packWithPolicy.length === 0) {
+  if (settings.packs.placement === "off" || packValidated.length === 0) {
     combined = sk6baSorted;
   } else if (settings.packs.placement === "prepend") {
-    combined = [...packWithPolicy, ...sk6baSorted];
+    combined = [...packValidated, ...sk6baSorted];
   } else {
-    combined = [...sk6baSorted, ...packWithPolicy];
+    combined = [...sk6baSorted, ...packValidated];
   }
 
   // Freq dedupe across the whole set
@@ -300,31 +306,45 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     return override ?? DEFAULT_PACK_NAMING;
   };
 
-  for (const ch of combined) {
+  const named = combined.map((ch) => {
     const n = namingFor(ch);
     const { full, clipped } = buildName(ch, n, maxNameLength);
-    ch.generated_name_full = full;
-    ch.generated_name_final = clipped || "NONAME";
-    if (!clipped) ch.warnings.push({ code: "empty_name", message: "Tomt kanalnamn" });
-  }
+    const final = clipped || "NONAME";
+    const extraWarnings: Warning[] = clipped
+      ? []
+      : [{ code: "empty_name", message: "Tomt kanalnamn" }];
+    return {
+      ...ch,
+      generated_name_full: full,
+      generated_name_final: final,
+      collided: false,
+      warnings: extraWarnings.length ? [...ch.warnings, ...extraWarnings] : ch.warnings,
+    };
+  });
 
   // Collisions are resolved globally with the repeater naming policy
   // (we just need a deterministic suffix scheme — maxLength comes from the active export target).
-  const { unresolved } = resolveCollisions(combined, settings.naming, maxNameLength);
-  for (const ch of combined) {
-    if (ch.collided) {
-      const already = ch.warnings.some((w) => w.code === "name_collision");
-      if (!already) ch.warnings.push({ code: "name_collision", message: "Namnkollision" });
-    }
-  }
+  const { channels: resolved, unresolved } = resolveCollisions(
+    named,
+    settings.naming,
+    maxNameLength,
+  );
+  const finalChannels = resolved.map((ch) => {
+    if (!ch.collided) return ch;
+    if (ch.warnings.some((w) => w.code === "name_collision")) return ch;
+    return {
+      ...ch,
+      warnings: [...ch.warnings, { code: "name_collision", message: "Namnkollision" }],
+    };
+  });
 
   return {
-    channels: combined,
-    filteredOut: totalInput - combined.length,
+    channels: finalChannels,
+    filteredOut: totalInput - finalChannels.length,
     unresolvedCollisions: unresolved,
     totalInput,
-    packCount: combined.filter((c) => c.source_type === "channel_pack").length,
-    sk6baCount: combined.filter((c) => c.source_type === "sk6ba").length,
+    packCount: finalChannels.filter((c) => c.source_type === "channel_pack").length,
+    sk6baCount: finalChannels.filter((c) => c.source_type === "sk6ba").length,
     duplicateStop: dedupe.stopped,
     withRx,
     droppedByDedupe,
