@@ -63,19 +63,33 @@ const MODE_ALIASES: Record<string, KnownMode> = {
  */
 export function parseModes(raw: string | undefined | null): KnownMode[] {
   if (!raw) return [];
-  const tokens = String(raw)
-    .split(/[/,;|]/) // separators between modes
-    .flatMap((p) => p.split(/\s+/)) // and whitespace within a chunk
-    .map((t) => t.trim())
+  // Chunks are the regions between mode-list separators. Inside one chunk we
+  // first try to match the whole chunk as a phrase alias (so multi-word keys
+  // like "SYSTEM FUSION" or "D STAR" in MODE_ALIASES actually fire); if that
+  // fails we fall back to splitting on whitespace and looking up each token.
+  const chunks = String(raw)
+    .split(/[/,;|]/)
+    .map((c) => c.trim())
     .filter(Boolean);
   const seen = new Set<KnownMode>();
   const out: KnownMode[] = [];
-  for (const t of tokens) {
-    const canonical = MODE_ALIASES[t.toUpperCase()];
-    if (!canonical) continue;
-    if (seen.has(canonical)) continue;
+  const push = (canonical: KnownMode) => {
+    if (seen.has(canonical)) return;
     seen.add(canonical);
     out.push(canonical);
+  };
+  for (const chunk of chunks) {
+    const phraseKey = chunk.replace(/\s+/g, " ").toUpperCase();
+    const phraseHit = MODE_ALIASES[phraseKey];
+    if (phraseHit) {
+      push(phraseHit);
+      continue;
+    }
+    for (const tok of chunk.split(/\s+/)) {
+      if (!tok) continue;
+      const canonical = MODE_ALIASES[tok.toUpperCase()];
+      if (canonical) push(canonical);
+    }
   }
   return out;
 }
