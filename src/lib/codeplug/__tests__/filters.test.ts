@@ -45,7 +45,7 @@ describe("applyFilters", () => {
       includeUnknownDistricts: true,
       countries: [],
     };
-    expect(applyFilters([ch], legacy)).toHaveLength(1);
+    expect(applyFilters([ch], legacy as unknown as typeof f)).toHaveLength(1);
   });
 
   it("country filter keeps SE rows, drops NO when SE-only", () => {
