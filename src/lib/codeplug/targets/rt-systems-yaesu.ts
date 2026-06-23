@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { NormalizedChannel, SplitSettings, Warning } from "../models";
 import { registerTarget } from "./registry";
 import { buildSplitFiles } from "./split";
@@ -53,6 +54,17 @@ export const RT_SYSTEMS_YAESU_DEFAULTS: RtSystemsYaesuSettings = {
   startNumber: 1,
   padToRows: 999,
 };
+
+export const rtSystemsYaesuSettingsSchema: z.ZodType<RtSystemsYaesuSettings> = z.object({
+  maxLength: z.number().int().min(1).max(64),
+  defaultPower: z.enum(["Low", "Medium", "High"]),
+  defaultStep: z.string().min(1),
+  defaultUserCtcss: z.number().int().min(0).max(50),
+  defaultAms: z.enum(["Y", "N"]),
+  skipLinks: z.boolean(),
+  startNumber: z.number().int().min(0),
+  padToRows: z.number().int().min(0),
+});
 
 const RT_SYSTEMS_YAESU_LIMITS: HardwareLimits = {
   maxNameLength: 16,
@@ -303,6 +315,7 @@ export const RT_SYSTEMS_YAESU_TARGET: ExportTarget<RtSystemsYaesuSettings> = {
   fileExtension: "csv",
   limits: RT_SYSTEMS_YAESU_LIMITS,
   defaultSettings: RT_SYSTEMS_YAESU_DEFAULTS,
+  settingsSchema: rtSystemsYaesuSettingsSchema,
   resolveMaxNameLength: (s) => s.maxLength,
   previewMode: (c) => operatingMode(c).mode,
   validate: (channels, s) => exportRtSystemsYaesuCsv(channels, s).warnings,

@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { z } from "zod";
 import type { NormalizedChannel, Warning } from "../models";
 import { channelSignalMode } from "../modes";
 import { registerTarget } from "./registry";
@@ -64,6 +65,14 @@ export const NICSURE_RT880_DEFAULTS: NicsureRt880Settings = {
   defaultBandwidth: "Wide",
   zoneDimensions: ["country", "district", "type", "category"],
 };
+
+export const nicsureRt880SettingsSchema: z.ZodType<NicsureRt880Settings> = z.object({
+  startLocation: z.number().int().min(0),
+  maxLength: z.number().int().min(1).max(64),
+  defaultPower: z.enum(["Very High", "High", "Medium", "Low", "N/T"]),
+  defaultBandwidth: z.enum(["Wide", "Narrow"]),
+  zoneDimensions: z.array(z.enum(["country", "district", "type", "category"])).max(4),
+});
 
 const NICSURE_RT880_LIMITS: HardwareLimits = {
   maxChannels: 999,
@@ -425,6 +434,7 @@ export const NICSURE_RT880_TARGET: ExportTarget<NicsureRt880Settings> = {
   fileExtension: "csv",
   limits: NICSURE_RT880_LIMITS,
   defaultSettings: NICSURE_RT880_DEFAULTS,
+  settingsSchema: nicsureRt880SettingsSchema,
   resolveMaxNameLength: (s) => s.maxLength,
   previewMode: (c, s) => {
     // Digitala SK6BA-rader filtreras bort vid export — visa kanonisk signal

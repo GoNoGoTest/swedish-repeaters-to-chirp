@@ -1,3 +1,4 @@
+import type { z } from "zod";
 import type { NormalizedChannel, SplitSettings, Warning } from "../models";
 
 /**
@@ -68,6 +69,13 @@ export interface ExportTarget<TSettings = unknown> {
   fileExtension: "csv" | "txt" | string;
   limits: HardwareLimits;
   defaultSettings: TSettings;
+  /**
+   * Zod-schema för target-specifika settings. Används av loaders för att
+   * validera localStorage-data och avgöra om patchen ska accepteras eller
+   * falla tillbaka på defaults. Valfritt — saknat schema ⇒ inget extra
+   * skydd, settings antas redan strukturellt korrekta (legacy beteende).
+   */
+  settingsSchema?: z.ZodType<TSettings>;
   /** Optional pre-export validation against limits. */
   validate?: (channels: NormalizedChannel[], settings: TSettings) => Warning[];
   /** Produce a single exportable file. */

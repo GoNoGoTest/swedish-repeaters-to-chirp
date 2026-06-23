@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { ChirpSettings, NormalizedChannel, SplitSettings } from "../models";
 import { exportChirpCsv, chirpDigitalWarnings, resolveChirpMode } from "../exporters/chirp";
 import { registerTarget } from "./registry";
@@ -11,6 +12,14 @@ export const CHIRP_GENERIC_DEFAULTS: ChirpSettings = {
   skipLinks: false,
   maxLength: 6,
 };
+
+export const chirpSettingsSchema: z.ZodType<ChirpSettings> = z.object({
+  startLocation: z.number().int().min(0),
+  mode: z.enum(["NFM", "FM"]),
+  tStep: z.number().positive(),
+  skipLinks: z.boolean(),
+  maxLength: z.number().int().min(1).max(64),
+});
 
 const CHIRP_GENERIC_LIMITS: HardwareLimits = {
   // CHIRP itself doesn't impose a max; the actual radio does. We keep a
@@ -51,6 +60,7 @@ export const CHIRP_GENERIC_TARGET: ExportTarget<ChirpSettings> = {
   fileExtension: "csv",
   limits: CHIRP_GENERIC_LIMITS,
   defaultSettings: CHIRP_GENERIC_DEFAULTS,
+  settingsSchema: chirpSettingsSchema,
   resolveMaxNameLength: (s) => s.maxLength,
   previewMode: (c, s) => resolveChirpMode(c, s.mode),
   validate: (channels) => chirpDigitalWarnings(channels),
