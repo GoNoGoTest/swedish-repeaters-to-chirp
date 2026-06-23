@@ -557,10 +557,9 @@ export function ExportPanel({
                 )}
                 <option value="mark">Exportera normalt + markera RX-ONLY i Comment</option>
                 <option value="skip">
-                  Hoppa över helt
                   {settings.export.targetId === "rt-systems-yaesu-generic"
-                    ? " (rekommenderas)"
-                    : ""}
+                    ? "Hoppa över helt (rekommenderas)"
+                    : "Hoppa över helt"}
                 </option>
               </select>
               <Hint>{rxOnlyHintForTarget(settings.export.targetId)}</Hint>
