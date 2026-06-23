@@ -73,7 +73,8 @@ export function PreviewTable({
             const rowClass = excluded
               ? "opacity-40 line-through decoration-muted-foreground/50"
               : baseRowClass;
-            const mode = isPack && c.mode_pack ? c.mode_pack : chirpMode;
+            const signalMode = c.mode_pack || c.mode_effective || "—";
+            const exportMode = getExportMode(c);
             const loc = excluded ? "—" : String(locCounter++);
             return (
               <tr
