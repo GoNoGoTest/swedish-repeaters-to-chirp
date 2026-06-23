@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { exportChirpCsv, toChirpRows, CHIRP_COLUMNS } from "../../exporters/chirp";
+import {
+  exportChirpCsv,
+  toChirpRows,
+  CHIRP_COLUMNS,
+  chirpDigitalWarnings,
+} from "../../exporters/chirp";
 
 import { makeChannel } from "../helpers";
 
