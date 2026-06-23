@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { exportChirpCsv, toChirpRows, CHIRP_COLUMNS } from "../../exporters/chirp";
-import { DEFAULT_SETTINGS } from "../../defaults";
+
 import { makeChannel } from "../helpers";
 
 import { CHIRP_GENERIC_DEFAULTS } from "@/lib/codeplug/targets";
