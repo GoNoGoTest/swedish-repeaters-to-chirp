@@ -3,7 +3,14 @@ import { Switch } from "@/components/ui/switch";
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function channelKey(c: NormalizedChannel): string {
-  return `${c.source_type}:${c.pack_id ?? ""}:${c.source_id}:${c.source_row}`;
+  return [
+    c.source_type,
+    c.pack_id ?? "",
+    c.source_id,
+    c.source_row,
+    c.mode_effective,
+    c.rx_frequency?.toFixed(6) ?? "",
+  ].join(":");
 }
 
 export function PreviewTable({
