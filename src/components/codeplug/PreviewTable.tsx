@@ -19,7 +19,7 @@ export function PreviewTable({
   excludedKeys,
   onToggleExclude,
   getExportMode,
-  startLoc,
+  getExportLocation,
   exportCount,
 }: {
   channels: NormalizedChannel[];
@@ -27,10 +27,14 @@ export function PreviewTable({
   onToggleExclude: (key: string) => void;
   /** Returnera target-specifikt export-mode token för raden. */
   getExportMode: (c: NormalizedChannel) => string;
-  startLoc: number;
+  /**
+   * Verklig exportposition för raden, beräknad från hela exportordningen
+   * (inte den filtrerade previewn). Returnera `null` om raden inte ingår i
+   * exporten (exkluderad eller bortdroppad).
+   */
+  getExportLocation: (c: NormalizedChannel) => number | null;
   exportCount?: number;
 }) {
-  let locCounter = startLoc;
   return (
     <div className="overflow-auto rounded border border-border max-h-[70vh]">
       <table className="min-w-full text-xs font-mono">
@@ -76,7 +80,8 @@ export function PreviewTable({
               : baseRowClass;
             const signalMode = channelSignalMode(c) || "—";
             const exportMode = getExportMode(c);
-            const loc = excluded ? "—" : String(locCounter++);
+            const locNum = getExportLocation(c);
+            const loc = excluded || locNum == null ? "—" : String(locNum);
             return (
               <tr
                 key={`${c.source_type}-${c.source_row}-${c.source_id}-${i}`}
