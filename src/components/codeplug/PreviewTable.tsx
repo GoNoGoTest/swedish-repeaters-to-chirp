@@ -109,7 +109,8 @@ export function PreviewTable({
                     : c.offset.toFixed(3)}
                 </td>
                 <td className="px-2 py-1">{c.ctcss_tx ?? (c.uses_1750 ? "1750" : "—")}</td>
-                <td className="px-2 py-1">{mode}</td>
+                <td className="px-2 py-1">{signalMode}</td>
+                <td className="px-2 py-1">{exportMode}</td>
                 <td className="px-2 py-1 truncate max-w-[10rem]">
                   {isPack
                     ? `${c.service || "?"} / ${c.category || "?"}`
