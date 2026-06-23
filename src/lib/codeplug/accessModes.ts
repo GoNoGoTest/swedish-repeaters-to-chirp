@@ -23,7 +23,7 @@ export type AccessClass = "analog" | "dmr" | "c4fm" | "dstar" | "p25" | "tetra" 
  * analog tone tillämpas.
  */
 export function classifyMode(mode: string): AccessClass {
-  const m = (mode || "").toUpperCase();
+  const m = (mode || "").trim().toUpperCase();
   if (m === "" || m === "FM" || m === "NFM" || m === "WFM") return "analog";
   if (m === "DMR" || m === "DMRPLUS" || m === "DMR+") return "dmr";
   if (m === "C4FM" || m === "DN") return "c4fm";
