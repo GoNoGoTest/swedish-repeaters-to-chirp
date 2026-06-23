@@ -229,6 +229,7 @@ describe("targets/nicsure-rt880", () => {
     const row = parseRows(out.content)[1];
     expect(row[4]).toBe("0.00000");
     expect(out.warnings.some((w) => w.code === "nicsure_tx_block_unsupported")).toBe(true);
+  });
 
   describe("analog-only mode filtering", () => {
     it("mixed-mode SK6BA FM / C4FM only yields the FM row, with warning", () => {
