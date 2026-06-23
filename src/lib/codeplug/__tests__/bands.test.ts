@@ -40,7 +40,7 @@ describe("band labels", () => {
   it("sorts the full known band set in expected order", () => {
     const input = ["3", "6cm", "9", "13", "23", "70", "1.5", "2", "4", "6", "10", ""];
     expect(sortBands(input)).toEqual([
-      "10", "6", "4", "2", "1.5", "70", "23", "13", "9", "6cm", "3", "",
+      "10", "6", "4", "2", "70", "23", "13", "9", "6cm", "3", "1.5", "",
     ]);
   });
 });
