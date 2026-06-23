@@ -1,56 +1,72 @@
-# CHIRP Generic CSV — korrigera header, mode-mappning och digital-varning
+## Mål
 
-Verifierade fynden mot källfilerna (`src/lib/codeplug/exporters/chirp.ts`, `targets/chirp-generic.ts`, `models.ts`, `pipeline.ts`):
-
-- **DVCODE saknas** i `CHIRP_COLUMNS` (verifierat: 20 kolumner, ingen DVCODE). Stämmer.
-- **Mode-mappning är fel**: `resolveMode` använder bara `c.mode_chirp` för pack-rader och annars `s.mode`. `c.mode_effective` (satt av pipeline:n för SK6BA‐rader, t.ex. `"C4FM"`, `"D-Star"`, `"DMR"`) ignoreras helt. Stämmer.
-- **Ingen varning** finns för digitala moder i CHIRP-exporten idag. Stämmer.
-- **Tonlogiken** (defensiva defaults för `rToneFreq`/`cToneFreq`/`DtcsCode`/`DtcsPolarity`/`RxDtcsCode`/`CrossMode`) lämnas orörd.
+`HardwareLimits.supportedSignalModes` används idag bara för att gråa ut mode-toggles i UI:t (`RepeaterFilterPanel`). Det stoppar inte digitala SK6BA-rader om användaren ändå kryssar i C4FM/DMR i filtret, eller om kanalpaket bär digitala mode-värden. För analog-only-mål (VGC N76, Nicsure RT-880) ska digitala SK6BA-varianter filtreras bort i exportsteget med en tydlig varning, medan kanalpaketens `mode_chirp` (AM/FM/NFM) fortsatt går igenom.
 
 ## Ändringar
 
-### 1. `src/lib/codeplug/exporters/chirp.ts`
+### 1. `src/lib/codeplug/targets/vgc-n76.ts`
 
-- Lägg `"DVCODE"` sist i `CHIRP_COLUMNS`. Exportera som tom sträng.
-- Ny `resolveMode(c, fallback)`:
-  1. `c.source_type === "channel_pack"` och `c.mode_chirp` → `c.mode_chirp` (oförändrat).
-  2. Annars mappa `c.mode_effective`:
-     - `"FM"` → `fallback` (`settings.mode`, dvs `"NFM"`/`"FM"`)
-     - `"C4FM"` → `"DN"`
-     - `"D-Star"` → `"DV"`
-     - `"DMR"` → `"DMR"`
-     - `"DMRplus"` → `"DMR"`
-     - `"P25"` → `"P25"`
-     - `"CW"` → `"CW"`
-     - `"Tetra"`, tomt eller okänt → `fallback`
-- Ny exporterad helper `chirpDigitalWarnings(channels): Warning[]` som returnerar **en** icke-blockerande varning (code: `unknown_mode` återanvänds — befintliga koder räcker; eller vi kan lägga till `"chirp_digital_partial"` i `WarningCode` för tydlighet — väljer det senare för spårbarhet) när minst en kanal har `mode_effective ∈ {C4FM, D-Star, DMR, DMRplus, P25}`. Meddelandetext på svenska enligt spec.
+Lägg till en privat helper:
 
-### 2. `src/lib/codeplug/models.ts`
+```ts
+function filterAnalogFmSk6ba(channels: NormalizedChannel[]): {
+  kept: NormalizedChannel[];
+  droppedCount: number;
+} {
+  const kept: NormalizedChannel[] = [];
+  let droppedCount = 0;
+  for (const c of channels) {
+    if (c.source_type === "sk6ba" && c.mode_effective !== "" && c.mode_effective !== "FM") {
+      droppedCount++;
+      continue;
+    }
+    kept.push(c);
+  }
+  return { kept, droppedCount };
+}
+```
 
-- Lägg till `"chirp_digital_partial"` i `WarningCode`-unionen.
+Kör den i `toVgcN76Rows` (innan `channels.map`). Pusha en `Warning` med kod `vgc_digital_sk6ba_skipped`:
 
-### 3. `src/lib/codeplug/targets/chirp-generic.ts`
+> "N kanal(er) från SK6BA hoppades över: VGC N76 stöder bara analog FM, digitala mode (C4FM/D-Star/DMR/DMRplus/P25) går inte att skriva i app-CSV:n."
 
-- `supportedModes` → `["NFM","FM","WFM","AM","NAM","DV","DN","DMR","P25","CW","USB","LSB","RTTY","DIG","PKT"]`.
-- `supportedSignalModes` lämnas som idag (`["FM","C4FM","D-Star","DMR","DMRplus","P25","Tetra","CW"]`).
-- `export()` returnerar nu `warnings: chirpDigitalWarnings(channels)` istället för `[]`.
-- `exportMany`/`buildSplitFiles`: varningar är globala per export, så vi behåller dem på single-export-path; multi-file behåller nuvarande beteende (varningar visas via `validate`-vägen vid behov — lägg in `validate: (ch) => chirpDigitalWarnings(ch)` så att UI:n får varningen oavsett split).
+Kanalpaket (`source_type === "channel_pack"`) påverkas inte — `mode_chirp=AM/FM/NFM` fortsätter exporteras via befintlig `encodeBandwidth` / `isAm`.
 
-### 4. Tester (`src/lib/codeplug/__tests__/exporters/chirp.test.ts` + `targets/chirp-generic.test.ts`)
+`exportVgcN76Csv` använder redan `toVgcN76Rows`, så filter och varning når både single-fil och `exportMany` (varje chunk filtreras separat — det är OK eftersom `buildSplitFiles` redan splittar på den filtrerade datan ovanifrån; det dubbla skyddet säkerställer korrekt output även för direkta `toVgcN76Rows`-anrop i tester).
 
-- Uppdatera `EXPECTED_HEADER` att sluta med `,DVCODE`.
-- Uppdatera "never produces empty …"-testet — DVCODE får vara tom.
-- Nya cases (SK6BA-kanal via `makeChannel({ mode_effective: ... })`):
-  - `C4FM` → `Mode === "DN"`
-  - `D-Star` → `Mode === "DV"`
-  - `DMR` → `Mode === "DMR"`
-  - `DMRplus` → `Mode === "DMR"`
-  - `P25` → `Mode === "P25"`
-  - `FM` med `settings.mode = "NFM"` → `Mode === "NFM"` (regression)
-  - `channel_pack` med `mode_chirp: "USB"` och `mode_effective: "C4FM"` → `Mode === "USB"` (override-regression bibehållen)
-- Target-test: export av en kanal med `mode_effective: "C4FM"` → `result.warnings` innehåller exakt en varning med svensk text om "CHIRP Generic CSV"/"digitala".
-- Target-test: export av bara `FM`-kanaler → `result.warnings.length === 0`.
+### 2. `src/lib/codeplug/targets/nicsure-rt880.ts`
 
-## Teknisk not
+Samma mönster i `toNicsureRows`:
 
-`makeChannel`-helpern måste tillåta att `mode_effective` sätts. Verifieras vid implementation; annars läggs default = `""` och vi sätter värdet explicit i testet.
+```ts
+function filterAnalogFmSk6ba(...) { /* identical */ }
+```
+
+Varningskod `nicsure_digital_sk6ba_skipped`:
+
+> "N kanal(er) från SK6BA hoppades över: RT-880 stöder bara analog FM, digitala mode (C4FM/D-Star/DMR/DMRplus/P25) går inte att skriva i Nicsure-CSV:n."
+
+`Channel_Num`-numreringen baseras på den filtrerade listans index, vilket är önskvärt (inga "hål" i numreringen).
+
+### 3. `src/lib/codeplug/models.ts`
+
+Lägg till `"vgc_digital_sk6ba_skipped"` och `"nicsure_digital_sk6ba_skipped"` i `WarningCode`-unionen.
+
+### 4. Tester
+
+**`src/lib/codeplug/__tests__/targets/vgc-n76.test.ts`**
+- Mixed-mode SK6BA: simulera `expandModes`-utdata med två rader (samma source) `mode_effective="FM"` + `mode_effective="C4FM"`. Exporten ska ha 1 datarad (FM-raden), och `warnings` ska innehålla `vgc_digital_sk6ba_skipped` med "1 kanal".
+- Pack-rad med `source_type="channel_pack"` och `mode_chirp="AM"` ska komma med (rx_mod=1, tx_mod=1, bandwidth=25000) även om `mode_effective` är tom/digital.
+- Pack-rad med `mode_chirp="NFM"` → bandwidth=12500, rx_mod=0.
+
+**`src/lib/codeplug/__tests__/targets/nicsure-rt880.test.ts`**
+- Mixed-mode SK6BA: bara FM-raden exporteras, varning `nicsure_digital_sk6ba_skipped` med "1 kanal".
+- Pack med `mode_chirp="AM"` → `Modulation="AM"`, `Bandwidth="Wide"`.
+
+Använd befintliga test-helpers (`makeChannel` om den finns under `__tests__/helpers.ts`, annars konstruera literaler som befintliga test-fall).
+
+## Icke-ändringar
+
+- `supportedSignalModes` på targets förändras inte — UI-gatingen fortsätter fungera. SK6BA-rader filtreras i `expandModes` när användaren har bockat ur digitala modes i filtret; den nya logiken är en defensiv sista barriär för fallet då filtret ändå släpper igenom digitalt (t.ex. via tomt `filter.modes`).
+- CHIRP-target och RT Systems Yaesu rörs inte.
+- Pipeline och `filters.ts` rörs inte.
