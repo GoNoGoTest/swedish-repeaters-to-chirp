@@ -3,7 +3,14 @@ import { Switch } from "@/components/ui/switch";
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function channelKey(c: NormalizedChannel): string {
-  return `${c.source_type}:${c.pack_id ?? ""}:${c.source_id}:${c.source_row}`;
+  return [
+    c.source_type,
+    c.pack_id ?? "",
+    c.source_id,
+    c.source_row,
+    c.mode_effective,
+    c.rx_frequency?.toFixed(6) ?? "",
+  ].join(":");
 }
 
 export function PreviewTable({
@@ -147,8 +154,8 @@ export function PreviewTable({
         </tbody>
       </table>
       <div className="px-3 py-2 text-xs text-muted-foreground border-t border-border sticky bottom-0 bg-card">
-        {channels.length} rader visas · {exportCount ?? channels.length - excludedKeys.size}{" "}
-        exporteras
+        {channels.length} rader visas ·{" "}
+        {exportCount ?? channels.filter((c) => !excludedKeys.has(channelKey(c))).length} exporteras
       </div>
     </div>
   );
