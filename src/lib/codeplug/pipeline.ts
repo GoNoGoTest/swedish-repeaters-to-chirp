@@ -332,12 +332,15 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     settings.naming,
     maxNameLength,
   );
-  const finalChannels = resolved.map((ch) => {
+  const finalChannels: NormalizedChannel[] = resolved.map((ch) => {
     if (!ch.collided) return ch;
     if (ch.warnings.some((w) => w.code === "name_collision")) return ch;
     return {
       ...ch,
-      warnings: [...ch.warnings, { code: "name_collision", message: "Namnkollision" }],
+      warnings: [
+        ...ch.warnings,
+        { code: "name_collision", message: "Namnkollision" } satisfies Warning,
+      ],
     };
   });
 
