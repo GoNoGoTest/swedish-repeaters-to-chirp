@@ -80,7 +80,8 @@ export function PreviewTable({
               : baseRowClass;
             const signalMode = channelSignalMode(c) || "—";
             const exportMode = getExportMode(c);
-            const loc = excluded ? "—" : String(locCounter++);
+            const locNum = getExportLocation(c);
+            const loc = excluded || locNum == null ? "—" : String(locNum);
             return (
               <tr
                 key={`${c.source_type}-${c.source_row}-${c.source_id}-${i}`}
