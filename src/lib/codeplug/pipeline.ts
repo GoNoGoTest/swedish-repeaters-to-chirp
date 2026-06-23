@@ -255,6 +255,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   // Freq dedupe across the whole set
   const dedupe = applyFreqDedupe(combined, settings.packs.freqDupePolicy);
   combined = dedupe.channels;
+  const droppedByDedupe = dedupe.dropped.length;
 
   // Resolve naming per channel using the correct rules
   // (sk6ba = settings.naming, channel_pack = per-pack override or DEFAULT_PACK_NAMING)
