@@ -142,7 +142,7 @@ function VgcN76Panel({
           label="Kanaler per grupp"
           value={settings.channelsPerGroup}
           onChange={(v) => update({ channelsPerGroup: v })}
-          hint="N76 grupperar i klumpar om 32. Överskrids gränsen visas en varning — uppdelning sker manuellt i v1."
+          hint="N76 grupperar i klumpar om 32. Vid 'En enda fil' visas bara en varning om gränsen överskrids — välj 'Per distrikt + chunka' nedan för att dela upp filen automatiskt."
         />
         <NumberField
           label="Padda till antal rader"
