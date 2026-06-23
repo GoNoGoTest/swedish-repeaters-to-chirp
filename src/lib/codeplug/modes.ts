@@ -64,7 +64,7 @@ const MODE_ALIASES: Record<string, KnownMode> = {
 export function parseModes(raw: string | undefined | null): KnownMode[] {
   if (!raw) return [];
   const tokens = String(raw)
-    .split(/[\/,;|]/) // separators between modes
+    .split(/[/,;|]/) // separators between modes
     .flatMap((p) => p.split(/\s+/)) // and whitespace within a chunk
     .map((t) => t.trim())
     .filter(Boolean);
