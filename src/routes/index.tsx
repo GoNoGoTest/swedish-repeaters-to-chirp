@@ -334,22 +334,30 @@ function Index() {
                     <Stat
                       label="Varningar"
                       value={stats?.warned ?? 0}
-                      tooltip="Exportkanaler som har minst en varning (t.ex. RX-only-policy, otydlig access, namnsaknad). Kanalerna exporteras ändå — se preview-tabellen för detaljer."
+                      tooltip="Exportkanaler som har minst en varning (t.ex. RX-only-policy, otydlig access, namnsaknad). Klicka för att filtrera previewn — exporten påverkas inte."
+                      onClick={() => toggleStatFilter("warned")}
+                      active={statFilter === "warned"}
                     />
                     <Stat
                       label="Namnkollisioner"
                       value={stats?.collided ?? 0}
-                      tooltip="Kanaler där det genererade namnet krockar med ett annat. Suffix-systemet har försökt göra dem unika — justera namnmallen om något fortfarande är otydligt."
+                      tooltip="Kanaler där det genererade namnet krockar med ett annat. Klicka för att filtrera previewn — exporten påverkas inte."
+                      onClick={() => toggleStatFilter("collided")}
+                      active={statFilter === "collided"}
                     />
                     <Stat
                       label="Frekvensdubbletter"
                       value={stats?.dupes ?? 0}
-                      tooltip="Kanaler som delar RX-frekvens med en annan kanal (oftast pack-vs-SK6BA). Påverkar inte exporten om policyn är 'behåll båda', men kan duplicera kanalplatser i radion."
+                      tooltip="Kanaler som delar RX-frekvens med en annan kanal (oftast pack-vs-SK6BA). Klicka för att filtrera previewn — exporten påverkas inte."
+                      onClick={() => toggleStatFilter("dupes")}
+                      active={statFilter === "dupes"}
                     />
                     <Stat
                       label="RX-only"
                       value={stats?.rxOnly ?? 0}
-                      tooltip="Kanaler från kanalpaket som är mottagningsbara men inte sändningsbara. Hur de exporteras beror på vald RX-only-policy (markerad i comment, TX spärrad, eller stoppar export)."
+                      tooltip="Kanaler från kanalpaket som är mottagningsbara men inte sändningsbara. Klicka för att filtrera previewn — exporten påverkas inte."
+                      onClick={() => toggleStatFilter("rxOnly")}
+                      active={statFilter === "rxOnly"}
                     />
                   </div>
                   {excludedKeys.size > 0 && (
