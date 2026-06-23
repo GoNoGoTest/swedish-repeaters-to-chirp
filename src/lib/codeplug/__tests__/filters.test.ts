@@ -39,7 +39,7 @@ describe("applyFilters", () => {
 
   it("legacy includeUnknownDistricts still works as alias when new field is undefined", () => {
     const ch = makeChannel({ district: "" });
-    const legacy: any = {
+    const legacy = {
       ...f,
       includeUnknownRegions: undefined,
       includeUnknownDistricts: true,
