@@ -580,7 +580,7 @@ function Index() {
                     channels={previewChannels}
                     excludedKeys={excludedKeys}
                     onToggleExclude={toggleExclude}
-                    chirpMode={target.id === "chirp-generic" ? chirpSettings.mode : "NFM"}
+                    getExportMode={getExportMode}
                     startLoc={target.id === "chirp-generic" ? chirpSettings.startLocation : 1}
                     exportCount={exportChannels.length}
                   />
