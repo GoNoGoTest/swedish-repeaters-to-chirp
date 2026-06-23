@@ -253,3 +253,27 @@ describe("RT Systems Yaesu — padding", () => {
   });
 });
 
+
+describe("RT Systems Yaesu — RX-only", () => {
+  it("excludes rx_only channels from CSV and emits rt_rx_only_excluded warning", () => {
+    const rxOnly = makeChannel({
+      generated_name_final: "MARINE16", mode_effective: "FM",
+      rx_frequency: 156.8, duplex: "", rx_only: true, tx_allowed: false,
+    });
+    const normal = makeChannel({
+      generated_name_final: "RV48", mode_effective: "FM",
+      rx_frequency: 145.6, duplex: "-", offset: 0.6, tx_shift: -0.6,
+    });
+    const { csv, warnings } = exportRtSystemsYaesuCsv([rxOnly, normal], { ...S, padToRows: 0 });
+    const lines = csv.split("\r\n");
+    // 1 header + 1 channel (rx_only excluded) + trailing empty line
+    expect(lines.length).toBe(3);
+    // The surviving row's Name column is the non-rx_only channel
+    expect(lines[1].split(",")[7]).toBe("RV48");
+    const w = warnings.find((x) => x.code === "rt_rx_only_excluded");
+    expect(w).toBeDefined();
+    expect(w!.message).toContain("1 kanal");
+  });
+});
+
+

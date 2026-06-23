@@ -25,9 +25,10 @@ export type WarningCode =
   | "vgc_title_truncated"
   | "vgc_unsupported_mode"
   | "nicsure_zone_pool_exhausted"
-  | "nicsure_tx_block_unsupported"
+  | "nicsure_rx_only_marked"
   | "rt_unsupported_mode"
   | "rt_name_truncated"
+  | "rt_rx_only_excluded"
   | "chirp_digital_partial"
   | "vgc_digital_sk6ba_skipped"
   | "nicsure_digital_sk6ba_skipped";
