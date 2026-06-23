@@ -303,5 +303,6 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     duplicateStop: dedupe.stopped,
     withRx,
     droppedByDedupe,
+    outOfScope,
   };
 }
