@@ -74,6 +74,12 @@ export interface NormalizedChannel {
   channel: string;
   network: string;
   network_id: string;
+  /**
+   * Källfältets råa accessteckenström — kan innehålla både analoga och
+   * digitala tokens (t.ex. `110.9 / CC 1`). Använd `ctcss_tx`, `dtcs_code`,
+   * `dmr_color_code` m.fl. för strukturerade värden i stället för att
+   * reparsa detta fält.
+   */
   access_raw: string;
   rx_frequency: number | null;
   tx_shift_raw: string;
@@ -83,6 +89,25 @@ export interface NormalizedChannel {
   offset: number;
   ctcss_tx: number | null;
   uses_1750: boolean;
+  /** True när access innehöll carrier/open/none/ingen/no tone. */
+  analog_carrier_open: boolean;
+  // Digital access — strukturerat per mode. Endast satt när mode-klassen
+  // matchar (se accessModes.ts / applyModeAccessSubset).
+  dmr_color_code: number | null;
+  dmr_timeslot: number | null;
+  dmr_talkgroup: string;
+  /**
+   * C4FM/DG-ID-liknande metadata från SK6BA `access`-fältet (TX00/RX00).
+   * Framtida exportmål får inte anta att detta ensamt räcker för komplett
+   * System Fusion-programmering.
+   */
+  c4fm_dg_id_tx: number | null;
+  c4fm_dg_id_rx: number | null;
+  p25_nac: string;
+  /** Rå digital accesssträng — satt per digital expanderad kanal. */
+  digital_access_raw: string;
+  /** Diagnostik: tokens som varken analog- eller digital-parsern konsumerade. */
+  access_unknown_tokens: string[];
   lat: number | null;
   lng: number | null;
   locator: string;
