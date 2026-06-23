@@ -429,8 +429,9 @@ export const NICSURE_RT880_TARGET: ExportTarget<NicsureRt880Settings> = {
   previewMode: (c, s) => {
     // Digitala SK6BA-rader filtreras bort vid export — visa kanonisk signal
     // i previewen så det är tydligt att de inte hamnar i filen.
-    if (c.source_type === "sk6ba" && c.mode_effective && c.mode_effective !== "FM") {
-      return c.mode_effective;
+    const sig = channelSignalMode(c);
+    if (c.source_type === "sk6ba" && sig && sig !== "FM") {
+      return sig;
     }
     const mod = encodeModulation(c);
     if (mod.mod === "AM") return "AM";
