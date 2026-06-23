@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { exportChirpCsv, toChirpRows, CHIRP_COLUMNS } from "../../exporters/chirp";
+import {
+  exportChirpCsv,
+  toChirpRows,
+  CHIRP_COLUMNS,
+  chirpDigitalWarnings,
+} from "../../exporters/chirp";
 
 import { makeChannel } from "../helpers";
 
@@ -346,5 +351,32 @@ describe("CHIRP digital mode handling", () => {
     const rows = toChirpRows([c], chirp);
     expect(rows[0].Tone).toBe("Tone");
     expect(rows[0].rToneFreq).toBe("88.5");
+  });
+});
+
+describe("chirpDigitalWarnings (classifyChannel-based)", () => {
+  const hasPartial = (channels: Parameters<typeof chirpDigitalWarnings>[0]) =>
+    chirpDigitalWarnings(channels).some((w) => w.code === "chirp_digital_partial");
+
+  it("pack mode_pack=DN triggers partial warning", () => {
+    const c = makeChannel({ source_type: "channel_pack", mode_pack: "DN" });
+    expect(hasPartial([c])).toBe(true);
+  });
+  it("pack mode_pack=DV triggers partial warning", () => {
+    const c = makeChannel({ source_type: "channel_pack", mode_pack: "DV" });
+    expect(hasPartial([c])).toBe(true);
+  });
+  it("pack mode_pack=DMR+ triggers partial warning", () => {
+    const c = makeChannel({ source_type: "channel_pack", mode_pack: "DMR+" });
+    expect(hasPartial([c])).toBe(true);
+  });
+  it("SK6BA mode_effective=C4FM triggers partial warning (regression)", () => {
+    const c = makeChannel({ mode_effective: "C4FM" });
+    expect(hasPartial([c])).toBe(true);
+  });
+  it("pure analog set (FM + USB pack) → no warning", () => {
+    const a = makeChannel({ mode_effective: "FM" });
+    const b = makeChannel({ source_type: "channel_pack", mode_pack: "USB" });
+    expect(chirpDigitalWarnings([a, b])).toEqual([]);
   });
 });

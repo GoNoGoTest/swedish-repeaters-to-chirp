@@ -1,7 +1,7 @@
 import Papa from "papaparse";
 import type { ChirpSettings, NormalizedChannel, Warning } from "../models";
 import { formatFrequency } from "../frequency";
-import { channelSignalMode } from "../modes";
+
 import { isAnalogToneMode, classifyChannel } from "../accessModes";
 import { parseAccess } from "../tones";
 
@@ -84,17 +84,23 @@ export function resolveChirpMode(c: NormalizedChannel, fallback: string): string
   return mapped ?? fallback;
 }
 
-const DIGITAL_MODES = new Set(["C4FM", "D-Star", "DMR", "DMRplus", "P25"]);
-
 /**
  * Returns a single non-blocking warning when the export contains at least
  * one channel with a digital effective mode. CHIRP Generic CSV can carry
  * Mode=DN/DV/DMR/P25 but full radio support depends on driver/model and
  * system-specific fields (talkgroup, color code, slot, Fusion params) are
  * not part of the Generic CSV schema.
+ *
+ * Använder `classifyChannel()` så att synonymer (DN, DV, DMR+, DMRPLUS) och
+ * framtida digitala modes upptäcks konsekvent — utan separat allowlist.
+ * Tetra hoppas över: CHIRP Generic CSV bär inte Tetra alls och target-
+ * limits faller tillbaka till analog mode för Tetra-rader.
  */
 export function chirpDigitalWarnings(channels: NormalizedChannel[]): Warning[] {
-  const has = channels.some((c) => DIGITAL_MODES.has(channelSignalMode(c)));
+  const has = channels.some((c) => {
+    const cls = classifyChannel(c);
+    return cls === "dmr" || cls === "c4fm" || cls === "dstar" || cls === "p25";
+  });
   if (!has) return [];
   return [
     {
