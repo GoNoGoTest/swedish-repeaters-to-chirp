@@ -17,14 +17,15 @@ export function PreviewTable({
   channels,
   excludedKeys,
   onToggleExclude,
-  chirpMode,
+  getExportMode,
   startLoc,
   exportCount,
 }: {
   channels: NormalizedChannel[];
   excludedKeys: Set<string>;
   onToggleExclude: (key: string) => void;
-  chirpMode: string;
+  /** Returnera target-specifikt export-mode token för raden. */
+  getExportMode: (c: NormalizedChannel) => string;
   startLoc: number;
   exportCount?: number;
 }) {
