@@ -250,18 +250,12 @@ export function exportRtSystemsYaesuCsv(
   let truncCount = 0;
   let unsupportedCount = 0;
 
-  // RX-only channels are excluded entirely: we don't have documentation for
-  // how RT Systems marks an RX-only memory in the CSV. Surface a warning so
-  // the user knows these channels won't reach the radio.
-  const exportable: NormalizedChannel[] = [];
-  let rxOnlyExcluded = 0;
-  for (const c of channels) {
-    if (c.rx_only || !c.tx_allowed) {
-      rxOnlyExcluded++;
-      continue;
-    }
-    exportable.push(c);
-  }
+  // RX-only-hantering sker i pipelinen (settings.packs.rxOnlyPolicy):
+  //  - skip  → raderna är redan bortfiltrerade innan vi når hit
+  //  - mark  → raderna kommer in med "RX-ONLY" i Comment och exporteras normalt
+  // RT-systems-targetet exponerar inte "block_tx" i UI, så vi behöver inte
+  // hantera en duplex=off-väg här.
+  const exportable: NormalizedChannel[] = channels;
 
   const lines: string[] = [joinRow(RT_SYSTEMS_YAESU_HEADER_FIELDS)];
   exportable.forEach((c, i) => {
@@ -294,12 +288,6 @@ export function exportRtSystemsYaesuCsv(
     warnings.push({
       code: "rt_unsupported_mode",
       message: `${unsupportedCount} kanal(er) har mode som Yaesu inte stöder (D-Star/DMR/…); exporterade som Operating Mode=FM.`,
-    });
-  }
-  if (rxOnlyExcluded > 0) {
-    warnings.push({
-      code: "rt_rx_only_excluded",
-      message: `${rxOnlyExcluded} kanal(er) är RX-only och exkluderades — vi saknar information om hur RT Systems markerar RX-only i CSV:n.`,
     });
   }
   return { csv, warnings };

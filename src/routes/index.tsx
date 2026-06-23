@@ -14,7 +14,11 @@ import { TargetPickerPanel } from "@/components/codeplug/TargetPickerPanel";
 import { RepeaterFilterPanel } from "@/components/codeplug/RepeaterFilterPanel";
 import { ChannelPacksPanel } from "@/components/codeplug/ChannelPacksPanel";
 import { NamingEditor } from "@/components/codeplug/NamingEditor";
-import { ExportPanel, RxOnlyExportNote } from "@/components/codeplug/ExportPanel";
+import {
+  ExportPanel,
+  RxOnlyExportNote,
+  RtSystemsRxOnlySkippedNote,
+} from "@/components/codeplug/ExportPanel";
 import { PreviewTable, channelKey } from "@/components/codeplug/PreviewTable";
 
 export const Route = createFileRoute("/")({
@@ -127,12 +131,15 @@ function Index() {
     [setSettings],
   );
 
-  // RX-only-policy default beror på target: rt-systems-yaesu saknar verifierat
-  // beteende → tvinga "skip". Övriga target använder "block_tx".
+  // RX-only-policy: säkerställ att valt värde är giltigt för aktuellt target.
+  // RT-systems-Yaesu stöder inte "block_tx" (vi saknar dokumentation om hur
+  // RT Systems markerar RX-only). Övriga target stöder alla tre val. Vi rör
+  // endast policyn när den är ogiltig — användarens egna val (mark/skip) på
+  // RT-systems lämnas orört.
   useEffect(() => {
-    const desired = settings.export.targetId === "rt-systems-yaesu-generic" ? "skip" : "block_tx";
-    if (settings.packs.rxOnlyPolicy !== desired) {
-      setSettings((prev) => ({ ...prev, packs: { ...prev.packs, rxOnlyPolicy: desired } }));
+    const isRtSystems = settings.export.targetId === "rt-systems-yaesu-generic";
+    if (isRtSystems && settings.packs.rxOnlyPolicy === "block_tx") {
+      setSettings((prev) => ({ ...prev, packs: { ...prev.packs, rxOnlyPolicy: "skip" } }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.export.targetId]);
@@ -429,7 +436,16 @@ function Index() {
                       dubbletter.
                     </div>
                   )}
-                  <RxOnlyExportNote channels={exportChannels} targetId={settings.export.targetId} />
+                  <RxOnlyExportNote
+                    channels={exportChannels}
+                    targetId={settings.export.targetId}
+                    rxOnlyPolicy={settings.packs.rxOnlyPolicy}
+                  />
+                  <RtSystemsRxOnlySkippedNote
+                    sourceHasRxOnly={selectedChannels.some((c) => c.rx_only || !c.tx_allowed)}
+                    targetId={settings.export.targetId}
+                    rxOnlyPolicy={settings.packs.rxOnlyPolicy}
+                  />
                   <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 text-sm mb-3">
                     <Stat label="Från SK6BA" value={pipeline.sk6baCount} />
                     <Stat label="Från kanalpaket" value={pipeline.packCount} />

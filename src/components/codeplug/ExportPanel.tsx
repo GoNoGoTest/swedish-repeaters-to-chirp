@@ -35,7 +35,7 @@ export function rxOnlyHintForTarget(targetId: string): string {
     case "nicsure-rt880":
       return "'Spärra TX' sätter TX_Power=N/T och TX=RX i RT-880-CSV:n. 'Markera' lägger RX-ONLY i Comment.";
     case "rt-systems-yaesu-generic":
-      return "RT Systems Yaesu: RX-only-kanaler exkluderas alltid ur exporten — vi saknar dokumentation om hur RT Systems markerar RX-only i CSV:n. Valet ovan ignoreras.";
+      return "RT Systems Yaesu: vi saknar dokumentation om hur RT Systems markerar RX-only i CSV:n. Default är att hoppa över RX-only-kanaler. 'Markera' exporterar dem som vanlig frekvens med RX-ONLY i Comment — kontrollera då i radion att TX är spärrad.";
     default:
       return "Hur ska kanaler markerade som mottagning-bara hanteras vid export?";
   }
@@ -44,20 +44,44 @@ export function rxOnlyHintForTarget(targetId: string): string {
 export function RxOnlyExportNote({
   channels,
   targetId,
+  rxOnlyPolicy,
 }: {
   channels: NormalizedChannel[];
   targetId: string;
+  rxOnlyPolicy: RxOnlyPolicy;
 }) {
-  // RT Systems excludes RX-only channels regardless of policy → no "you are
-  // exporting RX-only channels" banner there. The standard rt_rx_only_excluded
-  // warning still shows up in the warnings list for that case.
-  if (targetId === "rt-systems-yaesu-generic") return null;
+  // Standard-bannern visas när det faktiskt finns RX-only-kanaler i exporten.
+  // På RT-systems når RX-only-rader exporten endast om policy=mark (skip har
+  // redan filtrerat bort dem i pipelinen). Den separata "RX-only hoppas över"-
+  // notisen för RT-systems renderas av index-routen som har tillgång till
+  // pre-policy-källan.
+  void rxOnlyPolicy;
+  void targetId;
   const hasRxOnly = channels.some((c) => c.rx_only || !c.tx_allowed);
   if (!hasRxOnly) return null;
   return (
     <p className="mt-2 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
       Du exporterar kanaler som är RX-only — verifiera i din radio att du inte kan sända på dessa
       kanaler.
+    </p>
+  );
+}
+
+export function RtSystemsRxOnlySkippedNote({
+  sourceHasRxOnly,
+  targetId,
+  rxOnlyPolicy,
+}: {
+  sourceHasRxOnly: boolean;
+  targetId: string;
+  rxOnlyPolicy: RxOnlyPolicy;
+}) {
+  if (targetId !== "rt-systems-yaesu-generic") return null;
+  if (rxOnlyPolicy !== "skip") return null;
+  if (!sourceHasRxOnly) return null;
+  return (
+    <p className="mt-2 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+      Appen vet inte hur RX-only ska sättas i RT-systems — RX-only-kanaler hoppas över.
     </p>
   );
 }
@@ -543,15 +567,24 @@ export function ExportPanel({
                 onChange={(e) => updPacks({ rxOnlyPolicy: e.target.value as RxOnlyPolicy })}
                 className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
               >
-                <option value="block_tx">Spärra TX i radion (rekommenderas)</option>
+                {settings.export.targetId !== "rt-systems-yaesu-generic" && (
+                  <option value="block_tx">Spärra TX i radion (rekommenderas)</option>
+                )}
                 <option value="mark">Exportera normalt + markera RX-ONLY i Comment</option>
-                <option value="skip">Hoppa över helt</option>
-                <option value="stop">Stoppa export</option>
+                <option value="skip">
+                  {settings.export.targetId === "rt-systems-yaesu-generic"
+                    ? "Hoppa över helt (rekommenderas)"
+                    : "Hoppa över helt"}
+                </option>
               </select>
               <Hint>{rxOnlyHintForTarget(settings.export.targetId)}</Hint>
             </Field>
           </div>
-          <RxOnlyExportNote channels={channels} targetId={settings.export.targetId} />
+          <RxOnlyExportNote
+            channels={channels}
+            targetId={settings.export.targetId}
+            rxOnlyPolicy={settings.packs.rxOnlyPolicy}
+          />
         </div>
       )}
 
