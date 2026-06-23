@@ -204,18 +204,23 @@ function Index() {
                     const totalRows = summary.totalRows;
                     const inExport = exportChannels.length;
                     const droppedOut = Math.max(0, totalRows - inExport);
-                    const missingRx = Math.max(0, totalRows - (pipeline?.withRx ?? totalRows));
+                    const outOfScope = pipeline?.outOfScope ?? 0;
+                    const missingRx = Math.max(
+                      0,
+                      totalRows - (pipeline?.withRx ?? totalRows) - outOfScope,
+                    );
                     const droppedByDedupe = pipeline?.droppedByDedupe ?? 0;
                     const manuallyExcluded = excludedKeys.size;
                     // Allt övrigt (band/status/distrikt/läge-filter, namnlöshet, m.m.)
                     const droppedByFilter = Math.max(
                       0,
-                      droppedOut - missingRx - droppedByDedupe - manuallyExcluded,
+                      droppedOut - missingRx - droppedByDedupe - manuallyExcluded - outOfScope,
                     );
                     const lines: string[] = [
                       `${droppedOut} av ${totalRows} rader hamnar inte i exporten`,
                       "",
                     ];
+                    if (outOfScope) lines.push(`• uW QTH (utanför scope): ${outOfScope}`);
                     if (missingRx) lines.push(`• Saknar RX-frekvens: ${missingRx}`);
                     if (droppedByFilter) lines.push(`• Bortfiltrerade av filter: ${droppedByFilter}`);
                     if (droppedByDedupe) lines.push(`• Frekvensdubbletter: ${droppedByDedupe}`);
