@@ -278,6 +278,10 @@ function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): N
  */
 function applyPostExpansionAccessWarnings(channels: NormalizedChannel[]): NormalizedChannel[] {
   return channels.map((c) => {
+    // Access-varningar gäller bara SK6BA-rader. Channel-pack-rader har
+    // egen kuraterad tone-info; saknad tone på en analog pack-rad är
+    // inte en användarvarning.
+    if (c.source_type !== "sk6ba") return c;
     if (classifyChannel(c) !== "analog") return c;
     const newWarnings: Warning[] = [];
     const hasAnalog =

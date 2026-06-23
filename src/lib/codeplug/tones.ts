@@ -125,7 +125,9 @@ const EMPTY_DIGITAL: DigitalAccess = {
 // Token-mönster. Alla case-insensitive. Stöder ihopskrivet (CC1), separerat
 // (CC 1) och =-form (CC=1).
 const DMR_CC_RE = /\bCC\s*=?\s*(\d{1,2})\b/gi;
-const DMR_TS_RE = /\bTS\s*=?\s*([12])\b/gi;
+// TS-regexen accepterar avsiktligt alla siffror för att kunna flagga
+// ogiltiga värden (t.ex. TS3) diagnostiskt i unknownTokens.
+const DMR_TS_RE = /\bTS\s*=?\s*(\d+)\b/gi;
 const DMR_TG_RE = /\bTG\s*=?\s*([\w-]+)\b/gi;
 const C4FM_TX_RE = /\bTX\s*=?\s*(\d{2})\b/gi;
 const C4FM_RX_RE = /\bRX\s*=?\s*(\d{2})\b/gi;
@@ -155,40 +157,66 @@ export function parseDigitalAccess(raw: string | undefined | null): DigitalAcces
 
   // För varje match: skriv över träffen i `s` med blanksteg så att efter-
   // tokeniseringen inte ser fragmentet (annars hamnar "CC1" i unknownTokens).
-  const consumeAll = (re: RegExp, handler: (groups: string[]) => void): void => {
+  // Handler returnerar `true` om värdet är giltigt; annars läggs hela
+  // tokenen i unknownTokens som diagnostik.
+  const consumeAll = (re: RegExp, handler: (groups: string[]) => boolean): void => {
     s = s.replace(re, (full, ...rest) => {
-      // rest = [g1, g2, ..., offset, fullString, (groups?)]
       const groups: string[] = [];
       for (const r of rest) {
         if (typeof r === "string") groups.push(r);
         else break;
       }
-      handler(groups);
+      const ok = handler(groups);
+      if (!ok) result.unknownTokens.push(full);
       return " ".repeat(full.length);
     });
   };
 
   consumeAll(DMR_CC_RE, ([n]) => {
     const v = parseInt(n, 10);
-    if (Number.isFinite(v) && v >= 0 && v <= 15) result.dmr.colorCode = v;
+    if (Number.isFinite(v) && v >= 0 && v <= 15) {
+      result.dmr.colorCode = v;
+      return true;
+    }
+    return false;
   });
   consumeAll(DMR_TS_RE, ([n]) => {
     const v = parseInt(n, 10);
-    if (v === 1 || v === 2) result.dmr.timeSlot = v;
+    if (v === 1 || v === 2) {
+      result.dmr.timeSlot = v;
+      return true;
+    }
+    return false;
   });
   consumeAll(DMR_TG_RE, ([id]) => {
-    if (id) result.dmr.talkGroup = id;
+    if (id) {
+      result.dmr.talkGroup = id;
+      return true;
+    }
+    return false;
   });
   consumeAll(C4FM_TX_RE, ([nn]) => {
     const v = parseInt(nn, 10);
-    if (Number.isFinite(v)) result.c4fm.dgIdTx = v;
+    if (Number.isFinite(v)) {
+      result.c4fm.dgIdTx = v;
+      return true;
+    }
+    return false;
   });
   consumeAll(C4FM_RX_RE, ([nn]) => {
     const v = parseInt(nn, 10);
-    if (Number.isFinite(v)) result.c4fm.dgIdRx = v;
+    if (Number.isFinite(v)) {
+      result.c4fm.dgIdRx = v;
+      return true;
+    }
+    return false;
   });
   consumeAll(P25_NAC_RE, ([nac]) => {
-    if (nac) result.p25.nac = nac.toUpperCase();
+    if (nac) {
+      result.p25.nac = nac.toUpperCase();
+      return true;
+    }
+    return false;
   });
 
   // Återstoden: tokenisera och filtrera bort sådant parseAccess hade konsumerat.

@@ -181,4 +181,22 @@ describe("parseDigitalAccess", () => {
     const r = parseDigitalAccess("XYZ42");
     expect(r.unknownTokens).toEqual(["XYZ42"]);
   });
+
+  describe("invalid digital tokens land in unknownTokens", () => {
+    it("CC99 out of range → unknownTokens, colorCode null", () => {
+      const r = parseDigitalAccess("CC99");
+      expect(r.dmr.colorCode).toBeNull();
+      expect(r.unknownTokens).toContain("CC99");
+    });
+    it("TS3 invalid timeslot → unknownTokens, timeSlot null", () => {
+      const r = parseDigitalAccess("TS3");
+      expect(r.dmr.timeSlot).toBeNull();
+      expect(r.unknownTokens).toContain("TS3");
+    });
+    it("NACZZZ doesn't match strict regex → falls into unknownTokens via tokenizer", () => {
+      const r = parseDigitalAccess("NACZZZ");
+      expect(r.p25.nac).toBe("");
+      expect(r.unknownTokens).toContain("NACZZZ");
+    });
+  });
 });

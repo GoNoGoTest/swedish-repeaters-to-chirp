@@ -43,15 +43,20 @@ const DEFAULT_POWER = "10.0W";
 // Map canonical signal mode (mode_effective) → CHIRP Generic CSV Mode token.
 // "FM" intentionally returns null to let the caller fall back to settings.mode
 // (NFM vs FM is a per-export user choice for analog).
+// Accepts synonyms that may appear via pack imports: DN, DV, DSTAR/D-STAR,
+// DMRPLUS/DMR+ — so digital channel-pack rows export with the right token.
 function mapEffectiveMode(m: string): string | null {
-  switch (m) {
+  switch (m.trim().toUpperCase()) {
     case "C4FM":
+    case "DN":
       return "DN";
-    case "D-Star":
+    case "D-STAR":
+    case "DSTAR":
+    case "DV":
       return "DV";
     case "DMR":
-      return "DMR";
-    case "DMRplus":
+    case "DMRPLUS":
+    case "DMR+":
       return "DMR";
     case "P25":
       return "P25";
@@ -59,7 +64,7 @@ function mapEffectiveMode(m: string): string | null {
       return "CW";
     case "FM":
       return null; // use analog fallback
-    case "Tetra":
+    case "TETRA":
       return null; // unsupported by Generic CSV → fallback
     default:
       return null; // unknown / empty → fallback
@@ -67,8 +72,14 @@ function mapEffectiveMode(m: string): string | null {
 }
 
 export function resolveChirpMode(c: NormalizedChannel, fallback: string): string {
-  // Channel-pack explicit CHIRP mode wins (e.g. USB/LSB/AM/CW).
-  if (c.source_type === "channel_pack" && c.mode_pack) return c.mode_pack;
+  // Channel-pack: kör mode_pack genom samma digitala mapping så att
+  // pack-rader med mode_pack="C4FM"/"DMR+"/"DV" exporteras som DN/DMR/DV.
+  // Analoga och sideband-pack-modes (USB/LSB/AM/CW/FM/NFM) returneras as-is
+  // eftersom mapEffectiveMode returnerar null för dem.
+  if (c.source_type === "channel_pack" && c.mode_pack) {
+    const mapped = mapEffectiveMode(c.mode_pack);
+    return mapped ?? c.mode_pack;
+  }
   const mapped = mapEffectiveMode(c.mode_effective);
   return mapped ?? fallback;
 }

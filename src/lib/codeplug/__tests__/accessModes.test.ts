@@ -34,6 +34,10 @@ describe("classifyMode", () => {
     expect(classifyMode("P25")).toBe("p25");
     expect(classifyMode("Tetra")).toBe("tetra");
   });
+  it("trims whitespace", () => {
+    expect(classifyMode(" DMR ")).toBe("dmr");
+    expect(classifyMode("\tFM\n")).toBe("analog");
+  });
 });
 
 describe("isAnalogToneMode", () => {
