@@ -96,9 +96,9 @@ describe("targets/vgc-n76", () => {
     expect(warnings.filter((w) => w.code === "vgc_title_truncated")).toHaveLength(1);
   });
 
-  it("maps mode_chirp NFM/FM to 12500/25000 bandwidth", () => {
-    const nfm = makeChannel({ source_type: "channel_pack", mode_chirp: "NFM", rx_frequency: 144.5, tx_frequency: 144.5 });
-    const fm = makeChannel({ source_type: "channel_pack", mode_chirp: "FM",  rx_frequency: 144.5, tx_frequency: 144.5 });
+  it("maps mode_pack NFM/FM to 12500/25000 bandwidth", () => {
+    const nfm = makeChannel({ source_type: "channel_pack", mode_pack: "NFM", rx_frequency: 144.5, tx_frequency: 144.5 });
+    const fm = makeChannel({ source_type: "channel_pack", mode_pack: "FM",  rx_frequency: 144.5, tx_frequency: 144.5 });
     const out = VGC_N76_TARGET.export([nfm, fm], VGC_N76_DEFAULTS);
     const rows = Papa.parse<string[]>(out.content, { skipEmptyLines: true }).data;
     expect(rows[1][6]).toBe("12500");
@@ -149,7 +149,7 @@ describe("targets/vgc-n76", () => {
     const ch = makeChannel({
       source_type: "channel_pack",
       generated_name_final: "AIR",
-      mode_chirp: "AM",
+      mode_pack: "AM",
       rx_frequency: 121.5,
       tx_frequency: 121.5,
       rx_only: true,
@@ -167,7 +167,7 @@ describe("targets/vgc-n76", () => {
     const ch = makeChannel({
       source_type: "channel_pack",
       generated_name_final: "SSB",
-      mode_chirp: "USB",
+      mode_pack: "USB",
       rx_frequency: 14.2,
       tx_frequency: 14.2,
     });
@@ -261,13 +261,13 @@ describe("targets/vgc-n76 — APRS slot 32 reservation", () => {
       expect(w!.message).toContain("1 kanal");
     });
 
-    it("channel-pack with mode_chirp=AM exports as AM (rx/tx_mod=1, bandwidth=25000)", () => {
+    it("channel-pack with mode_pack=AM exports as AM (rx/tx_mod=1, bandwidth=25000)", () => {
       const ch = makeChannel({
         source_type: "channel_pack",
         generated_name_final: "AIR",
         rx_frequency: 121.5,
         mode_effective: "",
-        mode_chirp: "AM",
+        mode_pack: "AM",
         duplex: "off",
       });
       const out = VGC_N76_TARGET.export([ch], VGC_N76_DEFAULTS);
@@ -278,13 +278,13 @@ describe("targets/vgc-n76 — APRS slot 32 reservation", () => {
       expect(out.warnings.some((w) => w.code === "vgc_digital_sk6ba_skipped")).toBe(false);
     });
 
-    it("channel-pack with mode_chirp=NFM exports as FM 12500", () => {
+    it("channel-pack with mode_pack=NFM exports as FM 12500", () => {
       const ch = makeChannel({
         source_type: "channel_pack",
         generated_name_final: "PMR",
         rx_frequency: 446.00625,
         mode_effective: "",
-        mode_chirp: "NFM",
+        mode_pack: "NFM",
         duplex: "off",
       });
       const out = VGC_N76_TARGET.export([ch], VGC_N76_DEFAULTS);

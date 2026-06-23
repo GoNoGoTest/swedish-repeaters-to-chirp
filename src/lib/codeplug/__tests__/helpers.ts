@@ -39,7 +39,7 @@ export function makeChannel(over: Partial<NormalizedChannel> = {}): NormalizedCh
     label: "",
     name_hint: "",
     tx_frequency: null,
-    mode_chirp: "",
+    mode_pack: "",
     tstep: null,
     tone_raw: "",
     rtone_freq: null,

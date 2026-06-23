@@ -56,7 +56,7 @@ export interface NormalizedChannel {
   /**
    * The single canonical mode this channel will be exported under.
    * For sk6ba rows this is one of `parseModes(mode_raw)`; for channel-pack
-   * rows it falls back to `mode_chirp` or the row's `mode_raw`. May be
+   * rows it falls back to `mode_pack` or the row's `mode_raw`. May be
    * an empty string for unknown / unparseable inputs.
    */
   mode_effective: string;
@@ -92,7 +92,13 @@ export interface NormalizedChannel {
   label: string;
   name_hint: string;
   tx_frequency: number | null;
-  mode_chirp: string; // suggested CHIRP Mode for pack rows (NFM/FM/USB/CW)
+  /**
+   * Pack row's original mode (NFM/FM/AM/USB/LSB/CW) from the channel-pack
+   * CSV's `mode` column. Empty string for SK6BA rows. Consumed by the CHIRP,
+   * VGC N76 and NiCSURE RT-880 export targets to drive modulation/bandwidth
+   * columns for pack rows, bypassing the `mode_effective` mapping.
+   */
+  mode_pack: string;
   tstep: number | null;
   tone_raw: string;
   rtone_freq: number | null;

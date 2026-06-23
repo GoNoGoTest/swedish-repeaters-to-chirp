@@ -70,7 +70,7 @@ const VGC_N76_LIMITS: HardwareLimits = {
 
 
 function isAm(c: NormalizedChannel): boolean {
-  return (c.mode_chirp || "").toUpperCase() === "AM";
+  return (c.mode_pack || "").toUpperCase() === "AM";
 }
 
 // Exact header as emitted by the VGC app — every paren spec must match
@@ -140,7 +140,7 @@ function encodeTone(side: "tx" | "rx", c: NormalizedChannel): number {
 }
 
 function encodeBandwidth(c: NormalizedChannel, s: VgcN76Settings): 12500 | 25000 {
-  const m = (c.mode_chirp || "").toUpperCase();
+  const m = (c.mode_pack || "").toUpperCase();
   if (m === "NFM") return 12500;
   if (m === "FM") return 25000;
   if (m === "AM") return 25000;
@@ -205,7 +205,7 @@ const EMPTY_ROW: VgcRow = {
 /**
  * VGC N76 is analog-FM-only. Drop any SK6BA row whose effective mode is
  * a digital variant (C4FM/D-Star/DMR/DMRplus/P25). Channel-pack rows pass
- * through unchanged — their `mode_chirp` (AM/FM/NFM) is what drives the
+ * through unchanged — their `mode_pack` (AM/FM/NFM) is what drives the
  * VGC modulation/bandwidth columns.
  */
 function filterAnalogFmSk6ba(
@@ -251,7 +251,7 @@ export function toVgcN76Rows(
 
     if (c.dtcs_code && c.dtcs_polarity && c.dtcs_polarity !== "NN") polLost++;
 
-    const m = (c.mode_chirp || "").toUpperCase();
+    const m = (c.mode_pack || "").toUpperCase();
     if (m && m !== "NFM" && m !== "FM" && m !== "AM") unsupported++;
 
     const txMhz = mobileTxMhz(c);

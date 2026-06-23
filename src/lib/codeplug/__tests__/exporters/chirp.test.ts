@@ -42,9 +42,9 @@ describe("CHIRP exporter", () => {
     expect(rows[0].Offset).toBe("145.000000");
   });
 
-  it("uses pack mode_chirp when present, fallback to settings.mode otherwise", () => {
+  it("uses pack mode_pack when present, fallback to settings.mode otherwise", () => {
     const sk = makeChannel({ generated_name_final: "X" });
-    const pack = makeChannel({ source_type: "channel_pack", generated_name_final: "Y", mode_chirp: "USB" });
+    const pack = makeChannel({ source_type: "channel_pack", generated_name_final: "Y", mode_pack: "USB" });
     const rows = toChirpRows([sk, pack], { ...chirp, mode: "NFM" });
     expect(rows[0].Mode).toBe("NFM");
     expect(rows[1].Mode).toBe("USB");
@@ -203,11 +203,11 @@ describe("CHIRP exporter", () => {
       expect(rows[0].Mode).toBe("NFM");
     });
 
-    it("channel_pack mode_chirp overrides effective-mode mapping", () => {
+    it("channel_pack mode_pack overrides effective-mode mapping", () => {
       const c = makeChannel({
         source_type: "channel_pack",
         generated_name_final: "X",
-        mode_chirp: "USB",
+        mode_pack: "USB",
         mode_effective: "C4FM",
       });
       const rows = toChirpRows([c], { ...chirp, mode: "NFM" });

@@ -155,7 +155,7 @@ export function parseChannelPackCsv(text: string, fileName: string): PackParseRe
       label,
       name_hint: nameHint,
       tx_frequency: tx,
-      mode_chirp: mode,
+      mode_pack: mode,
       tstep: parseNumberLoose(r.tstep),
       tone_raw: (r.tone ?? "").trim(),
       rtone_freq: parseNumberLoose(r.rtone_freq),

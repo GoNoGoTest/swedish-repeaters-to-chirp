@@ -71,10 +71,10 @@ describe("targets/nicsure-rt880", () => {
     expect(row[6]).toBe("D051N");
   });
 
-  it("maps mode_chirp to Bandwidth and Modulation", () => {
-    const nfm = makeChannel({ rx_frequency: 145.5, mode_chirp: "NFM" });
-    const fm = makeChannel({ rx_frequency: 145.5, mode_chirp: "FM" });
-    const am = makeChannel({ rx_frequency: 121.5, mode_chirp: "AM", duplex: "" });
+  it("maps mode_pack to Bandwidth and Modulation", () => {
+    const nfm = makeChannel({ rx_frequency: 145.5, mode_pack: "NFM" });
+    const fm = makeChannel({ rx_frequency: 145.5, mode_pack: "FM" });
+    const am = makeChannel({ rx_frequency: 121.5, mode_pack: "AM", duplex: "" });
     const csv = NICSURE_RT880_TARGET.export([nfm, fm, am], NICSURE_RT880_DEFAULTS).content;
     const rows = parseRows(csv);
     expect([rows[1][12], rows[1][13]]).toEqual(["Narrow", "Auto"]);
@@ -83,7 +83,7 @@ describe("targets/nicsure-rt880", () => {
   });
 
   it("warns on unsupported modes (USB/LSB/CW)", () => {
-    const ch = makeChannel({ rx_frequency: 14.2, mode_chirp: "USB", duplex: "" });
+    const ch = makeChannel({ rx_frequency: 14.2, mode_pack: "USB", duplex: "" });
     const { warnings } = toNicsureRows([ch], NICSURE_RT880_DEFAULTS);
     expect(warnings.some((w) => w.code === "vgc_unsupported_mode")).toBe(true);
   });
@@ -244,13 +244,13 @@ describe("targets/nicsure-rt880", () => {
       expect(w!.message).toContain("1 kanal");
     });
 
-    it("channel-pack with mode_chirp=AM exports as Modulation=AM, Bandwidth=Wide", () => {
+    it("channel-pack with mode_pack=AM exports as Modulation=AM, Bandwidth=Wide", () => {
       const ch = makeChannel({
         source_type: "channel_pack",
         generated_name_final: "AIR",
         rx_frequency: 121.5,
         mode_effective: "",
-        mode_chirp: "AM",
+        mode_pack: "AM",
         duplex: "off",
       });
       const out = NICSURE_RT880_TARGET.export([ch], NICSURE_RT880_DEFAULTS);

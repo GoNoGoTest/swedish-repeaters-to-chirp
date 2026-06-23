@@ -30,7 +30,7 @@ export function PreviewTable({ channels, excludedKeys, onToggleExclude, chirpMod
             const excluded = excludedKeys.has(key);
             const baseRowClass = c.warnings.length ? "bg-destructive/5" : isPack ? "bg-primary/5" : "";
             const rowClass = excluded ? "opacity-40 line-through decoration-muted-foreground/50" : baseRowClass;
-            const mode = isPack && c.mode_chirp ? c.mode_chirp : chirpMode;
+            const mode = isPack && c.mode_pack ? c.mode_pack : chirpMode;
             const loc = excluded ? "—" : String(locCounter++);
             return (
               <tr key={`${c.source_type}-${c.source_row}-${c.source_id}-${i}`} className={`border-t border-border ${rowClass}`}>
