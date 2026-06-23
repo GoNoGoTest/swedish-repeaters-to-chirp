@@ -46,13 +46,13 @@ describe("runPipeline mode-medveten access-subset", () => {
     expect(dmr.digital_access_raw).toBe("123.0 / CC 1");
   });
 
-  it("FM utan access → missing_access_tone, ingen ctcss_and_dcs", () => {
+  it("FM utan access → ingen missing_access_tone, ingen ctcss_and_dcs", () => {
     const r = runPipeline({
       sk6baRows: [{ ...baseRow, mode: "FM" }],
       settings: baseSettings,
     });
     const codes = r.channels[0].warnings.map((w) => w.code);
-    expect(codes).toContain("missing_access_tone");
+    expect(codes).not.toContain("missing_access_tone");
     expect(codes).not.toContain("ctcss_and_dcs");
   });
 

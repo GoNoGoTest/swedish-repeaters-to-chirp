@@ -75,8 +75,8 @@ export function normalize(rows: RawRow[]): NormalizedChannel[] {
 
     const access = parseAccess(r.access);
     const digital = parseDigitalAccess(r.access);
-    // missing_access_tone och ctcss_and_dcs är mode-beroende och appliceras
-    // efter expandModes (se applyPostExpansionAccessWarnings nedan).
+    // ctcss_and_dcs är mode-beroende och appliceras efter expandModes
+    // (se applyPostExpansionAccessWarnings nedan).
 
     const lat = parseNumberLoose(r.lat);
     const lng = parseNumberLoose(r.lng);
@@ -271,35 +271,30 @@ function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): N
 }
 
 /**
- * Lägger till `missing_access_tone` och `ctcss_and_dcs` på rader där
- * mode-klassen är analog och de analoga fälten saknar/innehåller motsägelse.
- * Kallas efter `applyModeAccessSubset` så digitala rader (där analog access
- * redan nollats) aldrig får dessa varningar.
+ * Lägger till `ctcss_and_dcs` på analoga SK6BA-rader där både CTCSS och DCS
+ * faktiskt hittats i access-fältet. Kallas efter `applyModeAccessSubset`
+ * så digitala rader (där analog access redan nollats) aldrig får varningen.
+ *
+ * Notera: saknad analog access (tom access-sträng) varnas inte längre — tomt
+ * fält tolkas i praktiken som öppen squelch och är inte ett kvalitetsproblem.
  */
 function applyPostExpansionAccessWarnings(channels: NormalizedChannel[]): NormalizedChannel[] {
   return channels.map((c) => {
-    // Access-varningar gäller bara SK6BA-rader. Channel-pack-rader har
-    // egen kuraterad tone-info; saknad tone på en analog pack-rad är
-    // inte en användarvarning.
     if (c.source_type !== "sk6ba") return c;
     if (classifyChannel(c) !== "analog") return c;
-    const newWarnings: Warning[] = [];
-    const hasAnalog =
-      c.ctcss_tx != null || c.uses_1750 || c.analog_carrier_open || c.dtcs_code !== "";
-    if (!hasAnalog) {
-      newWarnings.push({
-        code: "missing_access_tone",
-        message: "FM-kanalen saknar explicit analog accessinformation",
-      });
-    }
     if (c.ctcss_tx != null && c.dtcs_code !== "") {
-      newWarnings.push({
-        code: "ctcss_and_dcs",
-        message: "Både CTCSS och DCS hittades; CTCSS valdes för analog CHIRP-export.",
-      });
+      return {
+        ...c,
+        warnings: [
+          ...c.warnings,
+          {
+            code: "ctcss_and_dcs",
+            message: "Både CTCSS och DCS hittades; CTCSS valdes för analog CHIRP-export.",
+          } satisfies Warning,
+        ],
+      };
     }
-    if (newWarnings.length === 0) return c;
-    return { ...c, warnings: [...c.warnings, ...newWarnings] };
+    return c;
   });
 }
 

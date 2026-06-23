@@ -12,7 +12,11 @@ export function parseShift(raw: string | undefined | null): FrequencyParse {
   if (!s || s.toLowerCase() === "simplex") {
     return { duplex: "", offset: 0, shift: 0, unclear: false };
   }
-  const n = parseNumberLoose(s);
+  // SK6BA-formatet "Duplex N" där N är siffra med valfritt tecken/decimal.
+  // "Duplex 0" → simplex; "Duplex -2" → -2 MHz; "Duplex +0.6" → +0.6 MHz.
+  const duplexMatch = s.match(/^duplex\s+([+-]?\d+(?:[.,]\d+)?)$/i);
+  const numericInput = duplexMatch ? duplexMatch[1] : s;
+  const n = parseNumberLoose(numericInput);
   if (n == null) return { duplex: "", offset: 0, shift: null, unclear: true };
   if (n === 0) return { duplex: "", offset: 0, shift: 0, unclear: false };
   if (n < 0) return { duplex: "-", offset: Math.abs(n), shift: n, unclear: false };
