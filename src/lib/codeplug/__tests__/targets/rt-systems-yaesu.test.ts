@@ -250,7 +250,9 @@ describe("RT Systems Yaesu — padding", () => {
   it("does not count padding rows as truncated or unsupported", () => {
     const { warnings } = exportRtSystemsYaesuCsv([], { ...S, padToRows: 999 });
     expect(warnings).toEqual([]);
+  });
 });
+
 
 describe("RT Systems Yaesu — RX-only", () => {
   it("excludes rx_only channels from CSV and emits rt_rx_only_excluded warning", () => {
