@@ -54,7 +54,7 @@ export interface PackParseResult {
   fileName: string;
   headerWarnings: string[];
   /** Icke-fatala PapaParse-fel och schema-warnings för enskilda rader. */
-  parseWarnings: string[];
+  parseWarnings: ParseWarning[];
 }
 
 function parseBool(v: string | undefined, fieldName: string, warnings: Warning[]): boolean {
