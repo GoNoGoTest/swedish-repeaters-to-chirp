@@ -183,6 +183,15 @@ export function ChannelPacksPanel({
         kanaler kommer läggas till. Klicka på ett paket för att fälla ut bands-/kategorifilter och
         egen namngivning.
       </div>
+      {packs
+        .filter((p) => p.parseWarnings.length > 0)
+        .map((p) => (
+          <ParseWarningsPanel
+            key={p.packId}
+            title={`i kanalpaket ${p.packId}`}
+            warnings={p.parseWarnings}
+          />
+        ))}
       {packs.map((pack) => (
         <PackRow
           key={pack.packId}
