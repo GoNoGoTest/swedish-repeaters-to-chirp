@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChirpSettings, NormalizedChannel, Warning } from "@/lib/codeplug/models";
+import { assertNever } from "@/lib/codeplug/assertNever";
 import { requireTarget, resolveTargetSettings } from "@/lib/codeplug/targets";
 import { loadSk6baCsv, type Sk6baLoadState } from "@/lib/codeplug/importers/sk6ba";
 import { useCodeplugSettings } from "@/hooks/useCodeplugSettings";
@@ -109,6 +110,8 @@ function Index() {
           target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ??
           target.limits.maxNameLength
         );
+      default:
+        return assertNever(target);
     }
   })();
 
@@ -514,6 +517,14 @@ function Index() {
                           resolveTargetSettings(target, storedPatch),
                         );
                         break;
+                      case "rt-systems-yaesu-generic":
+                        tw = target.validate?.(
+                          exportChannels,
+                          resolveTargetSettings(target, storedPatch),
+                        );
+                        break;
+                      default:
+                        assertNever(target);
                     }
                     if (!tw || tw.length === 0) return null;
                     return (
