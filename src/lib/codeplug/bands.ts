@@ -28,3 +28,39 @@ export function parseBandLabel(label: string, known: string[]): string {
   }
   return label;
 }
+
+/**
+ * Sort order by approximate centre frequency, lowest first.
+ * Empty string (rendered as "(tom)") always sorts last.
+ */
+const BAND_FREQUENCY_ORDER: Record<string, number> = {
+  "10": 28,
+  "6": 50,
+  "4": 70,
+  "2": 144,
+  "1.5": 222,
+  "70": 430,
+  "23": 1240,
+  "13": 2300,
+  "9": 3400,
+  "6cm": 5650,
+  "3": 10000,
+};
+
+export function sortBands(bands: string[]): string[] {
+  return [...bands].sort((a, b) => {
+    // Empty string last.
+    if (a === "" && b === "") return 0;
+    if (a === "") return 1;
+    if (b === "") return -1;
+    const fa = BAND_FREQUENCY_ORDER[a];
+    const fb = BAND_FREQUENCY_ORDER[b];
+    // Known bands sort by frequency.
+    if (fa !== undefined && fb !== undefined) return fa - fb;
+    // Known before unknown.
+    if (fa !== undefined) return -1;
+    if (fb !== undefined) return 1;
+    // Unknown bands sort alphabetically among themselves.
+    return a.localeCompare(b);
+  });
+}
