@@ -50,23 +50,39 @@ export function RxOnlyExportNote({
   targetId: string;
   rxOnlyPolicy: RxOnlyPolicy;
 }) {
+  // Standard-bannern visas när det faktiskt finns RX-only-kanaler i exporten.
+  // På RT-systems når RX-only-rader exporten endast om policy=mark (skip har
+  // redan filtrerat bort dem i pipelinen). Den separata "RX-only hoppas över"-
+  // notisen för RT-systems renderas av index-routen som har tillgång till
+  // pre-policy-källan.
+  void rxOnlyPolicy;
+  void targetId;
   const hasRxOnly = channels.some((c) => c.rx_only || !c.tx_allowed);
   if (!hasRxOnly) return null;
-  // RT-systems: när policy=skip har raderna redan filtrerats bort i pipelinen,
-  // men de finns kvar i `channels` (vi får hela exportlistan här). Visa då en
-  // informationsruta som förklarar att de hoppas över. Vid policy=mark visas
-  // den vanliga RX-only-varningen.
-  if (targetId === "rt-systems-yaesu-generic" && rxOnlyPolicy === "skip") {
-    return (
-      <p className="mt-2 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
-        Appen vet inte hur RX-only ska sättas i RT-systems — RX-only-kanaler hoppas över.
-      </p>
-    );
-  }
   return (
     <p className="mt-2 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
       Du exporterar kanaler som är RX-only — verifiera i din radio att du inte kan sända på dessa
       kanaler.
+    </p>
+  );
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function RtSystemsRxOnlySkippedNote({
+  sourceHasRxOnly,
+  targetId,
+  rxOnlyPolicy,
+}: {
+  sourceHasRxOnly: boolean;
+  targetId: string;
+  rxOnlyPolicy: RxOnlyPolicy;
+}) {
+  if (targetId !== "rt-systems-yaesu-generic") return null;
+  if (rxOnlyPolicy !== "skip") return null;
+  if (!sourceHasRxOnly) return null;
+  return (
+    <p className="mt-2 rounded-md border border-amber-400/40 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+      Appen vet inte hur RX-only ska sättas i RT-systems — RX-only-kanaler hoppas över.
     </p>
   );
 }
