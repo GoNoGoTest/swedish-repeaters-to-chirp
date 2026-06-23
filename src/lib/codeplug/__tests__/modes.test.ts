@@ -42,6 +42,38 @@ describe("parseModes", () => {
   it("handles realistic SK6BA multi-mode strings", () => {
     expect(parseModes("FM / C4FM / DMR / D-Star")).toEqual(["FM", "C4FM", "DMR", "D-Star"]);
   });
+
+  describe("multi-word phrase aliases", () => {
+    it("matches 'System Fusion' as a phrase (case-insensitive)", () => {
+      expect(parseModes("System Fusion")).toEqual(["C4FM"]);
+    });
+
+    it("collapses internal whitespace inside a phrase", () => {
+      expect(parseModes("SYSTEM   FUSION")).toEqual(["C4FM"]);
+    });
+
+    it("matches a phrase inside a separator-delimited list", () => {
+      expect(parseModes("FM / System Fusion / DMR")).toEqual(["FM", "C4FM", "DMR"]);
+    });
+
+    it("matches 'D Star' phrase alias", () => {
+      expect(parseModes("D Star")).toEqual(["D-Star"]);
+    });
+
+    it("still resolves single tokens (Fusion → C4FM)", () => {
+      expect(parseModes("Fusion")).toEqual(["C4FM"]);
+    });
+
+    it("separator breaks a phrase: only token-level aliases fire", () => {
+      // "System" is not a known token, "Fusion" is. The phrase "SYSTEM FUSION"
+      // does not match because the two words live in different chunks.
+      expect(parseModes("System / Fusion")).toEqual(["C4FM"]);
+    });
+
+    it("unknown phrase falls back to tokens and drops unknown tokens", () => {
+      expect(parseModes("frobnicate widget")).toEqual([]);
+    });
+  });
 });
 
 describe("isKnownMode", () => {
