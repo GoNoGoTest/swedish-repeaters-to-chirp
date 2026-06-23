@@ -202,6 +202,31 @@ const EMPTY_ROW: VgcRow = {
   tx_mod: "",
 };
 
+/**
+ * VGC N76 is analog-FM-only. Drop any SK6BA row whose effective mode is
+ * a digital variant (C4FM/D-Star/DMR/DMRplus/P25). Channel-pack rows pass
+ * through unchanged — their `mode_chirp` (AM/FM/NFM) is what drives the
+ * VGC modulation/bandwidth columns.
+ */
+function filterAnalogFmSk6ba(
+  channels: NormalizedChannel[],
+): { kept: NormalizedChannel[]; droppedCount: number } {
+  const kept: NormalizedChannel[] = [];
+  let droppedCount = 0;
+  for (const c of channels) {
+    if (
+      c.source_type === "sk6ba" &&
+      c.mode_effective !== "" &&
+      c.mode_effective !== "FM"
+    ) {
+      droppedCount++;
+      continue;
+    }
+    kept.push(c);
+  }
+  return { kept, droppedCount };
+}
+
 export function toVgcN76Rows(
   channels: NormalizedChannel[],
   s: VgcN76Settings,
@@ -210,6 +235,15 @@ export function toVgcN76Rows(
   let truncCount = 0;
   let polLost = 0;
   let unsupported = 0;
+
+  const { kept, droppedCount: digitalSk6baDropped } = filterAnalogFmSk6ba(channels);
+  if (digitalSk6baDropped > 0) {
+    warnings.push({
+      code: "vgc_digital_sk6ba_skipped",
+      message: `${digitalSk6baDropped} kanal(er) från SK6BA hoppades över: VGC N76 stöder bara analog FM, digitala mode (C4FM/D-Star/DMR/DMRplus/P25) går inte att skriva i app-CSV:n.`,
+    });
+  }
+  channels = kept;
 
   const rows: VgcRow[] = channels.map((c) => {
     const { title, truncated } = truncateTitle(c.generated_name_final, s.maxLength);

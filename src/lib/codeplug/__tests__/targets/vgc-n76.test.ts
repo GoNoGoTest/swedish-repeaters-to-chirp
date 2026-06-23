@@ -247,5 +247,52 @@ describe("targets/vgc-n76 — APRS slot 32 reservation", () => {
     expect(r2[1][0]).toBe("CH64");
     expect(r2[2][0]).toBe("APRS");
   });
+
+  describe("analog-only mode filtering", () => {
+    it("mixed-mode SK6BA FM / C4FM only yields the FM row, with warning", () => {
+      const fm = makeChannel({ generated_name_final: "FMR", rx_frequency: 145.6, mode_effective: "FM" });
+      const c4 = makeChannel({ generated_name_final: "C4R", rx_frequency: 145.6, mode_effective: "C4FM" });
+      const out = VGC_N76_TARGET.export([fm, c4], VGC_N76_DEFAULTS);
+      const rows = Papa.parse<string[]>(out.content, { skipEmptyLines: true }).data;
+      expect(rows.length).toBe(2); // header + 1 row
+      expect(rows[1][0]).toBe("FMR");
+      const w = out.warnings.find((x) => x.code === "vgc_digital_sk6ba_skipped");
+      expect(w).toBeDefined();
+      expect(w!.message).toContain("1 kanal");
+    });
+
+    it("channel-pack with mode_chirp=AM exports as AM (rx/tx_mod=1, bandwidth=25000)", () => {
+      const ch = makeChannel({
+        source_type: "channel_pack",
+        generated_name_final: "AIR",
+        rx_frequency: 121.5,
+        mode_effective: "",
+        mode_chirp: "AM",
+        duplex: "off",
+      });
+      const out = VGC_N76_TARGET.export([ch], VGC_N76_DEFAULTS);
+      const row = Papa.parse<string[]>(out.content, { skipEmptyLines: true }).data[1];
+      expect(row[6]).toBe("25000");
+      expect(row[14]).toBe("1"); // rx_mod
+      expect(row[15]).toBe("1"); // tx_mod
+      expect(out.warnings.some((w) => w.code === "vgc_digital_sk6ba_skipped")).toBe(false);
+    });
+
+    it("channel-pack with mode_chirp=NFM exports as FM 12500", () => {
+      const ch = makeChannel({
+        source_type: "channel_pack",
+        generated_name_final: "PMR",
+        rx_frequency: 446.00625,
+        mode_effective: "",
+        mode_chirp: "NFM",
+        duplex: "off",
+      });
+      const out = VGC_N76_TARGET.export([ch], VGC_N76_DEFAULTS);
+      const row = Papa.parse<string[]>(out.content, { skipEmptyLines: true }).data[1];
+      expect(row[6]).toBe("12500");
+      expect(row[14]).toBe("0");
+    });
+  });
 });
+
 

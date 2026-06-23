@@ -28,7 +28,9 @@ export type WarningCode =
   | "nicsure_tx_block_unsupported"
   | "rt_unsupported_mode"
   | "rt_name_truncated"
-  | "chirp_digital_partial";
+  | "chirp_digital_partial"
+  | "vgc_digital_sk6ba_skipped"
+  | "nicsure_digital_sk6ba_skipped";
 
 export interface Warning {
   code: WarningCode;

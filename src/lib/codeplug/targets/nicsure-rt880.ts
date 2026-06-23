@@ -290,6 +290,30 @@ interface NicsureRow {
   Scrambler: string;
 }
 
+/**
+ * RT-880 is analog-FM-only. Drop SK6BA rows whose effective mode is a
+ * digital variant (C4FM/D-Star/DMR/DMRplus/P25). Channel-pack rows pass
+ * through unchanged.
+ */
+function filterAnalogFmSk6ba(
+  channels: NormalizedChannel[],
+): { kept: NormalizedChannel[]; droppedCount: number } {
+  const kept: NormalizedChannel[] = [];
+  let droppedCount = 0;
+  for (const c of channels) {
+    if (
+      c.source_type === "sk6ba" &&
+      c.mode_effective !== "" &&
+      c.mode_effective !== "FM"
+    ) {
+      droppedCount++;
+      continue;
+    }
+    kept.push(c);
+  }
+  return { kept, droppedCount };
+}
+
 export function toNicsureRows(
   channels: NormalizedChannel[],
   s: NicsureRt880Settings,
@@ -298,6 +322,16 @@ export function toNicsureRows(
   let truncCount = 0;
   let unsupported = 0;
   let txBlocked = 0;
+
+  const { kept, droppedCount: digitalSk6baDropped } = filterAnalogFmSk6ba(channels);
+  if (digitalSk6baDropped > 0) {
+    warnings.push({
+      code: "nicsure_digital_sk6ba_skipped",
+      message: `${digitalSk6baDropped} kanal(er) från SK6BA hoppades över: RT-880 stöder bara analog FM, digitala mode (C4FM/D-Star/DMR/DMRplus/P25) går inte att skriva i Nicsure-CSV:n.`,
+    });
+  }
+  channels = kept;
+
 
   const dims = s.zoneDimensions.slice(0, 4);
   const legend = buildZoneLegend(channels, dims);
