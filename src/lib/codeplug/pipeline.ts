@@ -10,6 +10,13 @@ import { DEFAULT_PACK_NAMING } from "./defaults";
 import { deriveRegion } from "./region";
 import { parseModes } from "./modes";
 
+/**
+ * Type-värden i SK6BA-exporten som ligger utanför appens scope
+ * (inte programmerbara repeatrar/kanaler). Filtreras bort tidigt så de
+ * inte räknas in i "Saknar RX-frekvens" eller dyker upp i Typ-filtret.
+ */
+export const OUT_OF_SCOPE_TYPES = new Set<string>(["uW QTH"]);
+
 function emptyPackFields() {
   return {
     pack_id: "",
