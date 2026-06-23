@@ -7,7 +7,9 @@ const STORAGE_KEY = "sk6ba-chirp-settings-v6";
 import { parseModes } from "@/lib/codeplug/modes";
 import { getTarget } from "@/lib/codeplug/targets";
 
-function migrateFilter(parsedFilter: Record<string, unknown> | undefined | null): Settings["filter"] {
+function migrateFilter(
+  parsedFilter: Record<string, unknown> | undefined | null,
+): Settings["filter"] {
   const base: Record<string, unknown> = { ...DEFAULT_SETTINGS.filter, ...(parsedFilter ?? {}) };
   // Legacy `includeUnknownDistricts` → `includeUnknownRegions` if new field missing.
   if (
