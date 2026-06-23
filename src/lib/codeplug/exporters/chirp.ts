@@ -84,8 +84,6 @@ export function resolveChirpMode(c: NormalizedChannel, fallback: string): string
   return mapped ?? fallback;
 }
 
-const DIGITAL_MODES = new Set(["C4FM", "D-Star", "DMR", "DMRplus", "P25"]);
-
 /**
  * Returns a single non-blocking warning when the export contains at least
  * one channel with a digital effective mode. CHIRP Generic CSV can carry
