@@ -1,12 +1,12 @@
 import { useCallback } from "react";
 import Papa from "papaparse";
 import JSZip from "jszip";
-import type { NormalizedChannel, Settings, SplitSettings } from "@/lib/codeplug/models";
+import type { NormalizedChannel, Settings, SplitSettings, Warning } from "@/lib/codeplug/models";
 import {
   requireTarget,
   resolveTargetSettings,
   type AnyExportTarget,
-  type ExportFile,
+  type ExportManyResult,
   type ExportResult,
 } from "@/lib/codeplug/targets";
 
