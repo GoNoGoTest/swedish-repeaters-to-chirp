@@ -13,7 +13,9 @@ Idag muterar `runPipeline` kanaler in-place i tre olika steg (RX-only-policy, sp
 I `models.ts`:
 
 ```ts
-export type NormalizedChannel = { /* unchanged shape */ };
+export type NormalizedChannel = {
+  /* unchanged shape */
+};
 export type ReadonlyChannel = Readonly<NormalizedChannel> & {
   readonly warnings: ReadonlyArray<Warning>;
 };
@@ -32,7 +34,7 @@ Pipeline-stegen tar och returnerar `ReadonlyChannel[]`. Targets fortsätter ta `
 När inget steg muterar pack-rader kan `validPacks`-blocket (rad 260-268) ersättas av en ren filter:
 
 ```ts
-const validPacks = packChannels.filter(c => c.rx_frequency != null);
+const validPacks = packChannels.filter((c) => c.rx_frequency != null);
 ```
 
 Inga `warnings: []`/`generated_name_*: ""`-resets behövs, eftersom varje steg skapar nya objekt. Pack-importerns cache påverkas inte längre av en pipeline-körning.
@@ -55,9 +57,7 @@ Idag har `NormalizedChannel` två lägesfält som betyder olika saker beroende p
 ```ts
 /** Kanonisk source/signal-mode för en kanal, oavsett källa. */
 export function channelSignalMode(c: NormalizedChannel): string {
-  return c.source_type === "channel_pack"
-    ? (c.mode_pack || "")
-    : (c.mode_effective || "");
+  return c.source_type === "channel_pack" ? c.mode_pack || "" : c.mode_effective || "";
 }
 ```
 
