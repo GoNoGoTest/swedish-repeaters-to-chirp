@@ -4,6 +4,7 @@ import type { MergedPack } from "@/lib/codeplug/channel_packs/registry";
 import { DEFAULT_PACK_NAMING } from "@/lib/codeplug/defaults";
 import { MultiSelect, SectionLabel } from "./common";
 import { NamingEditor } from "./NamingEditor";
+import { ParseWarningsPanel } from "./ParseWarningsPanel";
 
 const PACK_TOKENS = ["{service}", "{category}", "{label}", "{name_hint}", "{channel}", "{band}"];
 
