@@ -125,7 +125,9 @@ const EMPTY_DIGITAL: DigitalAccess = {
 // Token-mönster. Alla case-insensitive. Stöder ihopskrivet (CC1), separerat
 // (CC 1) och =-form (CC=1).
 const DMR_CC_RE = /\bCC\s*=?\s*(\d{1,2})\b/gi;
-const DMR_TS_RE = /\bTS\s*=?\s*([12])\b/gi;
+// TS-regexen accepterar avsiktligt alla siffror för att kunna flagga
+// ogiltiga värden (t.ex. TS3) diagnostiskt i unknownTokens.
+const DMR_TS_RE = /\bTS\s*=?\s*(\d+)\b/gi;
 const DMR_TG_RE = /\bTG\s*=?\s*([\w-]+)\b/gi;
 const C4FM_TX_RE = /\bTX\s*=?\s*(\d{2})\b/gi;
 const C4FM_RX_RE = /\bRX\s*=?\s*(\d{2})\b/gi;
