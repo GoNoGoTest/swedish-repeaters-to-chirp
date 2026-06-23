@@ -27,6 +27,11 @@ export type KnownMode = (typeof KNOWN_MODES)[number];
  * Alias → canonical name. Keys are upper-cased before lookup so the table
  * itself only needs the upper form. Add liberally as new SK6BA / target
  * idioms appear.
+ *
+ * Keys with embedded whitespace (e.g. "SYSTEM FUSION", "D STAR") are treated
+ * as phrases by parseModes: they only match when the entire chunk between
+ * mode-list separators (`/ , ; |`) collapses to that key. They will NOT match
+ * if the words are split across separators.
  */
 const MODE_ALIASES: Record<string, KnownMode> = {
   FM: "FM",
