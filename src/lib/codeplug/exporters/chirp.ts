@@ -38,7 +38,7 @@ function mapEffectiveMode(m: string): string | null {
 
 function resolveMode(c: NormalizedChannel, fallback: string): string {
   // Channel-pack explicit CHIRP mode wins (e.g. USB/LSB/AM/CW).
-  if (c.source_type === "channel_pack" && c.mode_chirp) return c.mode_chirp;
+  if (c.source_type === "channel_pack" && c.mode_pack) return c.mode_pack;
   const mapped = mapEffectiveMode(c.mode_effective);
   return mapped ?? fallback;
 }

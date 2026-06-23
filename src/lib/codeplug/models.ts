@@ -56,7 +56,7 @@ export interface NormalizedChannel {
   /**
    * The single canonical mode this channel will be exported under.
    * For sk6ba rows this is one of `parseModes(mode_raw)`; for channel-pack
-   * rows it falls back to `mode_chirp` or the row's `mode_raw`. May be
+   * rows it falls back to `mode_pack` or the row's `mode_raw`. May be
    * an empty string for unknown / unparseable inputs.
    */
   mode_effective: string;
@@ -92,7 +92,7 @@ export interface NormalizedChannel {
   label: string;
   name_hint: string;
   tx_frequency: number | null;
-  mode_chirp: string; // suggested CHIRP Mode for pack rows (NFM/FM/USB/CW)
+  mode_pack: string; // suggested CHIRP Mode for pack rows (NFM/FM/USB/CW)
   tstep: number | null;
   tone_raw: string;
   rtone_freq: number | null;

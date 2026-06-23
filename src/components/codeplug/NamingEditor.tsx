@@ -29,7 +29,7 @@ function makeExampleChannel(over: Partial<NormalizedChannel>): NormalizedChannel
     lat: null, lng: null, locator: "", comment: "",
     pack_id: "", service: "", category: "", tags: [],
     label: "", name_hint: "",
-    tx_frequency: null, mode_chirp: "", tstep: null,
+    tx_frequency: null, mode_pack: "", tstep: null,
     tone_raw: "", rtone_freq: null, ctone_freq: null,
     dtcs_code: "", dtcs_polarity: "", skip_raw: "",
     tx_allowed: true, rx_only: false,

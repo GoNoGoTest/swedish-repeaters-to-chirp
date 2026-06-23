@@ -19,7 +19,7 @@ function emptyPackFields() {
     label: "",
     name_hint: "",
     tx_frequency: null as number | null,
-    mode_chirp: "",
+    mode_pack: "",
     tstep: null as number | null,
     tone_raw: "",
     rtone_freq: null as number | null,

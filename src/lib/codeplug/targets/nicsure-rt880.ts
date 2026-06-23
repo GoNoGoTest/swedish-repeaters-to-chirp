@@ -139,14 +139,14 @@ function encodeTone(side: "tx" | "rx", c: NormalizedChannel): string {
 }
 
 function encodeBandwidth(c: NormalizedChannel, s: NicsureRt880Settings): NicsureBandwidth {
-  const m = (c.mode_chirp || "").toUpperCase();
+  const m = (c.mode_pack || "").toUpperCase();
   if (m === "NFM") return "Narrow";
   if (m === "FM" || m === "AM") return "Wide";
   return s.defaultBandwidth;
 }
 
 function encodeModulation(c: NormalizedChannel): { mod: string; unsupported: boolean } {
-  const m = (c.mode_chirp || "").toUpperCase();
+  const m = (c.mode_pack || "").toUpperCase();
   if (m === "AM") return { mod: "AM", unsupported: false };
   if (m === "FM" || m === "NFM" || m === "") return { mod: "Auto", unsupported: false };
   return { mod: "Auto", unsupported: true };
