@@ -229,5 +229,35 @@ describe("targets/nicsure-rt880", () => {
     const row = parseRows(out.content)[1];
     expect(row[4]).toBe("0.00000");
     expect(out.warnings.some((w) => w.code === "nicsure_tx_block_unsupported")).toBe(true);
+
+  describe("analog-only mode filtering", () => {
+    it("mixed-mode SK6BA FM / C4FM only yields the FM row, with warning", () => {
+      const fm = makeChannel({ generated_name_final: "FMR", rx_frequency: 145.6, mode_effective: "FM" });
+      const c4 = makeChannel({ generated_name_final: "C4R", rx_frequency: 145.6, mode_effective: "C4FM" });
+      const out = NICSURE_RT880_TARGET.export([fm, c4], NICSURE_RT880_DEFAULTS);
+      const rows = parseRows(out.content);
+      expect(rows.length).toBe(2);
+      expect(rows[1][2]).toBe("FMR");
+      const w = out.warnings.find((x) => x.code === "nicsure_digital_sk6ba_skipped");
+      expect(w).toBeDefined();
+      expect(w!.message).toContain("1 kanal");
+    });
+
+    it("channel-pack with mode_chirp=AM exports as Modulation=AM, Bandwidth=Wide", () => {
+      const ch = makeChannel({
+        source_type: "channel_pack",
+        generated_name_final: "AIR",
+        rx_frequency: 121.5,
+        mode_effective: "",
+        mode_chirp: "AM",
+        duplex: "off",
+      });
+      const out = NICSURE_RT880_TARGET.export([ch], NICSURE_RT880_DEFAULTS);
+      const row = parseRows(out.content)[1];
+      expect(row[12]).toBe("Wide");
+      expect(row[13]).toBe("AM");
+      expect(out.warnings.some((w) => w.code === "nicsure_digital_sk6ba_skipped")).toBe(false);
+    });
   });
 });
+
