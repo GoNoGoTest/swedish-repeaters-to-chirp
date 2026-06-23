@@ -352,3 +352,24 @@ describe("RT Systems Yaesu — previewMode", () => {
     expect(RT_SYSTEMS_YAESU_TARGET.previewMode?.(c4fm, S)).toBe("DN");
   });
 });
+
+describe("RT Systems Yaesu — exportMany warnings", () => {
+  it("aggregerar truncerings-varningar över alla split-filer", async () => {
+    const { RT_SYSTEMS_YAESU_TARGET } = await import("../../targets/rt-systems-yaesu");
+    const longName = "ALLDELES_FOR_LANGT_NAMN_FOR_RADION";
+    const ch = makeChannel({
+      generated_name_final: longName,
+      mode_effective: "FM",
+      rx_frequency: 145.6,
+      duplex: "-",
+      offset: 0.6,
+      tx_shift: -0.6,
+    });
+    const result = RT_SYSTEMS_YAESU_TARGET.exportMany!([ch], { ...S, padToRows: 0 }, {
+      mode: "single",
+      chunkSize: 0,
+    });
+    expect(result.files.length).toBe(1);
+    expect(result.warnings.some((w) => w.code === "rt_name_truncated")).toBe(true);
+  });
+});
