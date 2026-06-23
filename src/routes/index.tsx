@@ -95,6 +95,16 @@ function Index() {
     }));
   }, [setSettings]);
 
+  // RX-only-policy default beror på target: rt-systems-yaesu saknar verifierat
+  // beteende → tvinga "skip". Övriga target använder "block_tx".
+  useEffect(() => {
+    const desired = settings.export.targetId === "rt-systems-yaesu-generic" ? "skip" : "block_tx";
+    if (settings.packs.rxOnlyPolicy !== desired) {
+      setSettings((prev) => ({ ...prev, packs: { ...prev.packs, rxOnlyPolicy: desired } }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.export.targetId]);
+
   const { packs, selectedChannels, enabledPackCount } = useSelectedPackChannels(settings);
 
   const rows = loadState.status === "loaded" ? loadState.rows : null;
