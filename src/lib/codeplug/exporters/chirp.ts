@@ -1,6 +1,7 @@
 import Papa from "papaparse";
 import type { ChirpSettings, NormalizedChannel, Warning } from "../models";
 import { formatFrequency } from "../frequency";
+import { channelSignalMode } from "../modes";
 
 export const CHIRP_COLUMNS = [
   "Location",
