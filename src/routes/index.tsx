@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChirpSettings, NormalizedChannel, Warning } from "@/lib/codeplug/models";
 import { requireTarget, resolveTargetSettings } from "@/lib/codeplug/targets";
 import { loadSk6baCsv, type Sk6baLoadState } from "@/lib/codeplug/importers/sk6ba";
@@ -14,7 +14,7 @@ import { TargetPickerPanel } from "@/components/codeplug/TargetPickerPanel";
 import { RepeaterFilterPanel } from "@/components/codeplug/RepeaterFilterPanel";
 import { ChannelPacksPanel } from "@/components/codeplug/ChannelPacksPanel";
 import { NamingEditor } from "@/components/codeplug/NamingEditor";
-import { ExportPanel } from "@/components/codeplug/ExportPanel";
+import { ExportPanel, RxOnlyExportNote } from "@/components/codeplug/ExportPanel";
 import { PreviewTable, channelKey } from "@/components/codeplug/PreviewTable";
 
 export const Route = createFileRoute("/")({
@@ -94,6 +94,16 @@ function Index() {
       },
     }));
   }, [setSettings]);
+
+  // RX-only-policy default beror på target: rt-systems-yaesu saknar verifierat
+  // beteende → tvinga "skip". Övriga target använder "block_tx".
+  useEffect(() => {
+    const desired = settings.export.targetId === "rt-systems-yaesu-generic" ? "skip" : "block_tx";
+    if (settings.packs.rxOnlyPolicy !== desired) {
+      setSettings((prev) => ({ ...prev, packs: { ...prev.packs, rxOnlyPolicy: desired } }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.export.targetId]);
 
   const { packs, selectedChannels, enabledPackCount } = useSelectedPackChannels(settings);
 
@@ -329,6 +339,7 @@ function Index() {
                       Export stoppad — frekvensdubbletter enligt policy. Ändra policy eller åtgärda dubbletter.
                     </div>
                   )}
+                  <RxOnlyExportNote channels={exportChannels} targetId={settings.export.targetId} />
                   <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 text-sm mb-3">
                     <Stat label="Från SK6BA" value={pipeline.sk6baCount} />
                     <Stat label="Från kanalpaket" value={pipeline.packCount} />
