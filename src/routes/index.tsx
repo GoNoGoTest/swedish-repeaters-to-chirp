@@ -131,12 +131,15 @@ function Index() {
     [setSettings],
   );
 
-  // RX-only-policy default beror på target: rt-systems-yaesu saknar verifierat
-  // beteende → tvinga "skip". Övriga target använder "block_tx".
+  // RX-only-policy: säkerställ att valt värde är giltigt för aktuellt target.
+  // RT-systems-Yaesu stöder inte "block_tx" (vi saknar dokumentation om hur
+  // RT Systems markerar RX-only). Övriga target stöder alla tre val. Vi rör
+  // endast policyn när den är ogiltig — användarens egna val (mark/skip) på
+  // RT-systems lämnas orört.
   useEffect(() => {
-    const desired = settings.export.targetId === "rt-systems-yaesu-generic" ? "skip" : "block_tx";
-    if (settings.packs.rxOnlyPolicy !== desired) {
-      setSettings((prev) => ({ ...prev, packs: { ...prev.packs, rxOnlyPolicy: desired } }));
+    const isRtSystems = settings.export.targetId === "rt-systems-yaesu-generic";
+    if (isRtSystems && settings.packs.rxOnlyPolicy === "block_tx") {
+      setSettings((prev) => ({ ...prev, packs: { ...prev.packs, rxOnlyPolicy: "skip" } }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.export.targetId]);
