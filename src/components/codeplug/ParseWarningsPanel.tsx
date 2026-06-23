@@ -28,9 +28,7 @@ export function ParseWarningsPanel({
     .map((w) => w.row)
     .filter((r): r is number => r != null);
   const rowsHint =
-    firstRows.length > 0
-      ? ` (rad ${firstRows.join(", ")}${warnings.length > 3 ? ", …" : ""})`
-      : "";
+    firstRows.length > 0 ? ` (rad ${firstRows.join(", ")}${warnings.length > 3 ? ", …" : ""})` : "";
 
   return (
     <details className="mt-3 rounded border border-amber-500/40 bg-amber-500/10 text-xs text-amber-800 dark:text-amber-300">
