@@ -21,17 +21,41 @@ export function SectionLabel({ children }: { children: ReactNode }) {
   return <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{children}</div>;
 }
 
-export function Stat({ label, value, tooltip }: { label: string; value: number | string; tooltip?: string }) {
-  return (
-    <div
-      className={`rounded border border-border bg-background px-3 py-2 ${tooltip ? "cursor-help" : ""}`}
-      title={tooltip}
-    >
-      <div className="text-xs text-muted-foreground">
+export function Stat({ label, value, tooltip, onClick, active }: {
+  label: string;
+  value: number | string;
+  tooltip?: string;
+  onClick?: () => void;
+  active?: boolean;
+}) {
+  const interactive = typeof onClick === "function";
+  const baseClass = "rounded border px-3 py-2 text-left transition-colors";
+  const stateClass = active
+    ? "border-primary bg-primary/5"
+    : interactive
+      ? "border-border bg-background hover:border-primary/60"
+      : "border-border bg-background";
+  const cursorClass = interactive ? "cursor-pointer" : tooltip ? "cursor-help" : "";
+  const className = `${baseClass} ${stateClass} ${cursorClass}`;
+  const content = (
+    <>
+      <div className="text-xs text-muted-foreground break-words leading-tight">
         {label}
         {tooltip ? <span aria-hidden className="ml-1 text-muted-foreground/60">ⓘ</span> : null}
       </div>
       <div className="font-mono text-lg">{value}</div>
+    </>
+  );
+  if (interactive) {
+    return (
+      <button type="button" onClick={onClick} title={tooltip} aria-pressed={active} className={className}>
+        {content}
+      </button>
+    );
+  }
+  return (
+    <div title={tooltip} className={className}>
+      {content}
     </div>
   );
 }
