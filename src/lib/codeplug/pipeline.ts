@@ -177,6 +177,10 @@ export interface PipelineResult {
   packCount: number;
   sk6baCount: number;
   duplicateStop: boolean;
+  /** SK6BA-rader med tolkbar RX-frekvens (innan filter/mode-expansion). */
+  withRx: number;
+  /** Antal rader som droppades av frekvensdedupe-policyn. */
+  droppedByDedupe: number;
 }
 
 function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): NormalizedChannel[] {
@@ -212,6 +216,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   const totalInput = sk6baRows.length + packChannels.length;
   const normalized = normalize(sk6baRows);
   const exportable = normalized.filter((c) => c.rx_frequency != null);
+  const withRx = exportable.length;
   // Expand multi-mode SK6BA rows into one channel per selected mode.
   // Channel-pack rows pass through unchanged.
   const expanded = expandModes(exportable, settings.filter.modes ?? []);
@@ -251,6 +256,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   // Freq dedupe across the whole set
   const dedupe = applyFreqDedupe(combined, settings.packs.freqDupePolicy);
   combined = dedupe.channels;
+  const droppedByDedupe = dedupe.dropped.length;
 
   // Resolve naming per channel using the correct rules
   // (sk6ba = settings.naming, channel_pack = per-pack override or DEFAULT_PACK_NAMING)
@@ -286,5 +292,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     packCount: combined.filter((c) => c.source_type === "channel_pack").length,
     sk6baCount: combined.filter((c) => c.source_type === "sk6ba").length,
     duplicateStop: dedupe.stopped,
+    withRx,
+    droppedByDedupe,
   };
 }
