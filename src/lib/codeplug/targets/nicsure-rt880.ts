@@ -425,6 +425,17 @@ export const NICSURE_RT880_TARGET: ExportTarget<NicsureRt880Settings> = {
   limits: NICSURE_RT880_LIMITS,
   defaultSettings: NICSURE_RT880_DEFAULTS,
   resolveMaxNameLength: (s) => s.maxLength,
+  previewMode: (c, s) => {
+    // Digitala SK6BA-rader filtreras bort vid export — visa kanonisk signal
+    // i previewen så det är tydligt att de inte hamnar i filen.
+    if (c.source_type === "sk6ba" && c.mode_effective && c.mode_effective !== "FM") {
+      return c.mode_effective;
+    }
+    const mod = encodeModulation(c);
+    if (mod.mod === "AM") return "AM";
+    const bw = encodeBandwidth(c, s);
+    return bw === "Narrow" ? "NFM" : "FM";
+  },
   validate: (channels, s) => toNicsureRows(channels, s).warnings,
   export: (channels, s) => {
     const { csv, warnings } = exportNicsureRt880Csv(channels, s);

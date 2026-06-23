@@ -1,46 +1,63 @@
 ## Problem
 
-`channelKey()` i `src/components/codeplug/PreviewTable.tsx` bygger nyckeln av `source_type:pack_id:source_id:source_row`. När pipelinen expanderar en SK6BA-rad med flera moder (t.ex. FM + C4FM) till flera `NormalizedChannel` får varianterna identisk nyckel. Konsekvenser:
+`PreviewTable` har en enda `Mode`-kolumn vars värde beräknas som `isPack && c.mode_pack ? c.mode_pack : chirpMode`. För RT Systems, VGC och Nicsure har den nollkoppling till vad targeten faktiskt skriver — en C4FM-rad visas som "NFM" trots att RT Systems exporterar `DN`. Det blir missvisande och dolda buggar slinker förbi.
 
-- Att toggla exkludering på FM-raden exkluderar även C4FM-varianten (och tvärtom).
-- `exportChannels`-filtret i `src/routes/index.tsx` (rad 165) tar bort båda samtidigt.
-- Footern i `PreviewTable` (rad 150) använder fallback `channels.length - excludedKeys.size`, vilket blir matematiskt fel när en nyckel motsvarar flera kanaler.
+## Lösning
 
-## Åtgärd
+Varje target ansvarar för sin egen "preview-adapter" som returnerar det mode-token targeten faktiskt skriver i CSV:n. Previewen visar både kanalens signalmode och targetens exportmode.
 
-### 1. `src/components/codeplug/PreviewTable.tsx`
+### 1. `src/lib/codeplug/targets/types.ts`
 
-Utvidga `channelKey` så den även diskriminerar på mode och RX-frekvens:
+Lägg till en valfri metod på `ExportTarget`:
 
 ```ts
-export function channelKey(c: NormalizedChannel): string {
-  return [
-    c.source_type,
-    c.pack_id ?? "",
-    c.source_id,
-    c.source_row,
-    c.mode_effective,
-    c.rx_frequency?.toFixed(6) ?? "",
-  ].join(":");
-}
+/** Mode-token som targeten faktiskt skulle skriva för den här kanalen. */
+previewMode?: (c: NormalizedChannel, settings: TSettings) => string;
 ```
 
-Ändra också footern (rad 150) så fallback inte används när det är missvisande — använd alltid `exportCount` när det finns, annars räkna faktiskt antal icke-exkluderade kanaler via `channels.filter((c) => !excludedKeys.has(channelKey(c))).length` istället för subtraktion. Det blir korrekt även om gamla nycklar råkar ligga kvar i `excludedKeys`.
+### 2. Implementera per target
 
-### 2. Inga ändringar krävs i `src/routes/index.tsx`
+- **chirp-generic**: exportera (eller flytta upp) `resolveMode(c, settings.mode)` och delegera till den.
+- **vgc-n76**: återanvänd logiken som redan finns i exportern — pack-läge `AM/FM/NFM` enligt `mode_pack`, annars `FM`/`NFM` enligt `defaultBandwidth`. Digitala SK6BA-rader (som annars droppas) → returnera `mode_effective` så previewen visar att raden inte kommer ut.
+- **nicsure-rt880**: motsvarande FM/NFM/AM-mappning.
+- **rt-systems-yaesu**: använd befintliga `operatingMode(c).mode` → `FM`/`DN`/(framtid).
 
-`exportChannels` använder redan `channelKey(c)` så filtret blir automatiskt korrekt när nyckeln blir mer specifik. `excludedKeys.size`-visningen på rad 487 är fortfarande sann (antal nycklar användaren togglat).
+Ingen ändring i `validate`/`export` — preview-adaptern delar logik via en intern helper i target-modulen, men ändrar inte exportbeteendet.
 
-### 3. Tester
+### 3. `src/components/codeplug/PreviewTable.tsx`
 
-Lägg till ett enhetstest under `src/lib/codeplug/__tests__/` (eller bredvid `PreviewTable`) som verifierar att två kanaler från samma SK6BA-rad med olika `mode_effective` får olika `channelKey`. Befintliga test ska fortsätta gå igenom.
+- Ersätt `Mode`-kolumnen med två: **`Signal`** och **`Export`**.
+  - Signal: `c.mode_pack || c.mode_effective || "—"` (pack-rader visar deras `mode_pack`, SK6BA visar kanonisk signal).
+  - Export: från ny prop `getExportMode(c)`; fallback till `chirpMode` om callbacken saknas (bakåtkompatibelt för enkla testfall).
+- Byt prop `chirpMode: string` till `getExportMode: (c: NormalizedChannel) => string` (obligatorisk).
+- Headerrad: ersätt `"Mode"` med `"Signal"` och `"Export"`.
 
-### Edge case: stale excluded keys
+### 4. `src/routes/index.tsx`
 
-När användaren ändrar inställningar så att multi-mode expansionen ändras kan gamla nycklar bli "dangling" i `excludedKeys`. Det är inte värre än tidigare och kräver ingen separat städning i denna fix — `Set.has()` returnerar bara `false` för dem.
+Bygg `getExportMode` från aktiv target. Pseudokod:
+
+```ts
+const settingsForTarget = /* befintlig resolveTargetSettings-uppslag */;
+const getExportMode = (c: NormalizedChannel) =>
+  target.previewMode?.(c, settingsForTarget) ?? "—";
+```
+
+Ta bort `chirpMode`-prop:en till `<PreviewTable>` (chirp-targetens `previewMode` ger nu samma värde).
+
+### 5. Tester
+
+- `src/lib/codeplug/__tests__/targets/rt-systems-yaesu.test.ts`: verifiera `previewMode(c4fmRow) === "DN"` och `previewMode(fmRow) === "FM"`.
+- `chirp-generic.test.ts`: verifiera att en C4FM-rad ger `"DN"` och en FM-rad ger settings.mode (NFM/FM).
+- `vgc-n76.test.ts` och `nicsure-rt880.test.ts`: verifiera att pack-rader med `mode_pack=AM` ger `"AM"`, och att SK6BA FM-rader ger `"FM"`/`"NFM"` enligt `defaultBandwidth`.
+
+## Tekniska detaljer
+
+- `previewMode` är rent presentationsbeteende — den anropas inte från exportpipen och kan därför inte påverka filinnehåll. Den ska dock spegla exportlogiken, så vi extraherar mode-mappningen till en delad helper i samma fil och anropar den från både `previewMode` och `export`.
+- För targets utan `previewMode` (framtida) visar UI `"—"` i Export-kolumnen. `assertNever`-mönstret tvingar ändå utvecklare att uppdatera schemat per target-id där det redan används.
 
 ## Acceptanskriterier
 
-- Toggla exkludering på FM-varianten av en multi-mode SK6BA-rad påverkar inte C4FM-varianten i previewen eller i export.
-- Footern visar korrekt antal exporterade kanaler även när multi-mode-rader är delvis exkluderade.
+- Med RT Systems Yaesu-target och en C4FM-SK6BA-rad: Signal=`C4FM`, Export=`DN`.
+- Med CHIRP-target och samma rad: Signal=`C4FM`, Export=`DN`. Med ren FM-rad: Signal=`FM`, Export=`NFM` eller `FM` beroende på `chirpSettings.mode`.
+- Med VGC N76 och pack-rad `mode_pack=AM`: Signal=`AM`, Export=`AM`. SK6BA C4FM-rad (som droppas) visar Signal=`C4FM`, Export=`C4FM` (eller markerat som "skippas" — behåll som `mode_effective` i denna iteration).
 - `bun run verify` grön.

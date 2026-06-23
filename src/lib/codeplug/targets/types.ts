@@ -81,4 +81,11 @@ export interface ExportTarget<TSettings = unknown> {
    * Defaults to limits.maxNameLength.
    */
   resolveMaxNameLength?: (settings: TSettings) => number;
+  /**
+   * Returnera mode-token som targeten faktiskt skulle skriva för den här
+   * kanalen — t.ex. "DN" för en C4FM-rad i RT Systems Yaesu. Rent
+   * presentationsbeteende: används av previewen för att visa export-mode
+   * vid sidan av signal-mode. Påverkar inte exportfilen.
+   */
+  previewMode?: (c: NormalizedChannel, settings: TSettings) => string;
 }

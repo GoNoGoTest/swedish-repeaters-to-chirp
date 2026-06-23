@@ -63,7 +63,7 @@ function mapEffectiveMode(m: string): string | null {
   }
 }
 
-function resolveMode(c: NormalizedChannel, fallback: string): string {
+export function resolveChirpMode(c: NormalizedChannel, fallback: string): string {
   // Channel-pack explicit CHIRP mode wins (e.g. USB/LSB/AM/CW).
   if (c.source_type === "channel_pack" && c.mode_pack) return c.mode_pack;
   const mapped = mapEffectiveMode(c.mode_effective);
@@ -202,7 +202,7 @@ export function toChirpRows(channels: NormalizedChannel[], s: ChirpSettings) {
       DtcsPolarity: tone.DtcsPolarity,
       RxDtcsCode: tone.RxDtcsCode,
       CrossMode: tone.CrossMode,
-      Mode: resolveMode(c, s.mode),
+      Mode: resolveChirpMode(c, s.mode),
       TStep: resolveTStep(c, s.tStep).toFixed(2),
       Skip: skip,
       Power: DEFAULT_POWER,

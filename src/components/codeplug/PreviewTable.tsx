@@ -17,14 +17,15 @@ export function PreviewTable({
   channels,
   excludedKeys,
   onToggleExclude,
-  chirpMode,
+  getExportMode,
   startLoc,
   exportCount,
 }: {
   channels: NormalizedChannel[];
   excludedKeys: Set<string>;
   onToggleExclude: (key: string) => void;
-  chirpMode: string;
+  /** Returnera target-specifikt export-mode token för raden. */
+  getExportMode: (c: NormalizedChannel) => string;
   startLoc: number;
   exportCount?: number;
 }) {
@@ -44,7 +45,8 @@ export function PreviewTable({
               "Dpx",
               "Off",
               "Tone",
-              "Mode",
+              "Signal",
+              "Export",
               "Type/Net/Kat",
               "Plats / Label",
               "Tags",
@@ -71,7 +73,8 @@ export function PreviewTable({
             const rowClass = excluded
               ? "opacity-40 line-through decoration-muted-foreground/50"
               : baseRowClass;
-            const mode = isPack && c.mode_pack ? c.mode_pack : chirpMode;
+            const signalMode = c.mode_pack || c.mode_effective || "—";
+            const exportMode = getExportMode(c);
             const loc = excluded ? "—" : String(locCounter++);
             return (
               <tr
@@ -106,7 +109,8 @@ export function PreviewTable({
                     : c.offset.toFixed(3)}
                 </td>
                 <td className="px-2 py-1">{c.ctcss_tx ?? (c.uses_1750 ? "1750" : "—")}</td>
-                <td className="px-2 py-1">{mode}</td>
+                <td className="px-2 py-1">{signalMode}</td>
+                <td className="px-2 py-1">{exportMode}</td>
                 <td className="px-2 py-1 truncate max-w-[10rem]">
                   {isPack
                     ? `${c.service || "?"} / ${c.category || "?"}`

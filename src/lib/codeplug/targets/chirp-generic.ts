@@ -1,5 +1,5 @@
 import type { ChirpSettings, NormalizedChannel, SplitSettings } from "../models";
-import { exportChirpCsv, chirpDigitalWarnings } from "../exporters/chirp";
+import { exportChirpCsv, chirpDigitalWarnings, resolveChirpMode } from "../exporters/chirp";
 import { registerTarget } from "./registry";
 import { buildSplitFiles } from "./split";
 import type { ExportTarget, HardwareLimits } from "./types";
@@ -52,6 +52,7 @@ export const CHIRP_GENERIC_TARGET: ExportTarget<ChirpSettings> = {
   limits: CHIRP_GENERIC_LIMITS,
   defaultSettings: CHIRP_GENERIC_DEFAULTS,
   resolveMaxNameLength: (s) => s.maxLength,
+  previewMode: (c, s) => resolveChirpMode(c, s.mode),
   validate: (channels) => chirpDigitalWarnings(channels),
   export: (channels: NormalizedChannel[], settings: ChirpSettings) => ({
     filename: "chirp.csv",

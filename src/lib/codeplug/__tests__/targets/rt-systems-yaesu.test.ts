@@ -342,3 +342,13 @@ describe("RT Systems Yaesu — RX-only", () => {
     expect(warnings.some((w) => w.code === "rt_rx_only_excluded")).toBe(false);
   });
 });
+
+describe("RT Systems Yaesu — previewMode", () => {
+  it("returnerar 'FM' för FM-rad och 'DN' för C4FM-rad", async () => {
+    const { RT_SYSTEMS_YAESU_TARGET } = await import("../../targets/rt-systems-yaesu");
+    const fm = makeChannel({ mode_effective: "FM" });
+    const c4fm = makeChannel({ mode_effective: "C4FM" });
+    expect(RT_SYSTEMS_YAESU_TARGET.previewMode?.(fm, S)).toBe("FM");
+    expect(RT_SYSTEMS_YAESU_TARGET.previewMode?.(c4fm, S)).toBe("DN");
+  });
+});

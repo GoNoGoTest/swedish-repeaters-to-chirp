@@ -304,6 +304,7 @@ export const RT_SYSTEMS_YAESU_TARGET: ExportTarget<RtSystemsYaesuSettings> = {
   limits: RT_SYSTEMS_YAESU_LIMITS,
   defaultSettings: RT_SYSTEMS_YAESU_DEFAULTS,
   resolveMaxNameLength: (s) => s.maxLength,
+  previewMode: (c) => operatingMode(c).mode,
   validate: (channels, s) => exportRtSystemsYaesuCsv(channels, s).warnings,
   export: (channels, s) => {
     const { csv, warnings } = exportRtSystemsYaesuCsv(channels, s);
