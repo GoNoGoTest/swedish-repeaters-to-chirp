@@ -9,6 +9,7 @@ import {
 import { KNOWN_MODES } from "@/lib/codeplug/modes";
 import { formatBandLabel, parseBandLabel, sortBands } from "@/lib/codeplug/bands";
 import { getTarget } from "@/lib/codeplug/targets";
+import { OUT_OF_SCOPE_TYPES } from "@/lib/codeplug/pipeline";
 import { Hint, MultiSelect, SectionLabel } from "./common";
 
 const ALL_COUNTRY_CODES: RegionCountryCode[] = (
