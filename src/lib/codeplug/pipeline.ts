@@ -292,5 +292,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     packCount: combined.filter((c) => c.source_type === "channel_pack").length,
     sk6baCount: combined.filter((c) => c.source_type === "sk6ba").length,
     duplicateStop: dedupe.stopped,
+    withRx,
+    droppedByDedupe,
   };
 }
