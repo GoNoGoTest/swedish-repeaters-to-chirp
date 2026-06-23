@@ -40,7 +40,7 @@ function migrateFilter(parsedFilter: Record<string, unknown> | undefined | null)
   if (!Array.isArray(base.countries)) base.countries = DEFAULT_SETTINGS.filter.countries;
   if (!Array.isArray(base.regions)) base.regions = DEFAULT_SETTINGS.filter.regions;
   if (!Array.isArray(base.modes)) base.modes = [...DEFAULT_SETTINGS.filter.modes];
-  return base;
+  return base as unknown as Settings["filter"];
 }
 
 function loadStoredSettings(): Settings {
