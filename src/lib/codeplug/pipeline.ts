@@ -177,6 +177,10 @@ export interface PipelineResult {
   packCount: number;
   sk6baCount: number;
   duplicateStop: boolean;
+  /** SK6BA-rader med tolkbar RX-frekvens (innan filter/mode-expansion). */
+  withRx: number;
+  /** Antal rader som droppades av frekvensdedupe-policyn. */
+  droppedByDedupe: number;
 }
 
 function applyRxOnlyPolicy(channels: NormalizedChannel[], settings: Settings): NormalizedChannel[] {
