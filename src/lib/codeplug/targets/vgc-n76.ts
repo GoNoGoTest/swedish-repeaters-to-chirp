@@ -428,16 +428,19 @@ export const VGC_N76_TARGET: ExportTarget<VgcN76Settings> = {
       s.reserveAprsSlot32 && split.mode === "per_district_chunked"
         ? { ...split, chunkSize: Math.min(Math.max(1, split.chunkSize), userCap) }
         : split;
-    return buildSplitFiles(channels, effectiveSplit, {
-      filenameBase: "vgc-n76",
-      extension: "csv",
-      renderChunk: (chunk) => exportVgcN76Csv(chunk, s).csv,
-      // Channel-packs have no district and must always respect the
-      // N76 per-group hardware limit (reduced by 1 when APRS slot is
-      // reserved), even when the user picks per_district (un-chunked)
-      // for repeaters.
-      packsChunkSize: userCap,
-    });
+    return {
+      files: buildSplitFiles(channels, effectiveSplit, {
+        filenameBase: "vgc-n76",
+        extension: "csv",
+        renderChunk: (chunk) => exportVgcN76Csv(chunk, s).csv,
+        // Channel-packs have no district and must always respect the
+        // N76 per-group hardware limit (reduced by 1 when APRS slot is
+        // reserved), even when the user picks per_district (un-chunked)
+        // for repeaters.
+        packsChunkSize: userCap,
+      }),
+      warnings: toVgcN76Rows(channels, s).warnings,
+    };
   },
 };
 
