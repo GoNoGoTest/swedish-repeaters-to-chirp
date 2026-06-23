@@ -120,6 +120,26 @@ function Index() {
     return { warned, collided, rxOnly, dupes };
   }, [pipeline, exportChannels]);
 
+  const previewChannels = useMemo(() => {
+    if (!pipeline) return [] as NormalizedChannel[];
+    if (!statFilter) return pipeline.channels;
+    return pipeline.channels.filter((c) => {
+      switch (statFilter) {
+        case "warned": return c.warnings.length > 0;
+        case "collided": return c.collided;
+        case "dupes": return c.warnings.some((w) => w.code === "freq_duplicate");
+        case "rxOnly": return c.rx_only;
+      }
+    });
+  }, [pipeline, statFilter]);
+
+  const statFilterLabel: Record<StatFilter, string> = {
+    warned: "Varningar",
+    collided: "Namnkollisioner",
+    dupes: "Frekvensdubbletter",
+    rxOnly: "RX-only",
+  };
+
   const { exportFiles, exportWarnings } = useCodeplugDownload({ settings, exportChannels });
 
   const onFile = useCallback(async (file: File) => {
