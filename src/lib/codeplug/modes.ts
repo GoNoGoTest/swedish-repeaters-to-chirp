@@ -84,3 +84,21 @@ export function parseModes(raw: string | undefined | null): KnownMode[] {
 export function isKnownMode(mode: string): mode is KnownMode {
   return (KNOWN_MODES as readonly string[]).includes(mode);
 }
+
+/**
+ * Kanonisk signal/source-mode för en kanal, oavsett källa.
+ *
+ * - SK6BA-rader: `mode_effective` (sätts av pipeline-expansionen, t.ex. "FM"/"C4FM").
+ * - Channel-pack-rader: `mode_pack` (t.ex. "FM"/"AM"/"USB"/"C4FM").
+ *
+ * Konsumenter som vill visa eller resonera kring kanalens *signal*-läge
+ * (i motsats till en target-specifik export-mode) ska använda den här
+ * accessorn istället för att läsa fälten direkt.
+ */
+export function channelSignalMode(c: {
+  source_type: "sk6ba" | "channel_pack";
+  mode_effective: string;
+  mode_pack: string;
+}): string {
+  return c.source_type === "channel_pack" ? c.mode_pack || "" : c.mode_effective || "";
+}
