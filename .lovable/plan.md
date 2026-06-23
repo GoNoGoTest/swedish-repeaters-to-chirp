@@ -37,13 +37,13 @@ Behåll testbredden minimal: 4–6 tester totalt, fokuserade på regressioner.
 - Mocka `URL.createObjectURL`, `URL.revokeObjectURL` och stubba `HTMLAnchorElement.prototype.click`.
 - Rendera hooken via `renderHook` med en exportChannels-fixtur och settings för `chirp-generic`.
 - Anropa `exportFiles()` → assertera att `click` anropas en gång och att Blob-innehållet (fångat via `createObjectURL`-mock) innehåller förväntade CSV-rader.
-- Andra case: exportChannels-fixtur där en kanal markerats som RX-only-exkluderad *innan* hooken anropas (dvs caller ska redan ha filtrerat). Verifierar dokumenterat kontrakt: hooken exporterar exakt det den får — inga dolda filter.
+- Andra case: exportChannels-fixtur där en kanal markerats som RX-only-exkluderad _innan_ hooken anropas (dvs caller ska redan ha filtrerat). Verifierar dokumenterat kontrakt: hooken exporterar exakt det den får — inga dolda filter.
 
 ### 4. `src/components/codeplug/__tests__/TargetPickerPanel.test.tsx`
 
 - Rendera target-pickern med kontrollerad `settings`/`setSettings`.
 - Klick på "RT Systems Yaesu generic" → `setSettings` kallas med `export.targetId === "rt-systems-yaesu-generic"`.
-- Assertera att target-bytet *inte* nollställer `perTarget` för andra targets (tidigare regression).
+- Assertera att target-bytet _inte_ nollställer `perTarget` för andra targets (tidigare regression).
 
 ## Utanför scope
 
