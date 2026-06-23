@@ -35,6 +35,11 @@ function Index() {
 
   const [loadState, setLoadState] = useState<Sk6baLoadState>({ status: "empty" });
   const [excludedKeys, setExcludedKeys] = useState<Set<string>>(new Set());
+  type StatFilter = "warned" | "collided" | "dupes" | "rxOnly";
+  const [statFilter, setStatFilter] = useState<StatFilter | null>(null);
+  const toggleStatFilter = useCallback((f: StatFilter) => {
+    setStatFilter((prev) => (prev === f ? null : f));
+  }, []);
 
   const toggleExclude = useCallback((key: string) => {
     setExcludedKeys((prev) => {
