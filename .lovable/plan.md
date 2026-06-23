@@ -27,6 +27,7 @@ Förslag: `"${n} kanaler överstiger N76:s ${cap}/grupp — välj split-läget '
 Idag säger texterna "distriktssiffra", men `groupChannelsForSplit` bucketar på `region` (country + districtLabel) — SE/SM6, NO/LA, DK/OZ, FI/OH6, etc.
 
 Förslag:
+
 - `per_district` label oförändrad (`"En fil per distrikt"`), beskrivning →
   `"Repeatrar grupperas per region (SM0–SM7, LA, OZ, OH0–OH9, …). Kanalpaket hamnar i egna filer."`
 - `per_district_chunked` beskrivning →
