@@ -303,12 +303,29 @@ function Index() {
                       Export stoppad — frekvensdubbletter enligt policy. Ändra policy eller åtgärda dubbletter.
                     </div>
                   )}
-                  <div className="grid gap-2 grid-cols-2 md:grid-cols-5 text-sm mb-3">
-                    <Stat label="Input totalt" value={pipeline.totalInput} />
-                    <Stat label="SK6BA" value={pipeline.sk6baCount} />
-                    <Stat label="Kanalpaket" value={pipeline.packCount} />
-                    <Stat label="Filtrerade bort" value={pipeline.filteredOut} />
-                    <Stat label="Varn/Koll/Dupes/RX" value={`${stats?.warned ?? 0}/${stats?.collided ?? 0}/${stats?.dupes ?? 0}/${stats?.rxOnly ?? 0}`} />
+                  <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 text-sm mb-3">
+                    <Stat label="Från SK6BA" value={pipeline.sk6baCount} />
+                    <Stat label="Från kanalpaket" value={pipeline.packCount} />
+                    <Stat
+                      label="Varningar"
+                      value={stats?.warned ?? 0}
+                      tooltip="Exportkanaler som har minst en varning (t.ex. RX-only-policy, otydlig access, namnsaknad). Kanalerna exporteras ändå — se preview-tabellen för detaljer."
+                    />
+                    <Stat
+                      label="Namnkollisioner"
+                      value={stats?.collided ?? 0}
+                      tooltip="Kanaler där det genererade namnet krockar med ett annat. Suffix-systemet har försökt göra dem unika — justera namnmallen om något fortfarande är otydligt."
+                    />
+                    <Stat
+                      label="Frekvensdubbletter"
+                      value={stats?.dupes ?? 0}
+                      tooltip="Kanaler som delar RX-frekvens med en annan kanal (oftast pack-vs-SK6BA). Påverkar inte exporten om policyn är 'behåll båda', men kan duplicera kanalplatser i radion."
+                    />
+                    <Stat
+                      label="RX-only"
+                      value={stats?.rxOnly ?? 0}
+                      tooltip="Kanaler från kanalpaket som är mottagningsbara men inte sändningsbara. Hur de exporteras beror på vald RX-only-policy (markerad i comment, TX spärrad, eller stoppar export)."
+                    />
                   </div>
                   {excludedKeys.size > 0 && (
                     <div className="mb-3 flex items-center justify-between rounded border border-border bg-muted/40 px-3 py-2 text-xs">
