@@ -345,7 +345,7 @@ function SplitPanel({
     [
       "per_district",
       "En fil per distrikt",
-      "Repeatrar grupperas på distriktssiffra. Paketkanaler i en egen fil.",
+      "Repeatrar grupperas per region (SM0–SM7, LA, OZ, OH0–OH9, …). Kanalpaket hamnar i egna filer.",
     ],
     [
       "per_district_chunked",
