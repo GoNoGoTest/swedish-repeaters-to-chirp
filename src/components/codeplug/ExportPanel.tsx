@@ -25,6 +25,7 @@ import { requireTarget } from "@/lib/codeplug/targets";
 import { isValidMaidenhead } from "@/lib/codeplug/maidenhead";
 import { Field, Hint, NumberField, SectionLabel } from "./common";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function rxOnlyHintForTarget(targetId: string): string {
   switch (targetId) {
     case "chirp-generic":
