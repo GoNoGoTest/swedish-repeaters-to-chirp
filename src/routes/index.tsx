@@ -139,43 +139,18 @@ function Index() {
   // ev. filtrerade tabellvyn. Räkna positioner från hela exportordningen
   // (pipeline.channels minus exkluderade) och slå upp per channelKey.
   const locationByKey = useMemo(() => {
-    const start = target.id === "chirp-generic" ? chirpSettings.startLocation : 1;
     const map = new Map<string, number>();
     if (!pipeline) return map;
-    let loc = start;
+    let loc = previewStartLocation;
     for (const c of pipeline.channels) {
       const key = channelKey(c);
       if (excludedKeys.has(key)) continue;
       map.set(key, loc++);
     }
     return map;
-  }, [pipeline, excludedKeys, target.id, chirpSettings.startLocation]);
+  }, [pipeline, excludedKeys, previewStartLocation]);
 
-  // Bygg en target-specifik previewMode-callback. Switchen narrowar
-  // `target` så att settings-typen blir exakt; assertNever tvingar fram
-  // uppdatering om ett nytt target läggs till.
-  const getExportMode = useMemo(() => {
-    switch (target.id) {
-      case "chirp-generic": {
-        const s = resolveTargetSettings(target, storedPatch);
-        return (c: NormalizedChannel) => target.previewMode?.(c, s) ?? "—";
-      }
-      case "vgc-n76": {
-        const s = resolveTargetSettings(target, storedPatch);
-        return (c: NormalizedChannel) => target.previewMode?.(c, s) ?? "—";
-      }
-      case "nicsure-rt880": {
-        const s = resolveTargetSettings(target, storedPatch);
-        return (c: NormalizedChannel) => target.previewMode?.(c, s) ?? "—";
-      }
-      case "rt-systems-yaesu-generic": {
-        const s = resolveTargetSettings(target, storedPatch);
-        return (c: NormalizedChannel) => target.previewMode?.(c, s) ?? "—";
-      }
-      default:
-        return assertNever(target);
-    }
-  }, [target, storedPatch]);
+  const getExportMode = previewMode;
 
   const stats = useMemo(() => {
     if (!pipeline) return null;
