@@ -489,37 +489,8 @@ function Index() {
                     </div>
                   )}
                   {(() => {
-                    // Narrow on `target.id` so validate() gets its exact settings type.
-                    let tw: Warning[] | undefined;
-                    switch (target.id) {
-                      case "chirp-generic":
-                        tw = target.validate?.(
-                          exportChannels,
-                          resolveTargetSettings(target, storedPatch),
-                        );
-                        break;
-                      case "vgc-n76":
-                        tw = target.validate?.(
-                          exportChannels,
-                          resolveTargetSettings(target, storedPatch),
-                        );
-                        break;
-                      case "nicsure-rt880":
-                        tw = target.validate?.(
-                          exportChannels,
-                          resolveTargetSettings(target, storedPatch),
-                        );
-                        break;
-                      case "rt-systems-yaesu-generic":
-                        tw = target.validate?.(
-                          exportChannels,
-                          resolveTargetSettings(target, storedPatch),
-                        );
-                        break;
-                      default:
-                        assertNever(target);
-                    }
-                    if (!tw || tw.length === 0) return null;
+                    const tw = targetValidate(exportChannels);
+                    if (tw.length === 0) return null;
                     return (
                       <ul className="mb-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200 space-y-1">
                         {tw.map((w, i) => (
