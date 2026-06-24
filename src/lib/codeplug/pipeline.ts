@@ -417,8 +417,7 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     if (c.source_type === "sk6ba") usedSk6baRows.add(c.source_row);
     else if (c.source_type === "channel_pack") usedPacks++;
   }
-  const filteredOut =
-    sk6baRows.length - usedSk6baRows.size + (packChannels.length - usedPacks);
+  const filteredOut = sk6baRows.length - usedSk6baRows.size + (packChannels.length - usedPacks);
 
   return {
     channels: finalChannels,
