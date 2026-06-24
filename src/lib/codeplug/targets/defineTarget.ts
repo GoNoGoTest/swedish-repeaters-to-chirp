@@ -84,7 +84,11 @@ export function defineTarget<TSettings, TCols extends string>(
   };
 
   if (spec.splitEnabled) {
-    target.exportMany = (channels: NormalizedChannel[], settings: TSettings, split: SplitSettings) => ({
+    target.exportMany = (
+      channels: NormalizedChannel[],
+      settings: TSettings,
+      split: SplitSettings,
+    ) => ({
       files: buildSplitFiles(channels, split, {
         filenameBase: baseFilename,
         extension: spec.fileExtension,
