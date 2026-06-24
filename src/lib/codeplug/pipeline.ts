@@ -318,16 +318,21 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   // per-run reset of warnings/name fields is needed.
   const validPacks = packChannels.filter((c) => c.rx_frequency != null);
   const packWithPolicy = applyRxOnlyPolicy(validPacks, settings);
-  // Validate split: needs tx_frequency or it can't export properly
+  // Validate split: needs tx_frequency or it can't export properly.
+  // Saknas tx_frequency degraderar vi raden till säker simplex i stället
+  // för att lämna duplex="split" vidare till exportern, där den annars
+  // skulle bli "Duplex=split, Offset=0.000000".
   const packValidated: NormalizedChannel[] = packWithPolicy.map((ch) =>
     ch.duplex === "split" && ch.tx_frequency == null
       ? {
           ...ch,
+          duplex: "" as const,
+          offset: 0,
           warnings: [
             ...ch.warnings,
             {
               code: "pack_split_unsupported",
-              message: "Split-kanal saknar tx_frequency",
+              message: "Split-kanal saknar tx_frequency; exporteras som simplex",
             } satisfies Warning,
           ],
         }
