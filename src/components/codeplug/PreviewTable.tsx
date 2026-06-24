@@ -126,7 +126,7 @@ export function PreviewTable({
                   {isPack
                     ? `${c.label || ""} ${c.channel ? `(${c.channel})` : ""}`.trim() || c.name_hint
                     : c.city}
-                  {c.rx_only && (
+                  {(c.rx_only || !c.tx_allowed) && (
                     <span className="ml-1 rounded bg-destructive/20 px-1 text-[9px] text-destructive">
                       RX
                     </span>
