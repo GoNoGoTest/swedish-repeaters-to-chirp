@@ -1,6 +1,7 @@
 import Papa from "papaparse";
 import type { RawRow } from "../models";
 import { deriveRegion, type RegionCountryCode } from "../region";
+import { parseShift } from "../frequency";
 import {
   sk6baRowSchema,
   papaErrorToWarning,
