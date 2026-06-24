@@ -10,6 +10,10 @@ describe("targets/chirp-generic", () => {
     expect(CHIRP_GENERIC_TARGET.fileExtension).toBe("csv");
   });
 
+  it("supportedSignalModes innehåller inte Tetra (Generic CSV bär inte Tetra)", () => {
+    expect(CHIRP_GENERIC_TARGET.limits.supportedSignalModes).not.toContain("Tetra");
+  });
+
   it("resolveMaxNameLength returns user-tunable chirp maxLength", () => {
     const len = CHIRP_GENERIC_TARGET.resolveMaxNameLength!({
       ...CHIRP_GENERIC_DEFAULTS,
