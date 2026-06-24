@@ -4,6 +4,8 @@ import type { NormalizedChannel, SplitSettings, Warning } from "../models";
 import { channelSignalMode } from "../modes";
 import { registerTarget } from "./registry";
 import { buildSplitFiles } from "./split";
+import { deriveTxMhz, mhzToHz } from "../exporters/shared/frequency";
+import { truncateName } from "../exporters/shared/name";
 import type { ExportTarget, HardwareLimits } from "./types";
 
 /**
@@ -104,22 +106,9 @@ export const VGC_N76_COLUMNS = [
   "tx_modulation(0=FM/1=AM)",
 ] as const;
 
-/** MHz → integer Hz, rounded to nearest Hz to avoid 6-decimal float drift. */
-function mhzToHz(mhz: number): number {
-  return Math.round(mhz * 1_000_000);
-}
-
 /** Mobile-side TX frequency in MHz, or null if not derivable. */
 function mobileTxMhz(c: NormalizedChannel): number | null {
-  if (c.tx_frequency != null) return c.tx_frequency;
-  if (c.rx_frequency == null) return null;
-  if (c.duplex === "+" || c.duplex === "-") {
-    const shift = c.tx_shift != null ? c.tx_shift : c.duplex === "+" ? c.offset : -c.offset;
-    return c.rx_frequency + shift;
-  }
-  if (c.duplex === "off") return c.rx_frequency;
-  // Simplex / unknown — TX = RX
-  return c.rx_frequency;
+  return deriveTxMhz(c);
 }
 
 /**
@@ -168,10 +157,8 @@ function isScanned(c: NormalizedChannel, s: VgcN76Settings): boolean {
 }
 
 function truncateTitle(raw: string, maxLen: number): { title: string; truncated: boolean } {
-  // Use Array.from to count visual code points, not UTF-16 units.
-  const chars = Array.from(raw);
-  if (chars.length <= maxLen) return { title: raw, truncated: false };
-  return { title: chars.slice(0, maxLen).join(""), truncated: true };
+  const { name, truncated } = truncateName(raw, maxLen);
+  return { title: name, truncated };
 }
 
 interface VgcRow {

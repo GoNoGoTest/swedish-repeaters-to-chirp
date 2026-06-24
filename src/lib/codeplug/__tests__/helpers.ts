@@ -1,6 +1,15 @@
 import type { NormalizedChannel } from "../models";
 import { deriveRegion } from "../region";
 
+/**
+ * Test fixture builder. Returns a fully-populated `NormalizedChannel` with
+ * sane defaults, overridable via `over`. The default profile is a Swedish
+ * 2 m repeater (SK6BA RV48 → 145.6 MHz with -0.6 MHz shift).
+ *
+ * Named variants (`makeAnalogRepeater`, `makeC4fmRepeater`, `makePackChannel`)
+ * are thin wrappers — they only pre-set the fields that distinguish that
+ * category, otherwise everything funnels through `makeChannel`.
+ */
 export function makeChannel(over: Partial<NormalizedChannel> = {}): NormalizedChannel {
   const district = over.district ?? "6";
   const region = over.region ?? deriveRegion(district, over.call);
@@ -70,4 +79,37 @@ export function makeChannel(over: Partial<NormalizedChannel> = {}): NormalizedCh
     district,
     region,
   };
+}
+
+/** Analog FM 2 m repeater preset (matches `makeChannel` default). */
+export function makeAnalogRepeater(over: Partial<NormalizedChannel> = {}): NormalizedChannel {
+  return makeChannel({ mode_raw: "FM", mode_effective: "FM", is_analog_fm: true, ...over });
+}
+
+/** C4FM/Fusion 2 m repeater preset. */
+export function makeC4fmRepeater(over: Partial<NormalizedChannel> = {}): NormalizedChannel {
+  return makeChannel({
+    mode_raw: "C4FM",
+    mode_effective: "C4FM",
+    is_analog_fm: false,
+    ...over,
+  });
+}
+
+/**
+ * Channel-pack row preset. Default is a marine VHF entry with
+ * `source_type: "channel_pack"`, `pack_id: "marine_vhf"`, and `mode_pack: "FM"`.
+ */
+export function makePackChannel(over: Partial<NormalizedChannel> = {}): NormalizedChannel {
+  return makeChannel({
+    source_type: "channel_pack",
+    pack_id: "marine_vhf",
+    category: "marine",
+    service: "marine",
+    mode_pack: "FM",
+    duplex: "",
+    offset: 0,
+    is_analog_fm: true,
+    ...over,
+  });
 }

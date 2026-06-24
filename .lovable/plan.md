@@ -1,145 +1,136 @@
-## Bekräftade fel mot koden
+## Mål
 
-Jag har gått igenom de sju punkterna mot källkoden. Sex av sju är reella; en (DCS-validering) är mer av en stramning än en bugg. Förslag nedan håller ändringarna smala.
+Sänk kostnaden för att lägga till nya exportmål (närmast Icom IC-705) genom att lyfta upp återkommande mönster i en delad exporter-runtime. Pipeline, importers och själva fil-/CSV-utgången från befintliga targets ska vara bit-identiska efter refaktorn.
 
----
+Eftersom IC-705-CSV-formatet inte är fastställt än är målet att en framtida IC-705-target ska kunna byggas som **en fil**: en kolumn-tabell + en mode-map + ett par overrides. Ingen ny logik för parsning, varningar, splittning eller naming.
 
-### 1. `summarize()` förstår inte `Duplex N` (sk6ba.ts:180–183)
+## Leveranser
 
-Idag:
+Tre patches, sekventiella, var och en grön på `bun run verify` innan nästa.
 
-```ts
-if (!shiftRaw || (parseNumberLoose(shiftRaw) == null && shiftRaw.toLowerCase() !== "simplex")) {
-  unclearShift++;
-}
+### Patch 1 — Deltyper + delade formatters (icke-funktionell)
+
+Inför namngivna sub-records i `models.ts` och komponera dem in i `NormalizedChannel` så publik typ förblir bakåtkompatibel:
+
+```text
+NormalizedChannel = ChannelSource
+                  & ChannelMode
+                  & ChannelFrequency
+                  & ChannelAnalogAccess
+                  & ChannelDigitalAccess
+                  & ChannelLocation
+                  & ChannelPackMeta
+                  & ChannelNaming
+                  & { warnings: Warning[] }
 ```
 
-`Duplex -2`, `Duplex 0`, tom sträng räknas alla som unclear, trots att `parseShift()` numera tolkar dem.
+Snittpunkter låses så vi slipper bikeshedding senare:
 
-**Fix:** importera `parseShift` från `./frequency` och räkna `unclearShift` som `parseShift(r.tx_shift).unclear`. Tom sträng → `simplex` (`unclear=false`), så summan blir konsistent med pipeline.
+- `is_analog_fm` → `ChannelMode` (härlett från mode, inte access).
+- `mode_pack` → `ChannelPackMeta` (men exporters får läsa det parallellt med `mode_effective` — ingen ändring).
+- `tx_allowed` / `rx_only` → `ChannelPackMeta` (de existerar bara i pack-kontexten i praktiken; för SK6BA-rader är default `true/false`).
+- `warnings` lämnas på toppen — det är tvärsnitt.
 
-Test: utöka `summarize counts categories` med rader `tx_shift: ""`, `"Duplex 0"`, `"Duplex -2"`, `"trams"` → endast den sista räknas som unclear.
+Skapa nya delade formatters i `src/lib/codeplug/exporters/shared/`:
 
----
+- `formatFrequencyMHz(hz)` — befintlig logik centraliserad.
+- `formatDuplexOffset(freq: ChannelFrequency, opts)` — gemensam, varje target väljer hur `"split"`-degradering ska se ut.
+- `formatAnalogTone(access: ChannelAnalogAccess)` → `{ tone, rtone, ctone, dtcs, polarity }`.
+- `formatDigitalAccess(mode: ChannelMode, dig: ChannelDigitalAccess)` → mode-aware text.
 
-### 2. `filteredOut` är fel efter mode-expansion (pipeline.ts)
+Existerande exporters (chirp.ts, vgc-n76.ts, nicsure-rt880.ts, rt-systems-yaesu.ts) plus exporters/chirp.ts uppdateras att **konsumera** dessa formatters där de redan gör exakt detta — men endast där bytet är 1:1. Allt annat lämnas orört. Snapshot-testerna är ekvivalenslås.
 
-`totalInput = sk6baRows.length + packChannels.length` mäts före expansion, `finalChannels.length` efter. En `FM / C4FM`-rad som expanderas till 2 kanaler ger negativ/missvisande diff.
+Acceptans: identiska snapshot-utdata, inga `as`-cast, inga ändringar i `pipeline.ts` / `importers/`.
 
-**Fix:** byt definition till "antal källrader som inte producerade någon utgångskanal":
+### Patch 2 — Mode-map-modul + RowMapper-kontrakt
 
-- För SK6BA: räkna unika `source_row` som finns kvar i `finalChannels` (SK6BA-grenen) → `sk6baRows.length - usedSourceRows.size`.
-- För packs: `packChannels.length - finalChannels.filter(c => c.source_type === "channel_pack").length`.
-- Summera. Kan inte bli negativ. Behåll fältet på `PipelineResult`.
-
-Test: ny test i `pipeline.test.ts` (eller utöka befintlig): 1 SK6BA-rad med `FM / C4FM`, mode-filter tomt → `filteredOut === 0` även om `channels.length === 2`.
-
----
-
-### 3. APRS hamnar inte på slot 32 vid <31 användarrader (vgc-n76.ts:377–383)
-
-`insertAprsRow` appenderar APRS när `rows.length < 31`. Settingsbeskrivningen lovar "fast slot 32".
-
-**Fix:** pad-up före insättning så APRS alltid landar på index 31 (slot 32) i icke-chunkade exporter:
+**Mode-map-modul** `src/lib/codeplug/exporters/shared/modeMap.ts`:
 
 ```ts
-function insertAprsRow(rows, aprs) {
-  const SLOT_INDEX = VGC_N76_CHANNELS_PER_GROUP - 1; // 31
-  if (rows.length >= SLOT_INDEX) {
-    return [...rows.slice(0, SLOT_INDEX), aprs, ...rows.slice(SLOT_INDEX)];
-  }
-  const padded = [...rows];
-  while (padded.length < SLOT_INDEX) padded.push({ ...EMPTY_ROW });
-  padded.push(aprs);
-  return padded;
-}
+type ModeMap = Partial<Record<KnownMode, string | null>>;
+function resolveTargetMode(c: ChannelMode, map: ModeMap, fallback?: string): string | null;
 ```
 
-Chunkad export påverkas inte (där cappas userCap till 31 redan).
+Varje target deklarerar bara sin tabell. `mapEffectiveMode` i chirp/vgc/nicsure/rt-yaesu byts mot `resolveTargetMode(c, CHIRP_MODE_MAP)` etc. `null` = unsupported (befintlig semantik).
 
-Test: utöka `vgc-n76.test.ts` — 5 användarrader + `reserveAprsSlot32` → rad index 31 = APRS, rader 5–30 är tomma.
-Snapshot under `targets/__snapshots__/` kan behöva uppdateras; jag uppdaterar berörda snapshots.
-
----
-
-### 4. Tetra listas som stött i CHIRP men mappas till null (chirp-generic.ts + chirp.ts:67)
-
-`supportedSignalModes` innehåller `"Tetra"`, men `mapEffectiveMode("TETRA")` returnerar null och `chirpDigitalWarnings` skippar den.
-
-**Fix:** ta bort `"Tetra"` ur `CHIRP_GENERIC_LIMITS.supportedSignalModes`. Det är den minimala, korrekta ändringen — Tetra hör inte hemma i Generic CSV. Befintlig kommentar i `mapEffectiveMode` förblir korrekt.
-
-Test: liten check i `targets/chirp-generic.test.ts`: `CHIRP_GENERIC_LIMITS.supportedSignalModes` innehåller inte `"Tetra"`.
-
----
-
-### 5. PreviewTable RX-badge undercountar (PreviewTable.tsx:129)
-
-Pipeline + ExportPanel använder `c.rx_only || !c.tx_allowed`. PreviewTable använder bara `c.rx_only`.
-
-**Fix:** ändra till `(c.rx_only || !c.tx_allowed)`. Ingen pipelineändring.
-
-Test: utöka `PreviewTable.test.tsx` med en pack-rad `rx_only=false, tx_allowed=false` → badge "RX" syns.
-
----
-
-### 6. Split utan tx_frequency exporterar trasigt (pipeline.ts:255–266, chirp.ts:122–129)
-
-Idag: varning `pack_split_unsupported` läggs men `duplex` lämnas som `"split"`. CHIRP-exporten faller då på `{ duplex: c.duplex, offset: c.offset.toFixed(6) }` → `Duplex=split, Offset=0.000000`, vilket är värre än simplex.
-
-**Fix:** i samma `packValidated.map(...)` där varningen läggs, degradera raden till säker simplex (`duplex: ""`, `offset: 0`) i stället för att bara varna. Behåll varningen så användaren ser nedgraderingen.
+**RowMapper-kontrakt** `src/lib/codeplug/exporters/shared/rowMapper.ts`:
 
 ```ts
-if (ch.duplex === "split" && ch.tx_frequency == null) {
-  return {
-    ...ch,
-    duplex: "",
-    offset: 0,
-    warnings: [
-      ...ch.warnings,
-      {
-        code: "pack_split_unsupported",
-        message: "Split-kanal saknar tx_frequency; exporteras som simplex",
-      },
-    ],
-  };
+interface RowMapper<TSettings, TCols extends string> {
+  columns: readonly TCols[];
+  toRow(c: NormalizedChannel, ctx: { index: number; settings: TSettings }): Record<TCols, string>;
 }
+function renderCsv<T, C extends string>(channels, mapper, settings, opts?): string;
 ```
 
-Test: ny test i `pipeline.test.ts` — pack-rad med `duplex="split"`, `tx_frequency=null` → resultatet har `duplex===""` och varning `pack_split_unsupported`.
+`renderCsv` äger CSV-escape, BOM, radslut, header. Bytena ska vara _byte-för-byte_ identiska med befintlig export — verifieras genom att snapshot-testerna inte ändras.
 
----
+Konvertera chirp-generic först (enklast, har redan tydlig kolumn-lista). Sedan vgc-n76, nicsure-rt880, rt-systems-yaesu en i taget; om någons CSV-utgång inte är ren tabell-mapping (t.ex. VGC's grupp-/APRS-injektion) behåller den sin nuvarande renderare och tar bara `RowMapper` för själva radmappningen — splittning/insättning sker fortsatt i target-koden.
 
-### 7. DCS-validering är för slapp (tones.ts:18–22)
+Acceptans: alla snapshots oförändrade. Targets blir tydligt kortare; ny target kan skrivas mot kontraktet.
 
-`normalizeDcs` accepterar 0–999 inkl. decimaltal med 8/9. DCS-koder är 3-siffriga oktala värden.
+### Patch 3 — Test-fixture-builder + `defineTarget()`-helper
 
-**Fix:** stram till `normalizeDcs` så icke-oktala värden förkastas:
+**Fixture-builder** `src/lib/codeplug/__tests__/helpers/makeChannel.ts`:
 
 ```ts
-function normalizeDcs(raw) {
-  const n = typeof raw === "number" ? raw : parseInt(raw, 10);
-  if (!Number.isInteger(n) || n < 0 || n > 777) return null;
-  const s = String(n).padStart(3, "0");
-  if (!/^[0-7]{3}$/.test(s)) return null; // oktal-only
-  return s;
-}
+function makeChannel(overrides?: DeepPartial<NormalizedChannel>): NormalizedChannel;
+function makeAnalogRepeater(overrides?: ...): NormalizedChannel;
+function makeC4fmRepeater(...): NormalizedChannel;
+function makePackChannel(...): NormalizedChannel;
 ```
 
-Detta avvisar t.ex. `DCS 089`, `DCS 800`. Det räcker som första steg utan att slå på en hårdkodad allowlist (kan göras separat senare). Befintliga tester använder `025`, `023`, `054` osv. — alla giltiga oktalt.
+Defaults fyller ALLA fält (klassificerade per deltyp så det är lätt att se vad som saknas vid framtida fältutökning). Befintliga test-helpers (`helpers.ts`) får interna omskrivningar att delegera till `makeChannel`, men deras publika API ändras inte — undviker dominoeffekt i ~30 testfiler.
 
-Test: i `tones.test.ts` lägg till `parseAccess("DCS 089").dcs === null` och `parseAccess("DCS 800").dcs === null`. Verifiera att befintliga DCS-tester fortfarande passerar.
+**`defineTarget()`-helper** `src/lib/codeplug/targets/defineTarget.ts`:
 
----
+```ts
+function defineTarget<TSettings, TCols extends string>(spec: {
+  id;
+  label;
+  vendor;
+  fileExtension;
+  filenameBase?;
+  limits;
+  defaults;
+  settingsSchema;
+  modeMap;
+  mapper: RowMapper<TSettings, TCols>;
+  validate?;
+  resolveMaxNameLength?;
+  previewMode?;
+  supportsSplit?: boolean; // → standardiserad exportMany via buildSplitFiles
+}): ExportTarget<TSettings>;
+```
 
-## Genomförandeordning
+Detta är "klistret" — när tabell + map + defaults är skrivna behöver en ny target inte deklarera `export` och `exportMany` själv. chirp-generic konverteras som referens-implementation; övriga targets lämnas oförändrade men kan migreras opportunistiskt senare. Skapar inga regressionsrisker för icke-migrerade targets.
 
-1. summarize-fix + test
-2. filteredOut + test
-3. VGC APRS pad-up + test (uppdatera ev. snapshots)
-4. Ta bort Tetra ur CHIRP supportedSignalModes + test
-5. PreviewTable RX-badge + test
-6. Split-degradering i pipeline + test
-7. DCS oktal-validering + test
-8. `bun run verify`
+Acceptans: snapshots oförändrade; chirp-generic.ts blir tydligt kortare; ny target = en fil ≈ 80–120 rader.
 
-Inga modeller, exportkontrakt eller filstrukturer ändras. Bredden förblir smal.
+## IC-705-readiness
+
+När CSV-spec landar är arbetet:
+
+1. Skapa `icom-ic705.ts`: `MODE_MAP` (FM/NFM/AM/USB/LSB/CW/DV), kolumn-tabell, defaults + schema, `defineTarget(...)`, `registerTarget(...)`.
+2. Lägga till `"icom-ic705": IcomIc705Settings` i `TargetSettingsMap`.
+3. Snapshot-test mot referens-CSV när sådan finns.
+
+Inga ändringar i pipeline, models eller importers krävs.
+
+## Risker & motåtgärder
+
+- **Snapshot-drift av misstag**: varje patch körs mot fullt snapshot-suite innan merge. Om en snapshot ändras är det en regression, inte en accepterad uppdatering.
+- **Subtila typincompabiliteter vid composition (`&`)**: vi undviker `Pick<>`-baserade subtyper i deltyperna; allt är platta `interface` som lyfts ut. Ingen användning av `as`.
+- **Test-helpers breddningar**: behåll befintliga publika helper-signaturer; `makeChannel` är _adderande_.
+- **Targets som inte är ren tabell-mapping (VGC APRS-slot, NiCSURE-zoner)**: dessa migreras till RowMapper _endast_ för radmappningen; specialinjektion ligger kvar i target-koden. Inget tvång att passa allt genom `defineTarget`.
+
+## Inte i scope
+
+- Refaktor av `pipeline.ts`, importers, varningsmodellen, naming, sorting, packregistret.
+- Förändringar av faktisk CSV-utgång för existerande targets.
+- Implementation av IC-705-targeten (separat patch när CSV-format finns).
+- Refactor av VGC/NiCSURE specialfall (grupp-32, zon-pool) utöver att de börjar använda RowMapper för radnivå.
+
+## Verifiering per patch
+
+`bun run verify`. Specifikt: snapshot-tester under `targets/__snapshots__/` måste vara oförändrade efter patch 1 och 2. Efter patch 3 får endast chirp-generic-relaterade test-implementationer (inte snapshots) ha ändrats.

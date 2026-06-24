@@ -2,6 +2,8 @@ import { z } from "zod";
 import type { NormalizedChannel, SplitSettings, Warning } from "../models";
 import { registerTarget } from "./registry";
 import { buildSplitFiles } from "./split";
+import { deriveTxMhz } from "../exporters/shared/frequency";
+import { truncateName as sharedTruncateName } from "../exporters/shared/name";
 import type { ExportTarget, HardwareLimits } from "./types";
 
 /**
@@ -121,19 +123,11 @@ function joinRow(fields: readonly string[]): string {
 }
 
 function truncateName(raw: string, maxLen: number): { name: string; truncated: boolean } {
-  const chars = Array.from(raw);
-  if (chars.length <= maxLen) return { name: raw, truncated: false };
-  return { name: chars.slice(0, maxLen).join(""), truncated: true };
+  return sharedTruncateName(raw, maxLen);
 }
 
 function mobileTxMhz(c: NormalizedChannel): number | null {
-  if (c.tx_frequency != null) return c.tx_frequency;
-  if (c.rx_frequency == null) return null;
-  if (c.duplex === "+" || c.duplex === "-") {
-    const shift = c.tx_shift != null ? c.tx_shift : c.duplex === "+" ? c.offset : -c.offset;
-    return c.rx_frequency + shift;
-  }
-  return c.rx_frequency;
+  return deriveTxMhz(c);
 }
 
 function formatOffsetFrequency(c: NormalizedChannel): string {
