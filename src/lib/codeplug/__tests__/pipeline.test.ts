@@ -249,3 +249,57 @@ describe("runPipeline with channel pack", () => {
     expect(rxOnly?.warnings.some((w) => w.code === "rx_only_blocked")).toBe(true);
   });
 });
+
+describe("runPipeline filteredOut semantics", () => {
+  it("räknar inte mode-expansion som extra utgångskanaler", () => {
+    const row = {
+      id: "1",
+      type: "Repeater",
+      status: "QRV",
+      output: "434.6000",
+      tx_shift: "-2",
+      band: "70",
+      district: "6",
+      city: "Borås",
+      call: "SK6BA",
+      channel: "RV48",
+      mode: "FM / C4FM",
+      access: "123.0",
+    };
+    const r = runPipeline({
+      sk6baRows: [row],
+      settings: {
+        ...baseSettings,
+        filter: { ...baseSettings.filter, modes: [] },
+      },
+    });
+    expect(r.channels.length).toBe(2);
+    // 1 källrad → 1 använd source_row → 0 filteredOut.
+    expect(r.filteredOut).toBe(0);
+  });
+});
+
+describe("runPipeline split utan tx_frequency", () => {
+  it("degraderar duplex till simplex och lägger varning", () => {
+    const pack = makeChannel({
+      source_type: "channel_pack",
+      pack_id: "p1",
+      mode_pack: "FM",
+      mode_effective: "FM",
+      duplex: "split",
+      offset: 0,
+      tx_frequency: null,
+      rx_frequency: 145.5,
+    });
+    const r = runPipeline({
+      sk6baRows: [],
+      packChannels: [pack],
+      settings: baseSettings,
+    });
+    expect(r.channels.length).toBe(1);
+    const c = r.channels[0];
+    expect(c.duplex).toBe("");
+    expect(c.offset).toBe(0);
+    expect(c.warnings.some((w) => w.code === "pack_split_unsupported")).toBe(true);
+  });
+});
