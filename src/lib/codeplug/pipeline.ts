@@ -407,9 +407,22 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     };
   });
 
+  // filteredOut mäts som "antal källrader som inte producerade någon
+  // utgångskanal". Räkna unika SK6BA source_row som överlevde + antal
+  // packs som överlevde, så att mode-expansion (1 SK6BA-rad → flera
+  // kanaler) inte ger negativ eller nonsens-siffra.
+  const usedSk6baRows = new Set<number>();
+  let usedPacks = 0;
+  for (const c of finalChannels) {
+    if (c.source_type === "sk6ba") usedSk6baRows.add(c.source_row);
+    else if (c.source_type === "channel_pack") usedPacks++;
+  }
+  const filteredOut =
+    sk6baRows.length - usedSk6baRows.size + (packChannels.length - usedPacks);
+
   return {
     channels: finalChannels,
-    filteredOut: totalInput - finalChannels.length,
+    filteredOut,
     unresolvedCollisions: unresolved,
     totalInput,
     packCount: finalChannels.filter((c) => c.source_type === "channel_pack").length,
