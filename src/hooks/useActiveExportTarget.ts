@@ -7,11 +7,7 @@ import type {
   Warning,
 } from "@/lib/codeplug/models";
 import { assertNever } from "@/lib/codeplug/assertNever";
-import {
-  type AnyExportTarget,
-  requireTarget,
-  resolveTargetSettings,
-} from "@/lib/codeplug/targets";
+import { type AnyExportTarget, requireTarget, resolveTargetSettings } from "@/lib/codeplug/targets";
 import type { ExportTarget } from "@/lib/codeplug/targets/types";
 
 /**
@@ -86,10 +82,7 @@ function bindTarget<T>(
 }
 
 export function useActiveExportTarget(settings: Settings): ActiveExportTargetBundle {
-  const target = useMemo(
-    () => requireTarget(settings.export.targetId),
-    [settings.export.targetId],
-  );
+  const target = useMemo(() => requireTarget(settings.export.targetId), [settings.export.targetId]);
   const storedPatch = settings.export.perTarget[settings.export.targetId] as
     | Record<string, unknown>
     | undefined;
