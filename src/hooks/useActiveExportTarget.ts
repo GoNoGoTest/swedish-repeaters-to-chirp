@@ -12,6 +12,7 @@ import {
   requireTarget,
   resolveTargetSettings,
 } from "@/lib/codeplug/targets";
+import type { ExportTarget } from "@/lib/codeplug/targets/types";
 
 /**
  * Bundle med target-relaterade deriveringar som tidigare låg utspridda i
@@ -36,9 +37,7 @@ export interface ActiveExportTargetBundle {
   validate: (channels: NormalizedChannel[]) => Warning[];
   /**
    * Loc-startposition för previewn. CHIRP läser `startLocation` ur sina
-   * settings; övriga targets börjar alltid på 1. Generaliseras lätt: lägg
-   * en `resolvePreviewStartLocation?(settings)` på `ExportTarget` om fler
-   * targets behöver det.
+   * settings; övriga targets börjar alltid på 1.
    */
   previewStartLocation: number;
   /**
@@ -63,49 +62,28 @@ const CHIRP_FALLBACK: ChirpSettings = {
   maxLength: 6,
 };
 
-interface InternalBundle<T> {
-  target: AnyExportTarget;
-  resolved: T;
-  previewStartLocation: number;
-}
-
-function buildBundle<T>(
-  inner: InternalBundle<T>,
-  storedPatch: Record<string, unknown> | undefined,
-  supportsRxOnlyPolicy: (p: RxOnlyPolicy) => boolean,
-  chirpSettings: ChirpSettings,
-): ActiveExportTargetBundle {
-  const { target, resolved, previewStartLocation } = inner;
-  // `target` är AnyExportTarget här, men `resolved` är typad som T för den
-  // narrowade varianten. Vi kapslar in passningen via `previewMode`/`validate`
-  // som båda är typade `(c, s: T) => ...` på den specifika `ExportTarget<T>`-
-  // signaturen. Eftersom buildBundle bara anropas inom rätt case är detta
-  // strukturellt korrekt — vi exponerar bara funktioner som redan har s bundet.
-  const previewMode = (c: NormalizedChannel): string => {
-    const fn = (target as { previewMode?: (c: NormalizedChannel, s: T) => string }).previewMode;
-    return fn ? (fn(c, resolved) ?? "—") : "—";
-  };
-  const validate = (channels: NormalizedChannel[]): Warning[] => {
-    const fn = (target as { validate?: (cs: NormalizedChannel[], s: T) => Warning[] }).validate;
-    return fn ? fn(channels, resolved) : [];
-  };
-  const maxNameLength =
-    (target as { resolveMaxNameLength?: (s: T) => number }).resolveMaxNameLength?.(resolved) ??
-    target.limits.maxNameLength;
-  return {
-    target,
-    storedPatch,
-    maxNameLength,
-    previewMode,
-    validate,
-    previewStartLocation,
-    supportsRxOnlyPolicy,
-    chirpSettings,
-  };
-}
-
 const supportsRxOnlyPolicyAll = (_p: RxOnlyPolicy): boolean => true;
 const supportsRxOnlyPolicyRtSystems = (p: RxOnlyPolicy): boolean => p !== "block_tx";
+
+/**
+ * Generisk bundle-byggare: tar ett narrowat `ExportTarget<T>` + dess
+ * resolvade settings och binder previewMode/validate/maxNameLength med
+ * exakt rätt typ — inga `as`-casts.
+ */
+function bindTarget<T>(
+  target: ExportTarget<T>,
+  resolved: T,
+): {
+  previewMode: (c: NormalizedChannel) => string;
+  validate: (channels: NormalizedChannel[]) => Warning[];
+  maxNameLength: number;
+} {
+  return {
+    previewMode: (c) => target.previewMode?.(c, resolved) ?? "—",
+    validate: (channels) => target.validate?.(channels, resolved) ?? [],
+    maxNameLength: target.resolveMaxNameLength?.(resolved) ?? target.limits.maxNameLength,
+  };
+}
 
 export function useActiveExportTarget(settings: Settings): ActiveExportTargetBundle {
   const target = useMemo(
@@ -120,39 +98,51 @@ export function useActiveExportTarget(settings: Settings): ActiveExportTargetBun
     switch (target.id) {
       case "chirp-generic": {
         const s = resolveTargetSettings(target, storedPatch);
-        return buildBundle(
-          { target, resolved: s, previewStartLocation: s.startLocation },
+        const bound = bindTarget(target, s);
+        return {
+          target,
           storedPatch,
-          supportsRxOnlyPolicyAll,
-          s,
-        );
+          ...bound,
+          previewStartLocation: s.startLocation,
+          supportsRxOnlyPolicy: supportsRxOnlyPolicyAll,
+          chirpSettings: s,
+        };
       }
       case "vgc-n76": {
         const s = resolveTargetSettings(target, storedPatch);
-        return buildBundle(
-          { target, resolved: s, previewStartLocation: 1 },
+        const bound = bindTarget(target, s);
+        return {
+          target,
           storedPatch,
-          supportsRxOnlyPolicyAll,
-          CHIRP_FALLBACK,
-        );
+          ...bound,
+          previewStartLocation: 1,
+          supportsRxOnlyPolicy: supportsRxOnlyPolicyAll,
+          chirpSettings: CHIRP_FALLBACK,
+        };
       }
       case "nicsure-rt880": {
         const s = resolveTargetSettings(target, storedPatch);
-        return buildBundle(
-          { target, resolved: s, previewStartLocation: 1 },
+        const bound = bindTarget(target, s);
+        return {
+          target,
           storedPatch,
-          supportsRxOnlyPolicyAll,
-          CHIRP_FALLBACK,
-        );
+          ...bound,
+          previewStartLocation: 1,
+          supportsRxOnlyPolicy: supportsRxOnlyPolicyAll,
+          chirpSettings: CHIRP_FALLBACK,
+        };
       }
       case "rt-systems-yaesu-generic": {
         const s = resolveTargetSettings(target, storedPatch);
-        return buildBundle(
-          { target, resolved: s, previewStartLocation: 1 },
+        const bound = bindTarget(target, s);
+        return {
+          target,
           storedPatch,
-          supportsRxOnlyPolicyRtSystems,
-          CHIRP_FALLBACK,
-        );
+          ...bound,
+          previewStartLocation: 1,
+          supportsRxOnlyPolicy: supportsRxOnlyPolicyRtSystems,
+          chirpSettings: CHIRP_FALLBACK,
+        };
       }
       default:
         return assertNever(target);
