@@ -111,8 +111,7 @@ function Index() {
   // endast policyn när den är ogiltig — användarens egna val (mark/skip) på
   // RT-systems lämnas orört.
   useEffect(() => {
-    const isRtSystems = settings.export.targetId === "rt-systems-yaesu-generic";
-    if (isRtSystems && settings.packs.rxOnlyPolicy === "block_tx") {
+    if (!supportsRxOnlyPolicy(settings.packs.rxOnlyPolicy)) {
       setSettings((prev) => ({ ...prev, packs: { ...prev.packs, rxOnlyPolicy: "skip" } }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
