@@ -70,49 +70,21 @@ function Index() {
   }, []);
   const resetExcluded = useCallback(() => setExcludedKeys(new Set()), []);
 
-  // Active export target — discriminated union (AnyExportTarget) keyed on `id`.
-  // Narrow with `target.id === "chirp-generic" | "vgc-n76"` to access settings
-  // safely; no `as` casts needed at call sites.
-  const target = useMemo(() => requireTarget(settings.export.targetId), [settings.export.targetId]);
-  const storedPatch = settings.export.perTarget[settings.export.targetId] as
-    | Record<string, unknown>
-    | undefined;
-  // Per-target resolved settings (defaults merged with user patch). Each
-  // branch narrows `target` to its concrete variant so the settings type is
-  // exact — no `as unknown as XSettings` cast.
-  const chirpSettings: ChirpSettings =
-    target.id === "chirp-generic"
-      ? resolveTargetSettings(target, storedPatch)
-      : { startLocation: 1, mode: "NFM", tStep: 5.0, skipLinks: false, maxLength: 6 };
-  // Persisted patch is opaque outside this file; pass through to ExportPanel,
-  // which narrows again on `target.id` before handing to per-target sub-panels.
+  // Alla target-relaterade deriveringar (target, settings, maxNameLength,
+  // previewMode, validate, RX-only-policy-stöd) lever i `useActiveExportTarget`.
+  // Route-komponenten orkestrerar bara UI-state och rendering.
+  const {
+    target,
+    storedPatch,
+    maxNameLength,
+    previewMode,
+    validate: targetValidate,
+    previewStartLocation,
+    supportsRxOnlyPolicy,
+    chirpSettings,
+  } = useActiveExportTarget(settings);
+  // Opaque patch som skickas vidare till ExportPanel (panelen narrowar själv).
   const targetSettings: Record<string, unknown> = (storedPatch ?? {}) as Record<string, unknown>;
-  const maxNameLength = (() => {
-    switch (target.id) {
-      case "chirp-generic":
-        return (
-          target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ??
-          target.limits.maxNameLength
-        );
-      case "vgc-n76":
-        return (
-          target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ??
-          target.limits.maxNameLength
-        );
-      case "nicsure-rt880":
-        return (
-          target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ??
-          target.limits.maxNameLength
-        );
-      case "rt-systems-yaesu-generic":
-        return (
-          target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ??
-          target.limits.maxNameLength
-        );
-      default:
-        return assertNever(target);
-    }
-  })();
 
   const setTargetSettings = useCallback(
     (patch: Record<string, unknown>) => {
