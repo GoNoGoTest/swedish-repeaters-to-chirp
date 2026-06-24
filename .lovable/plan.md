@@ -7,11 +7,13 @@ Jag har gått igenom de sju punkterna mot källkoden. Sex av sju är reella; en 
 ### 1. `summarize()` förstår inte `Duplex N` (sk6ba.ts:180–183)
 
 Idag:
+
 ```ts
 if (!shiftRaw || (parseNumberLoose(shiftRaw) == null && shiftRaw.toLowerCase() !== "simplex")) {
   unclearShift++;
 }
 ```
+
 `Duplex -2`, `Duplex 0`, tom sträng räknas alla som unclear, trots att `parseShift()` numera tolkar dem.
 
 **Fix:** importera `parseShift` från `./frequency` och räkna `unclearShift` som `parseShift(r.tx_shift).unclear`. Tom sträng → `simplex` (`unclear=false`), så summan blir konsistent med pipeline.
@@ -25,6 +27,7 @@ Test: utöka `summarize counts categories` med rader `tx_shift: ""`, `"Duplex 0"
 `totalInput = sk6baRows.length + packChannels.length` mäts före expansion, `finalChannels.length` efter. En `FM / C4FM`-rad som expanderas till 2 kanaler ger negativ/missvisande diff.
 
 **Fix:** byt definition till "antal källrader som inte producerade någon utgångskanal":
+
 - För SK6BA: räkna unika `source_row` som finns kvar i `finalChannels` (SK6BA-grenen) → `sk6baRows.length - usedSourceRows.size`.
 - För packs: `packChannels.length - finalChannels.filter(c => c.source_type === "channel_pack").length`.
 - Summera. Kan inte bli negativ. Behåll fältet på `PipelineResult`.
@@ -38,6 +41,7 @@ Test: ny test i `pipeline.test.ts` (eller utöka befintlig): 1 SK6BA-rad med `FM
 `insertAprsRow` appenderar APRS när `rows.length < 31`. Settingsbeskrivningen lovar "fast slot 32".
 
 **Fix:** pad-up före insättning så APRS alltid landar på index 31 (slot 32) i icke-chunkade exporter:
+
 ```ts
 function insertAprsRow(rows, aprs) {
   const SLOT_INDEX = VGC_N76_CHANNELS_PER_GROUP - 1; // 31
@@ -50,6 +54,7 @@ function insertAprsRow(rows, aprs) {
   return padded;
 }
 ```
+
 Chunkad export påverkas inte (där cappas userCap till 31 redan).
 
 Test: utöka `vgc-n76.test.ts` — 5 användarrader + `reserveAprsSlot32` → rad index 31 = APRS, rader 5–30 är tomma.
@@ -89,7 +94,13 @@ if (ch.duplex === "split" && ch.tx_frequency == null) {
     ...ch,
     duplex: "",
     offset: 0,
-    warnings: [...ch.warnings, { code: "pack_split_unsupported", message: "Split-kanal saknar tx_frequency; exporteras som simplex" }],
+    warnings: [
+      ...ch.warnings,
+      {
+        code: "pack_split_unsupported",
+        message: "Split-kanal saknar tx_frequency; exporteras som simplex",
+      },
+    ],
   };
 }
 ```
@@ -103,6 +114,7 @@ Test: ny test i `pipeline.test.ts` — pack-rad med `duplex="split"`, `tx_freque
 `normalizeDcs` accepterar 0–999 inkl. decimaltal med 8/9. DCS-koder är 3-siffriga oktala värden.
 
 **Fix:** stram till `normalizeDcs` så icke-oktala värden förkastas:
+
 ```ts
 function normalizeDcs(raw) {
   const n = typeof raw === "number" ? raw : parseInt(raw, 10);
@@ -112,6 +124,7 @@ function normalizeDcs(raw) {
   return s;
 }
 ```
+
 Detta avvisar t.ex. `DCS 089`, `DCS 800`. Det räcker som första steg utan att slå på en hårdkodad allowlist (kan göras separat senare). Befintliga tester använder `025`, `023`, `054` osv. — alla giltiga oktalt.
 
 Test: i `tones.test.ts` lägg till `parseAccess("DCS 089").dcs === null` och `parseAccess("DCS 800").dcs === null`. Verifiera att befintliga DCS-tester fortfarande passerar.
