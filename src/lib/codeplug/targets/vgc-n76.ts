@@ -369,17 +369,21 @@ function aprsVgcRow(s: VgcN76Settings): VgcRow {
 }
 
 /**
- * Insert APRS row at slot 32 (0-indexed 31). For chunks with <31 user
- * rows the APRS row is appended at the end; for chunks with ≥31 user
- * rows it is spliced in at position 31 so any overflow user rows
- * shift down rather than being overwritten.
+ * Insert APRS row at slot 32 (0-indexed 31). For chunks with ≥31 user
+ * rows it is spliced in at position 31 so any overflow user rows shift
+ * down rather than being overwritten. For chunks with <31 user rows we
+ * pad upp till index 31 med tomma rader så APRS alltid hamnar exakt på
+ * slot 32 — det är vad inställningen lovar.
  */
 function insertAprsRow(rows: VgcRow[], aprs: VgcRow): VgcRow[] {
   const SLOT_INDEX = VGC_N76_CHANNELS_PER_GROUP - 1; // 31
   if (rows.length >= SLOT_INDEX) {
     return [...rows.slice(0, SLOT_INDEX), aprs, ...rows.slice(SLOT_INDEX)];
   }
-  return [...rows, aprs];
+  const padded = [...rows];
+  while (padded.length < SLOT_INDEX) padded.push({ ...EMPTY_ROW });
+  padded.push(aprs);
+  return padded;
 }
 
 export function exportVgcN76Csv(
