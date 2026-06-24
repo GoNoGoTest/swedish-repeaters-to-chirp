@@ -294,7 +294,11 @@ describe("targets/vgc-n76 — APRS slot 32 reservation", () => {
     const r2 = parseRows(files[2].content);
     expect(r2[0][0]).toBe("CH63");
     expect(r2[1][0]).toBe("CH64");
-    expect(r2[2][0]).toBe("APRS");
+    // Slot 32 reserveras alltid för APRS — sista chunken paddas upp till
+    // index 31 så APRS hamnar på faktisk slot 32, inte direkt efter
+    // sista användarkanalen.
+    expect(r2.length).toBe(32);
+    expect(r2[31][0]).toBe("APRS");
   });
 
   describe("analog-only mode filtering", () => {
