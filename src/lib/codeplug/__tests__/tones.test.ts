@@ -100,6 +100,12 @@ describe("parseAccess", () => {
       expect(r.ctcss).toBeCloseTo(123.0);
       expect(r.dcs).toBe("025");
     });
+    it("avvisar icke-oktala DCS-värden (digits 8/9)", () => {
+      // DCS-koder är 3-siffriga oktala värden; 089 och 800 är inte giltiga.
+      expect(parseAccess("DCS 089").dcs).toBeNull();
+      expect(parseAccess("DCS 800").dcs).toBeNull();
+      expect(parseAccess("DCS 999").dcs).toBeNull();
+    });
   });
 });
 

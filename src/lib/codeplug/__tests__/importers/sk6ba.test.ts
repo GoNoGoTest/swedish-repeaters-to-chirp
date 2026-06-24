@@ -28,6 +28,21 @@ describe("parseSk6baCsv", () => {
     expect(s.uniqueCounts.status.QRV).toBe(5);
     expect(s.unclearShift).toBeGreaterThanOrEqual(1);
   });
+
+  it("summarize.unclearShift använder parseShift och förstår 'Duplex N'", () => {
+    const rows = [
+      { tx_shift: "" },
+      { tx_shift: "simplex" },
+      { tx_shift: "Duplex 0" },
+      { tx_shift: "Duplex -2" },
+      { tx_shift: "Duplex +0.6" },
+      { tx_shift: "-0.6" },
+      { tx_shift: "trams" },
+    ] as unknown as Parameters<typeof summarize>[0];
+    const s = summarize(rows, []);
+    // Endast "trams" är unclear.
+    expect(s.unclearShift).toBe(1);
+  });
 });
 
 describe("loadSk6baCsv", () => {

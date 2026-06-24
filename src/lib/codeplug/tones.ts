@@ -17,8 +17,12 @@ const DCS_DSHORT_RE = /^D0*(\d{1,3})$/i;
 
 function normalizeDcs(raw: string | number): string | null {
   const n = typeof raw === "number" ? raw : parseInt(raw, 10);
-  if (!Number.isFinite(n) || n < 0 || n > 999) return null;
-  return String(n).padStart(3, "0");
+  if (!Number.isInteger(n) || n < 0 || n > 777) return null;
+  const s = String(n).padStart(3, "0");
+  // DCS-koder är 3-siffriga oktala värden (digits 0–7). Avvisa
+  // godtyckliga decimaltal med 8/9, t.ex. "DCS 089" eller "DCS 800".
+  if (!/^[0-7]{3}$/.test(s)) return null;
+  return s;
 }
 
 /**

@@ -240,6 +240,28 @@ describe("targets/vgc-n76 — APRS slot 32 reservation", () => {
     expect(rows[32][0]).toBe("CH32"); // overflowed user channel
   });
 
+  it("APRS on with <31 user channels: APRS landar på slot 32, tomma rader emellan", () => {
+    const channels = Array.from({ length: 5 }, (_, i) =>
+      makeChannel({
+        generated_name_final: `CH${i + 1}`,
+        rx_frequency: 145.6 + i * 0.025,
+        is_analog_fm: true,
+      }),
+    );
+    const out = VGC_N76_TARGET.export(channels, {
+      ...VGC_N76_DEFAULTS,
+      reserveAprsSlot32: true,
+    });
+    const rows = parseRows(out.content);
+    expect(rows.length).toBe(32); // 5 user + 26 padding + 1 APRS
+    expect(rows[4][0]).toBe("CH5");
+    // Slot 32 = index 31
+    expect(rows[31][0]).toBe("APRS");
+    // Mellanrader 5..30 är tomma (kolumn 0 = title tomt)
+    expect(rows[5][0]).toBe("");
+    expect(rows[30][0]).toBe("");
+  });
+
   it("per_district_chunked + APRS on with 64 channels: 3 files, channel 32 falls over to part2, APRS row 32 in each", () => {
     const channels = Array.from({ length: 64 }, (_, i) =>
       makeChannel({
@@ -272,7 +294,11 @@ describe("targets/vgc-n76 — APRS slot 32 reservation", () => {
     const r2 = parseRows(files[2].content);
     expect(r2[0][0]).toBe("CH63");
     expect(r2[1][0]).toBe("CH64");
-    expect(r2[2][0]).toBe("APRS");
+    // Slot 32 reserveras alltid för APRS — sista chunken paddas upp till
+    // index 31 så APRS hamnar på faktisk slot 32, inte direkt efter
+    // sista användarkanalen.
+    expect(r2.length).toBe(32);
+    expect(r2[31][0]).toBe("APRS");
   });
 
   describe("analog-only mode filtering", () => {

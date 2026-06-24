@@ -318,16 +318,21 @@ export function runPipeline(input: PipelineInput): PipelineResult {
   // per-run reset of warnings/name fields is needed.
   const validPacks = packChannels.filter((c) => c.rx_frequency != null);
   const packWithPolicy = applyRxOnlyPolicy(validPacks, settings);
-  // Validate split: needs tx_frequency or it can't export properly
+  // Validate split: needs tx_frequency or it can't export properly.
+  // Saknas tx_frequency degraderar vi raden till säker simplex i stället
+  // för att lämna duplex="split" vidare till exportern, där den annars
+  // skulle bli "Duplex=split, Offset=0.000000".
   const packValidated: NormalizedChannel[] = packWithPolicy.map((ch) =>
     ch.duplex === "split" && ch.tx_frequency == null
       ? {
           ...ch,
+          duplex: "" as const,
+          offset: 0,
           warnings: [
             ...ch.warnings,
             {
               code: "pack_split_unsupported",
-              message: "Split-kanal saknar tx_frequency",
+              message: "Split-kanal saknar tx_frequency; exporteras som simplex",
             } satisfies Warning,
           ],
         }
@@ -402,9 +407,21 @@ export function runPipeline(input: PipelineInput): PipelineResult {
     };
   });
 
+  // filteredOut mäts som "antal källrader som inte producerade någon
+  // utgångskanal". Räkna unika SK6BA source_row som överlevde + antal
+  // packs som överlevde, så att mode-expansion (1 SK6BA-rad → flera
+  // kanaler) inte ger negativ eller nonsens-siffra.
+  const usedSk6baRows = new Set<number>();
+  let usedPacks = 0;
+  for (const c of finalChannels) {
+    if (c.source_type === "sk6ba") usedSk6baRows.add(c.source_row);
+    else if (c.source_type === "channel_pack") usedPacks++;
+  }
+  const filteredOut = sk6baRows.length - usedSk6baRows.size + (packChannels.length - usedPacks);
+
   return {
     channels: finalChannels,
-    filteredOut: totalInput - finalChannels.length,
+    filteredOut,
     unresolvedCollisions: unresolved,
     totalInput,
     packCount: finalChannels.filter((c) => c.source_type === "channel_pack").length,

@@ -90,4 +90,25 @@ describe("PreviewTable", () => {
     const rows = screen.getAllByRole("row").slice(1);
     expect(within(rows[0]).getAllByRole("cell")[2]).toHaveTextContent("—");
   });
+
+  it("visar RX-badge även när tx_allowed=false (utan rx_only)", () => {
+    const c = makeChannel({
+      source_type: "channel_pack",
+      source_row: 2,
+      source_id: "A",
+      pack_id: "p1",
+      rx_only: false,
+      tx_allowed: false,
+    });
+    render(
+      <PreviewTable
+        channels={[c]}
+        excludedKeys={new Set()}
+        onToggleExclude={() => {}}
+        getExportMode={() => "FM"}
+        getExportLocation={() => 1}
+      />,
+    );
+    expect(screen.getByText("RX")).toBeInTheDocument();
+  });
 });
