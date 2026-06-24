@@ -47,11 +47,35 @@ export type SourceType = "sk6ba" | "channel_pack";
 
 import type { RegionInfo, RegionCountryCode } from "./region";
 
-export interface NormalizedChannel {
+/**
+ * `NormalizedChannel` is the canonical in-memory shape that flows through
+ * the entire pipeline: importers → expansion → filters → naming → export.
+ *
+ * The type is composed from named sub-records so each concern (source,
+ * mode, frequency, access, location, pack-metadata, naming) can be
+ * referenced independently by helpers and target row-mappers without
+ * everyone widening to the full union. The composition is via `&` so the
+ * fields remain a flat namespace at runtime — existing call sites that
+ * read `c.rx_frequency`, `c.mode_effective`, etc. are unaffected.
+ *
+ * Snittpunkter (locked in to avoid future bikeshedding):
+ *  - `is_analog_fm` hör till `ChannelMode` (härlett från mode, inte access).
+ *  - `mode_pack` hör till `ChannelPackMeta` (SK6BA-rader har "").
+ *  - `tx_allowed` / `rx_only` ligger i `ChannelPackMeta` (det är där de
+ *    faktiskt varierar; SK6BA-defaults är `true` / `false`).
+ *  - `warnings` och `comment` är top-level tvärsnitt och hör inte till
+ *    någon enskild sub-record.
+ */
+
+/** Identifiering av källraden — SK6BA-rad eller channel-pack-rad. */
+export interface ChannelSource {
   source_type: SourceType;
   source_row: number;
   source_id: string;
-  // SK6BA fields (also used by packs where applicable)
+}
+
+/** Kanaltyp + signal mode. */
+export interface ChannelMode {
   type: string;
   status: string;
   mode_raw: string;
@@ -63,16 +87,30 @@ export interface NormalizedChannel {
    */
   mode_effective: string;
   is_analog_fm: boolean;
-  band: string;
-  /** Raw district value from the CSV (preserved verbatim). */
-  district: string;
-  /** Derived country/region metadata (see src/lib/codeplug/region.ts). */
-  region: RegionInfo;
-  city: string;
-  call: string;
-  channel: string;
-  network: string;
-  network_id: string;
+}
+
+/** RX-frekvens, TX-frekvens, duplex/offset. */
+export interface ChannelFrequency {
+  rx_frequency: number | null;
+  tx_shift_raw: string;
+  tx_shift: number | null;
+  shift_unclear: boolean;
+  duplex: "" | "+" | "-" | "split" | "off";
+  offset: number;
+  /**
+   * Explicit TX-frekvens (channel-pack split-kanaler m.m.). När `null`
+   * härleds TX från `rx_frequency` + `duplex`/`offset` av varje target
+   * som behöver det.
+   */
+  tx_frequency: number | null;
+}
+
+/**
+ * Analog access — CTCSS, DCS, 1750, carrier-open. `access_raw` är råa
+ * fältet från CSV:n. Strukturerade fält är resultatet av `parseAccess()`
+ * filtrerat genom `applyModeAccessSubset()`.
+ */
+export interface ChannelAnalogAccess {
   /**
    * Källfältets råa accessteckenström — kan innehålla både analoga och
    * digitala tokens (t.ex. `110.9 / CC 1`). Använd `ctcss_tx`, `dtcs_code`,
@@ -80,18 +118,23 @@ export interface NormalizedChannel {
    * reparsa detta fält.
    */
   access_raw: string;
-  rx_frequency: number | null;
-  tx_shift_raw: string;
-  tx_shift: number | null;
-  shift_unclear: boolean;
-  duplex: "" | "+" | "-" | "split" | "off";
-  offset: number;
   ctcss_tx: number | null;
   uses_1750: boolean;
   /** True när access innehöll carrier/open/none/ingen/no tone. */
   analog_carrier_open: boolean;
-  // Digital access — strukturerat per mode. Endast satt när mode-klassen
-  // matchar (se accessModes.ts / applyModeAccessSubset).
+  /** Channel-pack tone hint ("TSQL", "Tone", "DTCS", "DCS", ""). */
+  tone_raw: string;
+  rtone_freq: number | null;
+  ctone_freq: number | null;
+  dtcs_code: string;
+  dtcs_polarity: string;
+}
+
+/**
+ * Digital access — strukturerat per mode. Endast satt när mode-klassen
+ * matchar (se accessModes.ts / applyModeAccessSubset).
+ */
+export interface ChannelDigitalAccess {
   dmr_color_code: number | null;
   dmr_timeslot: number | null;
   dmr_talkgroup: string;
@@ -107,18 +150,37 @@ export interface NormalizedChannel {
   digital_access_raw: string;
   /** Diagnostik: tokens som varken analog- eller digital-parsern konsumerade. */
   access_unknown_tokens: string[];
+}
+
+/** Geografi + identitet (band, distrikt, region, ort, anropssignal). */
+export interface ChannelLocation {
+  band: string;
+  /** Raw district value from the CSV (preserved verbatim). */
+  district: string;
+  /** Derived country/region metadata (see src/lib/codeplug/region.ts). */
+  region: RegionInfo;
+  city: string;
+  call: string;
+  channel: string;
+  network: string;
+  network_id: string;
   lat: number | null;
   lng: number | null;
   locator: string;
-  comment: string;
-  // Channel pack fields
+}
+
+/**
+ * Channel-pack-specifika fält. `mode_pack`, `tstep`, `skip_raw` m.fl. är
+ * tomma/null för SK6BA-rader. `tx_allowed` / `rx_only` är pack-bestämda
+ * (defaults `true`/`false` för SK6BA — repeatrar antas alltid TX-bara).
+ */
+export interface ChannelPackMeta {
   pack_id: string;
   service: string;
   category: string;
   tags: string[];
   label: string;
   name_hint: string;
-  tx_frequency: number | null;
   /**
    * Pack row's original mode (NFM/FM/AM/USB/LSB/CW) from the channel-pack
    * CSV's `mode` column. Empty string for SK6BA rows. Consumed by the CHIRP,
@@ -127,11 +189,6 @@ export interface NormalizedChannel {
    */
   mode_pack: string;
   tstep: number | null;
-  tone_raw: string;
-  rtone_freq: number | null;
-  ctone_freq: number | null;
-  dtcs_code: string;
-  dtcs_polarity: string;
   skip_raw: string;
   tx_allowed: boolean;
   rx_only: boolean;
@@ -139,12 +196,33 @@ export interface NormalizedChannel {
   source: string;
   source_url: string;
   inferred_from_range: boolean;
-  // Naming / output
+}
+
+/** Namnbygge-resultat (efter `buildName` + `resolveCollisions`). */
+export interface ChannelNaming {
   generated_name_full: string;
   generated_name_final: string;
   collided: boolean;
-  warnings: Warning[];
 }
+
+/**
+ * Komponerad typ för en kanal genom hela pipelinen. Fälten ligger platt
+ * — `c.rx_frequency` osv. fungerar precis som tidigare. Sub-recorden
+ * existerar för dokumentation och för att helpers/exporters ska kunna
+ * ta in *delar* av en kanal med en smalare typ.
+ */
+export type NormalizedChannel = ChannelSource &
+  ChannelMode &
+  ChannelFrequency &
+  ChannelAnalogAccess &
+  ChannelDigitalAccess &
+  ChannelLocation &
+  ChannelPackMeta &
+  ChannelNaming & {
+    /** Free-text per-row note. Used by both SK6BA and pack rows. */
+    comment: string;
+    warnings: Warning[];
+  };
 
 export interface FilterSettings {
   statuses: string[];

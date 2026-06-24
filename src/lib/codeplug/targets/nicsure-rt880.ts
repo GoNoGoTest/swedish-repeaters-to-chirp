@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { NormalizedChannel, Warning } from "../models";
 import { channelSignalMode } from "../modes";
 import { registerTarget } from "./registry";
+import { deriveTxMhz, formatMhzFixed } from "../exporters/shared/frequency";
+import { truncateName as sharedTruncateName } from "../exporters/shared/name";
 import type { ExportTarget, HardwareLimits } from "./types";
 
 /**
@@ -110,9 +112,7 @@ const EMPTY_SLOT = " ";
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 function truncateName(raw: string, maxLen: number): { name: string; truncated: boolean } {
-  const chars = Array.from(raw);
-  if (chars.length <= maxLen) return { name: raw, truncated: false };
-  return { name: chars.slice(0, maxLen).join(""), truncated: true };
+  return sharedTruncateName(raw, maxLen);
 }
 
 /** Mobile-side TX frequency in MHz, or null. */
@@ -120,17 +120,11 @@ function mobileTxMhz(c: NormalizedChannel): number | null {
   // RX-only channels: TX_Power column carries the "N/T" signal; TX frequency
   // mirrors RX (radio convention — no offset, no zero-frequency placeholder).
   if (c.rx_only || !c.tx_allowed) return c.rx_frequency;
-  if (c.tx_frequency != null) return c.tx_frequency;
-  if (c.rx_frequency == null) return null;
-  if (c.duplex === "+" || c.duplex === "-") {
-    const shift = c.tx_shift != null ? c.tx_shift : c.duplex === "+" ? c.offset : -c.offset;
-    return c.rx_frequency + shift;
-  }
-  return c.rx_frequency;
+  return deriveTxMhz(c);
 }
 
 function formatMhz5(mhz: number | null): string {
-  return (mhz ?? 0).toFixed(5);
+  return formatMhzFixed(mhz ?? 0, 5);
 }
 
 function encodeTone(side: "tx" | "rx", c: NormalizedChannel): string {

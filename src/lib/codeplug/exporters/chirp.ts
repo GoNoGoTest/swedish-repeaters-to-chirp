@@ -1,9 +1,10 @@
-import Papa from "papaparse";
 import type { ChirpSettings, NormalizedChannel, Warning } from "../models";
 import { formatFrequency } from "../frequency";
 
 import { isAnalogToneMode, classifyChannel } from "../accessModes";
 import { parseAccess } from "../tones";
+import { canonicalizeMode, type ModeMap } from "./shared/modeMap";
+import { renderCsv, type RowMapper } from "./shared/rowMapper";
 
 export const CHIRP_COLUMNS = [
   "Location",
@@ -27,7 +28,9 @@ export const CHIRP_COLUMNS = [
   "RPT1CALL",
   "RPT2CALL",
   "DVCODE",
-];
+] as const;
+
+type ChirpColumn = (typeof CHIRP_COLUMNS)[number];
 
 // Technical CSV-import defaults. CHIRP/RMS parse these columns as float/int
 // even when Tone is empty, so the columns must always carry parsable values.
@@ -40,35 +43,27 @@ const DEFAULT_RX_DTCS = "023";
 const DEFAULT_CROSS = "Tone->";
 const DEFAULT_POWER = "10.0W";
 
-// Map canonical signal mode (mode_effective) → CHIRP Generic CSV Mode token.
-// "FM" intentionally returns null to let the caller fall back to settings.mode
-// (NFM vs FM is a per-export user choice for analog).
-// Accepts synonyms that may appear via pack imports: DN, DV, DSTAR/D-STAR,
-// DMRPLUS/DMR+ — so digital channel-pack rows export with the right token.
+/**
+ * Canonical signal mode → CHIRP Generic CSV Mode token.
+ * `null` = analog fallback (caller picks NFM vs FM from settings).
+ * Tetra is intentionally `null`: Generic CSV cannot carry Tetra; we emit
+ * the user's analog default and `chirpDigitalWarnings` does NOT flag it.
+ */
+const CHIRP_MODE_MAP: ModeMap = {
+  FM: null,
+  C4FM: "DN",
+  "D-Star": "DV",
+  DMR: "DMR",
+  DMRplus: "DMR",
+  P25: "P25",
+  Tetra: null,
+  CW: "CW",
+};
+
 function mapEffectiveMode(m: string): string | null {
-  switch (m.trim().toUpperCase()) {
-    case "C4FM":
-    case "DN":
-      return "DN";
-    case "D-STAR":
-    case "DSTAR":
-    case "DV":
-      return "DV";
-    case "DMR":
-    case "DMRPLUS":
-    case "DMR+":
-      return "DMR";
-    case "P25":
-      return "P25";
-    case "CW":
-      return "CW";
-    case "FM":
-      return null; // use analog fallback
-    case "TETRA":
-      return null; // unsupported by Generic CSV → fallback
-    default:
-      return null; // unknown / empty → fallback
-  }
+  const canon = canonicalizeMode(m);
+  if (canon == null) return null;
+  return CHIRP_MODE_MAP[canon] ?? null;
 }
 
 export function resolveChirpMode(c: NormalizedChannel, fallback: string): string {
@@ -241,41 +236,53 @@ function resolveToneFields(c: NormalizedChannel): ToneFields {
   return { ...DEFAULT_TONE_FIELDS };
 }
 
+/**
+ * Per-channel row builder for CHIRP Generic CSV. Used both by `toChirpRows`
+ * (legacy callers that want plain row objects) and `renderCsv` via the
+ * `CHIRP_ROW_MAPPER` below.
+ */
+function buildChirpRow(
+  c: NormalizedChannel,
+  ctx: { index: number; settings: ChirpSettings },
+): Record<ChirpColumn, string> {
+  const s = ctx.settings;
+  const skip = (s.skipLinks && c.type.toLowerCase() === "link") || c.skip_raw === "S" ? "S" : "";
+  const { duplex, offset } = resolveDuplexAndOffset(c);
+  const tone = resolveToneFields(c);
+  return {
+    Location: String(s.startLocation + ctx.index),
+    Name: c.generated_name_final,
+    Frequency: c.rx_frequency != null ? formatFrequency(c.rx_frequency) : "",
+    Duplex: duplex,
+    Offset: offset,
+    Tone: tone.Tone,
+    rToneFreq: tone.rToneFreq,
+    cToneFreq: tone.cToneFreq,
+    DtcsCode: tone.DtcsCode,
+    DtcsPolarity: tone.DtcsPolarity,
+    RxDtcsCode: tone.RxDtcsCode,
+    CrossMode: tone.CrossMode,
+    Mode: resolveChirpMode(c, s.mode),
+    TStep: resolveTStep(c, s.tStep).toFixed(2),
+    Skip: skip,
+    Power: DEFAULT_POWER,
+    Comment: resolveComment(c),
+    URCALL: "",
+    RPT1CALL: "",
+    RPT2CALL: "",
+    DVCODE: "",
+  };
+}
+
+export const CHIRP_ROW_MAPPER: RowMapper<ChirpSettings, ChirpColumn> = {
+  columns: CHIRP_COLUMNS,
+  toRow: buildChirpRow,
+};
+
 export function toChirpRows(channels: NormalizedChannel[], s: ChirpSettings) {
-  return channels.map((c, i) => {
-    const skip = (s.skipLinks && c.type.toLowerCase() === "link") || c.skip_raw === "S" ? "S" : "";
-    const { duplex, offset } = resolveDuplexAndOffset(c);
-    const tone = resolveToneFields(c);
-    return {
-      Location: String(s.startLocation + i),
-      Name: c.generated_name_final,
-      Frequency: c.rx_frequency != null ? formatFrequency(c.rx_frequency) : "",
-      Duplex: duplex,
-      Offset: offset,
-      Tone: tone.Tone,
-      rToneFreq: tone.rToneFreq,
-      cToneFreq: tone.cToneFreq,
-      DtcsCode: tone.DtcsCode,
-      DtcsPolarity: tone.DtcsPolarity,
-      RxDtcsCode: tone.RxDtcsCode,
-      CrossMode: tone.CrossMode,
-      Mode: resolveChirpMode(c, s.mode),
-      TStep: resolveTStep(c, s.tStep).toFixed(2),
-      Skip: skip,
-      Power: DEFAULT_POWER,
-      Comment: resolveComment(c),
-      URCALL: "",
-      RPT1CALL: "",
-      RPT2CALL: "",
-      DVCODE: "",
-    };
-  });
+  return channels.map((c, index) => buildChirpRow(c, { index, settings: s }));
 }
 
 export function exportChirpCsv(channels: NormalizedChannel[], s: ChirpSettings): string {
-  const rows = toChirpRows(channels, s);
-  return Papa.unparse({
-    fields: CHIRP_COLUMNS,
-    data: rows.map((r) => CHIRP_COLUMNS.map((c) => (r as Record<string, unknown>)[c])),
-  });
+  return renderCsv(channels, CHIRP_ROW_MAPPER, s);
 }
