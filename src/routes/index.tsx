@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ChirpSettings, NormalizedChannel, Warning } from "@/lib/codeplug/models";
-import { assertNever } from "@/lib/codeplug/assertNever";
-import { requireTarget, resolveTargetSettings } from "@/lib/codeplug/targets";
+import type { NormalizedChannel } from "@/lib/codeplug/models";
+import { useActiveExportTarget } from "@/hooks/useActiveExportTarget";
 import { loadSk6baCsv, type Sk6baLoadState } from "@/lib/codeplug/importers/sk6ba";
 import { useCodeplugSettings } from "@/hooks/useCodeplugSettings";
 import { useSavedSk6baExports } from "@/hooks/useSavedSk6baExports";
@@ -71,49 +70,21 @@ function Index() {
   }, []);
   const resetExcluded = useCallback(() => setExcludedKeys(new Set()), []);
 
-  // Active export target — discriminated union (AnyExportTarget) keyed on `id`.
-  // Narrow with `target.id === "chirp-generic" | "vgc-n76"` to access settings
-  // safely; no `as` casts needed at call sites.
-  const target = useMemo(() => requireTarget(settings.export.targetId), [settings.export.targetId]);
-  const storedPatch = settings.export.perTarget[settings.export.targetId] as
-    | Record<string, unknown>
-    | undefined;
-  // Per-target resolved settings (defaults merged with user patch). Each
-  // branch narrows `target` to its concrete variant so the settings type is
-  // exact — no `as unknown as XSettings` cast.
-  const chirpSettings: ChirpSettings =
-    target.id === "chirp-generic"
-      ? resolveTargetSettings(target, storedPatch)
-      : { startLocation: 1, mode: "NFM", tStep: 5.0, skipLinks: false, maxLength: 6 };
-  // Persisted patch is opaque outside this file; pass through to ExportPanel,
-  // which narrows again on `target.id` before handing to per-target sub-panels.
+  // Alla target-relaterade deriveringar (target, settings, maxNameLength,
+  // previewMode, validate, RX-only-policy-stöd) lever i `useActiveExportTarget`.
+  // Route-komponenten orkestrerar bara UI-state och rendering.
+  const {
+    target,
+    storedPatch,
+    maxNameLength,
+    previewMode,
+    validate: targetValidate,
+    previewStartLocation,
+    supportsRxOnlyPolicy,
+    chirpSettings,
+  } = useActiveExportTarget(settings);
+  // Opaque patch som skickas vidare till ExportPanel (panelen narrowar själv).
   const targetSettings: Record<string, unknown> = (storedPatch ?? {}) as Record<string, unknown>;
-  const maxNameLength = (() => {
-    switch (target.id) {
-      case "chirp-generic":
-        return (
-          target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ??
-          target.limits.maxNameLength
-        );
-      case "vgc-n76":
-        return (
-          target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ??
-          target.limits.maxNameLength
-        );
-      case "nicsure-rt880":
-        return (
-          target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ??
-          target.limits.maxNameLength
-        );
-      case "rt-systems-yaesu-generic":
-        return (
-          target.resolveMaxNameLength?.(resolveTargetSettings(target, storedPatch)) ??
-          target.limits.maxNameLength
-        );
-      default:
-        return assertNever(target);
-    }
-  })();
 
   const setTargetSettings = useCallback(
     (patch: Record<string, unknown>) => {
@@ -140,8 +111,7 @@ function Index() {
   // endast policyn när den är ogiltig — användarens egna val (mark/skip) på
   // RT-systems lämnas orört.
   useEffect(() => {
-    const isRtSystems = settings.export.targetId === "rt-systems-yaesu-generic";
-    if (isRtSystems && settings.packs.rxOnlyPolicy === "block_tx") {
+    if (!supportsRxOnlyPolicy(settings.packs.rxOnlyPolicy)) {
       setSettings((prev) => ({ ...prev, packs: { ...prev.packs, rxOnlyPolicy: "skip" } }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -169,43 +139,18 @@ function Index() {
   // ev. filtrerade tabellvyn. Räkna positioner från hela exportordningen
   // (pipeline.channels minus exkluderade) och slå upp per channelKey.
   const locationByKey = useMemo(() => {
-    const start = target.id === "chirp-generic" ? chirpSettings.startLocation : 1;
     const map = new Map<string, number>();
     if (!pipeline) return map;
-    let loc = start;
+    let loc = previewStartLocation;
     for (const c of pipeline.channels) {
       const key = channelKey(c);
       if (excludedKeys.has(key)) continue;
       map.set(key, loc++);
     }
     return map;
-  }, [pipeline, excludedKeys, target.id, chirpSettings.startLocation]);
+  }, [pipeline, excludedKeys, previewStartLocation]);
 
-  // Bygg en target-specifik previewMode-callback. Switchen narrowar
-  // `target` så att settings-typen blir exakt; assertNever tvingar fram
-  // uppdatering om ett nytt target läggs till.
-  const getExportMode = useMemo(() => {
-    switch (target.id) {
-      case "chirp-generic": {
-        const s = resolveTargetSettings(target, storedPatch);
-        return (c: NormalizedChannel) => target.previewMode?.(c, s) ?? "—";
-      }
-      case "vgc-n76": {
-        const s = resolveTargetSettings(target, storedPatch);
-        return (c: NormalizedChannel) => target.previewMode?.(c, s) ?? "—";
-      }
-      case "nicsure-rt880": {
-        const s = resolveTargetSettings(target, storedPatch);
-        return (c: NormalizedChannel) => target.previewMode?.(c, s) ?? "—";
-      }
-      case "rt-systems-yaesu-generic": {
-        const s = resolveTargetSettings(target, storedPatch);
-        return (c: NormalizedChannel) => target.previewMode?.(c, s) ?? "—";
-      }
-      default:
-        return assertNever(target);
-    }
-  }, [target, storedPatch]);
+  const getExportMode = previewMode;
 
   const stats = useMemo(() => {
     if (!pipeline) return null;
@@ -544,37 +489,8 @@ function Index() {
                     </div>
                   )}
                   {(() => {
-                    // Narrow on `target.id` so validate() gets its exact settings type.
-                    let tw: Warning[] | undefined;
-                    switch (target.id) {
-                      case "chirp-generic":
-                        tw = target.validate?.(
-                          exportChannels,
-                          resolveTargetSettings(target, storedPatch),
-                        );
-                        break;
-                      case "vgc-n76":
-                        tw = target.validate?.(
-                          exportChannels,
-                          resolveTargetSettings(target, storedPatch),
-                        );
-                        break;
-                      case "nicsure-rt880":
-                        tw = target.validate?.(
-                          exportChannels,
-                          resolveTargetSettings(target, storedPatch),
-                        );
-                        break;
-                      case "rt-systems-yaesu-generic":
-                        tw = target.validate?.(
-                          exportChannels,
-                          resolveTargetSettings(target, storedPatch),
-                        );
-                        break;
-                      default:
-                        assertNever(target);
-                    }
-                    if (!tw || tw.length === 0) return null;
+                    const tw = targetValidate(exportChannels);
+                    if (tw.length === 0) return null;
                     return (
                       <ul className="mb-3 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200 space-y-1">
                         {tw.map((w, i) => (

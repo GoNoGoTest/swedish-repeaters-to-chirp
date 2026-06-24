@@ -1,136 +1,101 @@
 ## Mål
 
-Sänk kostnaden för att lägga till nya exportmål (närmast Icom IC-705) genom att lyfta upp återkommande mönster i en delad exporter-runtime. Pipeline, importers och själva fil-/CSV-utgången från befintliga targets ska vara bit-identiska efter refaktorn.
+Extrahera target-relaterade deriveringar från `src/routes/index.tsx` till en återanvändbar hook så att route-komponenten orkestrerar UI-state — inte target-specifika switch-satser.
 
-Eftersom IC-705-CSV-formatet inte är fastställt än är målet att en framtida IC-705-target ska kunna byggas som **en fil**: en kolumn-tabell + en mode-map + ett par overrides. Ingen ny logik för parsning, varningar, splittning eller naming.
+## Problembild i nuvarande `routes/index.tsx`
 
-## Leveranser
+Fyra närmast identiska `switch (target.id)`-block existerar enbart för TypeScript-narrowing:
 
-Tre patches, sekventiella, var och en grön på `bun run verify` innan nästa.
+1. `maxNameLength` (rad 91–116) — varje case anropar samma `resolveMaxNameLength?.() ?? limits.maxNameLength`.
+2. `getExportMode` (rad 187–208) — varje case bygger samma `(c) => target.previewMode?.(c, s) ?? "—"`.
+3. target-`validate(...)` i JSX (rad 546–576) — varje case anropar samma `validate?.(channels, s)`.
+4. Spridd target-specifik logik: `chirpSettings`-derivering (rad 84–87) och `startLocation`-läsning i `locationByKey` (rad 172).
 
-### Patch 1 — Deltyper + delade formatters (icke-funktionell)
+Plus en target-koppling i `useEffect` (rad 142–148): RT-Systems stödjer inte `block_tx` som RX-only-policy.
 
-Inför namngivna sub-records i `models.ts` och komponera dem in i `NormalizedChannel` så publik typ förblir bakåtkompatibel:
+## Ny hook: `useActiveExportTarget`
 
-```text
-NormalizedChannel = ChannelSource
-                  & ChannelMode
-                  & ChannelFrequency
-                  & ChannelAnalogAccess
-                  & ChannelDigitalAccess
-                  & ChannelLocation
-                  & ChannelPackMeta
-                  & ChannelNaming
-                  & { warnings: Warning[] }
-```
+Plats: `src/hooks/useActiveExportTarget.ts`
 
-Snittpunkter låses så vi slipper bikeshedding senare:
-
-- `is_analog_fm` → `ChannelMode` (härlett från mode, inte access).
-- `mode_pack` → `ChannelPackMeta` (men exporters får läsa det parallellt med `mode_effective` — ingen ändring).
-- `tx_allowed` / `rx_only` → `ChannelPackMeta` (de existerar bara i pack-kontexten i praktiken; för SK6BA-rader är default `true/false`).
-- `warnings` lämnas på toppen — det är tvärsnitt.
-
-Skapa nya delade formatters i `src/lib/codeplug/exporters/shared/`:
-
-- `formatFrequencyMHz(hz)` — befintlig logik centraliserad.
-- `formatDuplexOffset(freq: ChannelFrequency, opts)` — gemensam, varje target väljer hur `"split"`-degradering ska se ut.
-- `formatAnalogTone(access: ChannelAnalogAccess)` → `{ tone, rtone, ctone, dtcs, polarity }`.
-- `formatDigitalAccess(mode: ChannelMode, dig: ChannelDigitalAccess)` → mode-aware text.
-
-Existerande exporters (chirp.ts, vgc-n76.ts, nicsure-rt880.ts, rt-systems-yaesu.ts) plus exporters/chirp.ts uppdateras att **konsumera** dessa formatters där de redan gör exakt detta — men endast där bytet är 1:1. Allt annat lämnas orört. Snapshot-testerna är ekvivalenslås.
-
-Acceptans: identiska snapshot-utdata, inga `as`-cast, inga ändringar i `pipeline.ts` / `importers/`.
-
-### Patch 2 — Mode-map-modul + RowMapper-kontrakt
-
-**Mode-map-modul** `src/lib/codeplug/exporters/shared/modeMap.ts`:
+Signatur:
 
 ```ts
-type ModeMap = Partial<Record<KnownMode, string | null>>;
-function resolveTargetMode(c: ChannelMode, map: ModeMap, fallback?: string): string | null;
+function useActiveExportTarget(settings: Settings): {
+  target: AnyExportTarget;
+  storedPatch: Record<string, unknown> | undefined;
+  resolvedSettings: TargetSettingsMap[TargetId]; // narrowed per target internt
+  maxNameLength: number;
+  previewMode: (c: NormalizedChannel) => string;
+  validate: (channels: NormalizedChannel[]) => Warning[];
+  previewStartLocation: number; // chirp: startLocation, övriga: 1
+  supportsRxOnlyPolicy: (p: RxOnlyPolicy) => boolean;
+};
 ```
 
-Varje target deklarerar bara sin tabell. `mapEffectiveMode` i chirp/vgc/nicsure/rt-yaesu byts mot `resolveTargetMode(c, CHIRP_MODE_MAP)` etc. `null` = unsupported (befintlig semantik).
+### Implementation
 
-**RowMapper-kontrakt** `src/lib/codeplug/exporters/shared/rowMapper.ts`:
+En enda intern `switch (target.id)` med `assertNever`-default narrowas target + settings korrekt, sedan exponeras färdiga värden/closures. Inga `as`-casts.
 
 ```ts
-interface RowMapper<TSettings, TCols extends string> {
-  columns: readonly TCols[];
-  toRow(c: NormalizedChannel, ctx: { index: number; settings: TSettings }): Record<TCols, string>;
+switch (target.id) {
+  case "chirp-generic": {
+    const s = resolveTargetSettings(target, storedPatch);
+    return buildBundle(target, s, /* previewStart */ s.startLocation);
+  }
+  case "vgc-n76": { const s = resolveTargetSettings(target, storedPatch); return buildBundle(target, s, 1); }
+  case "nicsure-rt880": { ... }
+  case "rt-systems-yaesu-generic": { ... }
+  default: return assertNever(target);
 }
-function renderCsv<T, C extends string>(channels, mapper, settings, opts?): string;
 ```
 
-`renderCsv` äger CSV-escape, BOM, radslut, header. Bytena ska vara _byte-för-byte_ identiska med befintlig export — verifieras genom att snapshot-testerna inte ändras.
+`buildBundle` är en intern generic-helper `<T>(target: ExportTarget<T>, s: T, startLoc: number)` som returnerar bundle-objektet — narrowingen sker en gång i switchen, inte fyra.
 
-Konvertera chirp-generic först (enklast, har redan tydlig kolumn-lista). Sedan vgc-n76, nicsure-rt880, rt-systems-yaesu en i taget; om någons CSV-utgång inte är ren tabell-mapping (t.ex. VGC's grupp-/APRS-injektion) behåller den sin nuvarande renderare och tar bara `RowMapper` för själva radmappningen — splittning/insättning sker fortsatt i target-koden.
+`supportsRxOnlyPolicy` flyttar RT-Systems-undantaget från `useEffect` in i hooken (en table: `{ "rt-systems-yaesu-generic": p => p !== "block_tx" }`, default `() => true`).
 
-Acceptans: alla snapshots oförändrade. Targets blir tydligt kortare; ny target kan skrivas mot kontraktet.
+`chirpSettings` försvinner som top-level-derivering i route. Komponenter som idag tar `chirpSettings` (ExportPanel?) får antingen `resolvedSettings` typed via en separat narrowed-accessor eller fortsätter ta `targetSettings: Record<string, unknown>` som idag.
 
-### Patch 3 — Test-fixture-builder + `defineTarget()`-helper
+### Memoisering
 
-**Fixture-builder** `src/lib/codeplug/__tests__/helpers/makeChannel.ts`:
+Hela bundle:n memoas på `[target, storedPatch]`. `previewMode` och `validate` är stabila inom samma bundle.
 
-```ts
-function makeChannel(overrides?: DeepPartial<NormalizedChannel>): NormalizedChannel;
-function makeAnalogRepeater(overrides?: ...): NormalizedChannel;
-function makeC4fmRepeater(...): NormalizedChannel;
-function makePackChannel(...): NormalizedChannel;
-```
+## Ändringar i `src/routes/index.tsx`
 
-Defaults fyller ALLA fält (klassificerade per deltyp så det är lätt att se vad som saknas vid framtida fältutökning). Befintliga test-helpers (`helpers.ts`) får interna omskrivningar att delegera till `makeChannel`, men deras publika API ändras inte — undviker dominoeffekt i ~30 testfiler.
+- Ersätt rad 77–116 och 187–208 med `const { target, maxNameLength, previewMode, validate, previewStartLocation, supportsRxOnlyPolicy } = useActiveExportTarget(settings);`
+- `locationByKey` läser `previewStartLocation` istället för att switcha på `target.id`.
+- JSX-blocket rad 546–576 blir `const tw = validate(exportChannels);`
+- `useEffect` rad 142–148 blir `if (!supportsRxOnlyPolicy(settings.packs.rxOnlyPolicy)) { ...skip... }` — fortfarande generiskt, ingen target-namn i route.
+- `chirpSettings`-variabeln tas bort från route; `ExportPanel` får fortsatt `targetSettings` (opaque patch) som idag.
 
-**`defineTarget()`-helper** `src/lib/codeplug/targets/defineTarget.ts`:
+Inga ändringar i:
 
-```ts
-function defineTarget<TSettings, TCols extends string>(spec: {
-  id;
-  label;
-  vendor;
-  fileExtension;
-  filenameBase?;
-  limits;
-  defaults;
-  settingsSchema;
-  modeMap;
-  mapper: RowMapper<TSettings, TCols>;
-  validate?;
-  resolveMaxNameLength?;
-  previewMode?;
-  supportsSplit?: boolean; // → standardiserad exportMany via buildSplitFiles
-}): ExportTarget<TSettings>;
-```
+- target-modulerna (`chirp-generic.ts`, `vgc-n76.ts`, ...)
+- `registry.ts` / `types.ts`
+- pipeline, importers, exporters, models
 
-Detta är "klistret" — när tabell + map + defaults är skrivna behöver en ny target inte deklarera `export` och `exportMany` själv. chirp-generic konverteras som referens-implementation; övriga targets lämnas oförändrade men kan migreras opportunistiskt senare. Skapar inga regressionsrisker för icke-migrerade targets.
+## Tester
 
-Acceptans: snapshots oförändrade; chirp-generic.ts blir tydligt kortare; ny target = en fil ≈ 80–120 rader.
+- Ny `src/hooks/__tests__/useActiveExportTarget.test.tsx` med en case per target:
+  - Verifierar `maxNameLength`, `previewMode(c)`, `validate(channels)`, `previewStartLocation` matchar direkta anrop mot target API:t.
+  - Verifierar `supportsRxOnlyPolicy("block_tx")` är `false` enbart för RT-Systems.
+- Befintliga tester (`PreviewTable`, snapshots, target-tester) ska passera oförändrade — hooken är ren refactor av routes/index.tsx.
 
-## IC-705-readiness
+## Acceptanskriterier
 
-När CSV-spec landar är arbetet:
+- Inga `switch (target.id)`-block kvar i `routes/index.tsx`.
+- `useActiveExportTarget` är enda stället där target-narrowing sker för dessa deriveringar.
+- Inga `as any` / `as unknown as`-casts införs.
+- `bun run verify` passerar.
+- Manuell preview: byt mellan alla fyra targets → samma `maxNameLength`, preview-mode-kolumn, target-warnings, och Loc-numrering som före.
 
-1. Skapa `icom-ic705.ts`: `MODE_MAP` (FM/NFM/AM/USB/LSB/CW/DV), kolumn-tabell, defaults + schema, `defineTarget(...)`, `registerTarget(...)`.
-2. Lägga till `"icom-ic705": IcomIc705Settings` i `TargetSettingsMap`.
-3. Snapshot-test mot referens-CSV när sådan finns.
+## Utanför scope
 
-Inga ändringar i pipeline, models eller importers krävs.
+- Att splittra `NormalizedChannel`/models vidare.
+- Att flytta `ExportPanel`s egna `target.id`-narrowing (panelens sub-panel-routing är en separat refactor).
+- IC-705 eller nya targets.
+- Ändringar i pipeline/importers/exporters.
 
-## Risker & motåtgärder
+## Risker
 
-- **Snapshot-drift av misstag**: varje patch körs mot fullt snapshot-suite innan merge. Om en snapshot ändras är det en regression, inte en accepterad uppdatering.
-- **Subtila typincompabiliteter vid composition (`&`)**: vi undviker `Pick<>`-baserade subtyper i deltyperna; allt är platta `interface` som lyfts ut. Ingen användning av `as`.
-- **Test-helpers breddningar**: behåll befintliga publika helper-signaturer; `makeChannel` är _adderande_.
-- **Targets som inte är ren tabell-mapping (VGC APRS-slot, NiCSURE-zoner)**: dessa migreras till RowMapper _endast_ för radmappningen; specialinjektion ligger kvar i target-koden. Inget tvång att passa allt genom `defineTarget`.
-
-## Inte i scope
-
-- Refaktor av `pipeline.ts`, importers, varningsmodellen, naming, sorting, packregistret.
-- Förändringar av faktisk CSV-utgång för existerande targets.
-- Implementation av IC-705-targeten (separat patch när CSV-format finns).
-- Refactor av VGC/NiCSURE specialfall (grupp-32, zon-pool) utöver att de börjar använda RowMapper för radnivå.
-
-## Verifiering per patch
-
-`bun run verify`. Specifikt: snapshot-tester under `targets/__snapshots__/` måste vara oförändrade efter patch 1 och 2. Efter patch 3 får endast chirp-generic-relaterade test-implementationer (inte snapshots) ha ändrats.
+- `ExportPanel` förväntar sig kanske `chirpSettings` som prop idag — om så är fallet ersätts den i samma patch med `targetSettings`-patchen den redan får (kontrolleras vid implementation; om props-formen är annan, byggs en tunn adapter i route utan target-switch).
+- `useEffect`-omskrivningen får inte trigga sig själv i loop — `supportsRxOnlyPolicy` läses som funktion, `useEffect`-deps förblir `[settings.export.targetId]`.
