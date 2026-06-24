@@ -178,8 +178,10 @@ export function summarize(rows: RawRow[], columns: string[]): Summary {
     }
     if (parseNumberLoose(r.output) == null) missingOutput++;
     if (parseNumberLoose(r.lat) == null || parseNumberLoose(r.lng) == null) missingCoords++;
-    const shiftRaw = (r.tx_shift ?? "").toString().trim();
-    if (!shiftRaw || (parseNumberLoose(shiftRaw) == null && shiftRaw.toLowerCase() !== "simplex")) {
+    // Använd samma parseShift som pipeline för att räkna unclear.
+    // Tom sträng / "simplex" / "Duplex N" tolkas korrekt och räknas inte
+    // som unclear.
+    if (parseShift(r.tx_shift).unclear) {
       unclearShift++;
     }
     const access = (r.access ?? "").toString();
