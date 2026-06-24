@@ -44,7 +44,7 @@ const CHIRP_GENERIC_LIMITS: HardwareLimits = {
   ],
   // CHIRP-CSV is permissive: analog modes export cleanly; digital modes
   // pass through as Mode=DN/DV/DMR/P25 with a non-blocking warning.
-  supportedSignalModes: ["FM", "C4FM", "D-Star", "DMR", "DMRplus", "P25", "Tetra", "CW"],
+  supportedSignalModes: ["FM", "C4FM", "D-Star", "DMR", "DMRplus", "P25", "CW"],
   supportsSplit: true,
   supportsCtcss: true,
   supportsDcs: true,
